@@ -121,30 +121,13 @@ The Inspector provides a graphical interface for:
 
 ## Available Tools
 
-### Authentication Tools
+### OAuth2 Callback
 
-- Tool: `start_auth`
-- Description: Starts the authentication process with automatic browser handling
+- Tool: `oauth2callback`
+- Description: Handles the OAuth 2.0 callback from Google
 - Parameters:
-  - `user_id`: Email address of the user
-
-- Tool: `auth_status`
-- Description: Checks the status of an authentication process
-- Parameters:
-  - `user_id`: Email address of the user
-
-- Tool: `complete_auth`
-- Description: Completes the authentication process with a manual code
-- Parameters:
-  - `user_id`: Email address of the user
-  - `authorization_code`: The code received from Google
-
-- Tool: `oauth2callback` (Advanced)
-- Description: Low-level callback handler for OAuth 2.0 redirects
-- Parameters:
-  - `code`: Authorization code from Google
-  - `state`: State parameter for security verification
-  - `redirect_uri`: Custom redirect URI (optional)
+  - `code`: The authorization code from Google
+  - `state`: Optional state parameter
 
 ### Calendar Tools
 
@@ -162,44 +145,13 @@ The Inspector provides a graphical interface for:
 
 ## Authentication
 
-This server uses OAuth 2.0 for authentication with Google APIs. There are two ways to authenticate:
-
-### Method 1: Automatic Browser-based Authentication (Recommended)
-
-1. Use the `start_auth` tool:
-   ```
-   start_auth
-   user_id: your.email@gmail.com
-   ```
-2. A browser window will open automatically to the Google authorization page
-3. After authorizing, you'll be redirected to a success page
-4. Check authentication status if needed:
-   ```
-   auth_status
-   user_id: your.email@gmail.com
-   ```
-
-### Method 2: Manual Code Entry
-
-For cases where automatic authentication doesn't work:
-
-1. Use any calendar tool which will prompt for authentication
-2. Open the authentication URL in your browser
-3. After authorizing, extract the `code` parameter from the redirect URL
-4. Complete authentication with:
-   ```
-   complete_auth
-   user_id: your.email@gmail.com
-   authorization_code: [PASTE CODE HERE]
-   ```
-
-Behind the scenes, the authentication flow works as follows:
+This server uses OAuth 2.0 for authentication with Google APIs. The authentication flow works as follows:
 
 1. The client requests an action that requires authentication
 2. The server returns an authentication URL
-3. The user authorizes access at this URL
-4. Google redirects back with an authorization code
-5. The code is exchanged for access and refresh tokens
+3. The user is directed to this URL to grant permissions
+4. Google redirects back to the server's callback endpoint
+5. The server exchanges the authorization code for credentials
 6. The server stores these credentials for future requests
 
 ## Examples

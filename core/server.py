@@ -22,12 +22,8 @@ from gcalendar.calendar_tools import *
 
 # Define OAuth callback as a tool
 @server.tool("oauth2callback")
-async def oauth2callback(code: str = None, state: str = None, redirect_uri: str = "http://localhost:8080/callback"):
-    """
-    Handle OAuth2 callback from Google - for integration with external servers.
-    
-    Most users should use the complete_auth tool instead.
-    """
+async def oauth2callback(code: str = None, state: str = None):
+    """Handle OAuth2 callback from Google"""
     if not code:
         logger.error("Authorization code not found in callback request.")
         return {
@@ -38,23 +34,17 @@ async def oauth2callback(code: str = None, state: str = None, redirect_uri: str 
     try:
         client_secrets_path = os.path.join(os.path.dirname(__file__), '..', 'client_secret.json')
         
-        # Construct full authorization response URL
-        full_callback_url = f"{redirect_uri}?code={code}"
-        if state:
-            full_callback_url += f"&state={state}"
-            
         # Exchange code for credentials
         user_id, credentials = handle_auth_callback(
             client_secrets_path=client_secrets_path,
             scopes=SCOPES,
-            authorization_response=full_callback_url,
-            redirect_uri=redirect_uri
+            authorization_response=code  # Pass the code directly
         )
         
         logger.info(f"Successfully exchanged code for credentials for user: {user_id}")
         return {
             "success": True,
-            "message": f"Authentication successful for user: {user_id}"
+            "message": "Authentication successful"
         }
     except RefreshError as e:
         logger.error(f"Failed to exchange authorization code for tokens: {e}", exc_info=True)

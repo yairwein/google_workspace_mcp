@@ -7,8 +7,7 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-from auth.google_auth import get_credentials, start_auth_flow, handle_auth_callback
-from auth.oauth_manager import start_oauth_flow, check_auth_status, stop_oauth_flow
+from auth.google_auth import get_credentials, start_auth_flow
 from core.server import server  # Import the MCP server instance
 
 # Define Google Calendar API Scopes
@@ -19,98 +18,7 @@ CALENDAR_EVENTS_SCOPE = "https://www.googleapis.com/auth/calendar.events"
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# --- Tool Implementations ---
-
-@server.tool()
-async def start_auth(user_id: str) -> str:
-    """
-    Start the Google OAuth authentication process with automatic callback handling.
-    
-    This tool provides a smoother authentication experience by automatically
-    opening a browser window and handling the callback process.
-    
-    Args:
-        user_id: The unique identifier (e.g., email address) for the user.
-        
-    Returns:
-        Instructions for completing the authentication.
-    """
-    logger.info(f"Starting OAuth authentication flow for user: {user_id}")
-    
-    # Use the Calendar readonly scope by default
-    scopes = [CALENDAR_READONLY_SCOPE]
-    
-    try:
-        # Start the OAuth flow with automatic callback handling
-        result = start_oauth_flow(user_id, scopes)
-        return result
-    except Exception as e:
-        logger.error(f"Error starting authentication flow: {e}")
-        return f"Failed to start authentication: {e}"
-
-@server.tool()
-async def auth_status(user_id: str) -> str:
-    """
-    Check the status of an ongoing authentication process.
-    
-    Args:
-        user_id: The unique identifier (e.g., email address) for the user.
-        
-    Returns:
-        A status message about the authentication process.
-    """
-    logger.info(f"Checking authentication status for user: {user_id}")
-    
-    try:
-        # Check current status
-        result = check_auth_status(user_id)
-        return result
-    except Exception as e:
-        logger.error(f"Error checking authentication status: {e}")
-        return f"Failed to check authentication status: {e}"
-
-@server.tool()
-async def complete_auth(user_id: str, authorization_code: str) -> str:
-    """
-    Completes the OAuth flow by exchanging the authorization code for credentials.
-    
-    Args:
-        user_id: The unique identifier (e.g., email address) for the user.
-        authorization_code: The authorization code received from Google OAuth.
-        
-    Returns:
-        A string indicating success or failure.
-    """
-    logger.info(f"Attempting to complete authentication for user: {user_id}")
-    
-    try:
-        # Get the scopes used during the initial auth request
-        scopes = [CALENDAR_READONLY_SCOPE]  # Default to readonly scope
-        
-        # Construct the full callback URL
-        redirect_uri = "http://localhost:8080/callback"
-        full_callback_url = f"{redirect_uri}?code={authorization_code}"
-        
-        # Use handle_auth_callback to exchange the code for credentials
-        user_email, credentials = handle_auth_callback(
-            client_secrets_path='client_secret.json',
-            scopes=scopes,
-            authorization_response=full_callback_url,
-            redirect_uri=redirect_uri
-        )
-        
-        # Verify the user_id matches the authenticated email
-        if user_email.lower() != user_id.lower():
-            logger.warning(f"User ID mismatch: provided {user_id}, authenticated as {user_email}")
-            return (f"Warning: You authenticated as {user_email}, but requested credentials for {user_id}. "
-                   f"Using authenticated email {user_email} for credentials.")
-        
-        logger.info(f"Successfully completed authentication for user: {user_email}")
-        return f"Authentication successful! You can now use the Google Calendar tools with user: {user_email}"
-    
-    except Exception as e:
-        logger.error(f"Error completing authentication: {e}", exc_info=True)
-        return f"Failed to complete authentication: {e}"
+# --- Tool Implementations will go here ---
 @server.tool()
 async def list_calendars(user_id: str) -> str:
     """
@@ -124,23 +32,16 @@ async def list_calendars(user_id: str) -> str:
     """
     logger.info(f"Attempting to list calendars for user: {user_id}")
     scopes = [CALENDAR_READONLY_SCOPE]
-    logger.debug(f"Calling get_credentials with user_id: {user_id}, scopes: {scopes}")
-    try:
-        credentials = get_credentials(user_id, scopes, client_secrets_path='client_secret.json')
-        logger.debug(f"get_credentials returned: {credentials}")
-    except Exception as e:
-        logger.error(f"Error getting credentials: {e}")
-        return f"Failed to get credentials: {e}"
+    credentials = await get_credentials(user_id, scopes)
 
     if not credentials or not credentials.valid:
         logger.warning(f"Missing or invalid credentials for user: {user_id}")
-        try:
-            # Use the automatic flow for better user experience
-            result = start_oauth_flow(user_id, scopes)
-            return result
-        except Exception as e:
-            logger.error(f"Failed to start auth flow: {e}")
-            return f"Failed to start authentication flow: {e}"
+        auth_url = await start_auth_flow(user_id, scopes)
+        return (
+            "Authentication required. Please visit this URL to authorize access: "
+            f"{auth_url}\nThen, provide the authorization code using the "
+            "'complete_auth' tool (implementation pending)."
+        )
 
     try:
         service = build('calendar', 'v3', credentials=credentials)
@@ -191,22 +92,16 @@ async def get_events(
     """
     logger.info(f"Attempting to get events for user: {user_id}, calendar: {calendar_id}")
     scopes = [CALENDAR_READONLY_SCOPE]
-    try:
-        credentials = get_credentials(user_id, scopes, client_secrets_path='client_secret.json')
-        logger.debug(f"get_credentials returned: {credentials}")
+    credentials = await get_credentials(user_id, scopes)
 
-        if not credentials or not credentials.valid:
-            logger.warning(f"Missing or invalid credentials for user: {user_id}")
-            try:
-                # Use the automatic flow for better user experience
-                result = start_oauth_flow(user_id, scopes)
-                return result
-            except Exception as e:
-                logger.error(f"Failed to start auth flow: {e}")
-                return f"Failed to start authentication flow: {e}"
-    except Exception as e:
-        logger.error(f"Error getting credentials: {e}")
-        return f"Failed to get credentials: {e}"
+    if not credentials or not credentials.valid:
+        logger.warning(f"Missing or invalid credentials for user: {user_id}")
+        auth_url = await start_auth_flow(user_id, scopes)
+        return (
+            "Authentication required. Please visit this URL to authorize access: "
+            f"{auth_url}\nThen, provide the authorization code using the "
+            "'complete_auth' tool (implementation pending)."
+        )
 
     try:
         service = build('calendar', 'v3', credentials=credentials)
@@ -288,23 +183,17 @@ async def create_event(
     logger.info(f"Attempting to create event for user: {user_id}, calendar: {calendar_id}")
     # Request write scope for creating events
     scopes = [CALENDAR_EVENTS_SCOPE]
-    try:
-        credentials = get_credentials(user_id, scopes, client_secrets_path='client_secret.json')
-        logger.debug(f"get_credentials returned: {credentials}")
+    credentials = await get_credentials(user_id, scopes)
 
-        if not credentials or not credentials.valid:
-            logger.warning(f"Missing or invalid credentials for user: {user_id} (write access needed)")
-            try:
-                # Use the automatic flow for better user experience
-                # For event creation, we need write permissions
-                result = start_oauth_flow(user_id, scopes)  # scopes already includes CALENDAR_EVENTS_SCOPE
-                return result
-            except Exception as e:
-                logger.error(f"Failed to start auth flow: {e}")
-                return f"Failed to start authentication flow: {e}"
-    except Exception as e:
-        logger.error(f"Error getting credentials: {e}")
-        return f"Failed to get credentials: {e}"
+    if not credentials or not credentials.valid:
+        logger.warning(f"Missing or invalid credentials for user: {user_id} (write access needed)")
+        # Request the necessary write scope during auth flow
+        auth_url = await start_auth_flow(user_id, scopes)
+        return (
+            "Authentication required for creating events. Please visit this URL to authorize access: "
+            f"{auth_url}\nThen, provide the authorization code using the "
+            "'complete_auth' tool (implementation pending)."
+        )
 
     try:
         service = build('calendar', 'v3', credentials=credentials)
