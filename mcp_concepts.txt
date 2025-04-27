@@ -1,0 +1,182 @@
+Core MCP Concepts
+MCP servers can provide three main types of capabilities:
+
+Resources: File-like data that can be read by clients (like API responses or file contents)
+Tools: Functions that can be called by the LLM (with user approval)
+Prompts: Pre-written templates that help users accomplish specific tasks
+This tutorial will primarily focus on tools.
+
+What Is MCP (and Why Should You Care)?
+Let’s break this down before we start writing code.
+
+MCP stands for Model Context Protocol. It’s a way to let apps like Claude for Desktop securely interact with external data and custom tools that you define.
+
+Think of it like building your own mini API—but instead of exposing it to the whole internet, you’re exposing it to an AI assistant on your machine.
+
+With MCP, you can:
+
+Let Claude read a file or query a database
+Create tools that do useful things (like summarize a dataset or fetch an API)
+Add reusable prompts to guide how Claude behaves in certain tasks
+For this project, we’re focusing on tools—the part of MCP that lets you write small Python functions the AI can call.
+
+​
+Prerequisite knowledge
+This quickstart assumes you have familiarity with:
+
+Create a Clean Folder Structure
+We’ll use the following layout to stay organized:
+
+mix_server/
+│
+├── data/                 # Sample CSV and Parquet files
+│
+├── tools/                # MCP tool definitions
+│
+├── utils/                # Reusable file reading logic
+│
+├── server.py             # Creates the Server
+├── main.py             # Entry point for the MCP server
+└── README.md             # Optional documentation
+
+Python
+LLMs like Claude
+​
+
+# Create a new directory for our project
+uv init weather
+cd weather
+
+# Create virtual environment and activate it
+uv venv
+source .venv/bin/activate
+
+# Install dependencies
+uv add "mcp[cli]" httpx
+
+# Create our server file
+touch weather.py
+Now let’s dive into building your server.
+
+​
+Building your server
+​
+Importing packages and setting up the instance
+Add these to the top of your weather.py:
+
+
+Copy
+from typing import Any
+import httpx
+from mcp.server.fastmcp import FastMCP
+
+# Initialize FastMCP server
+mcp = FastMCP("weather")
+
+# Constants
+NWS_API_BASE = "https://api.weather.gov"
+USER_AGENT = "weather-app/1.0"
+The FastMCP class uses Python type hints and docstrings to automatically generate tool definitions, making it easy to create and maintain MCP tools.
+
+​
+Helper functions
+Next, let’s add our helper functions for querying and formatting the data from the National Weather Service API:
+
+
+Copy
+async def make_nws_request(url: str) -> dict[str, Any] | None:
+    """Make a request to the NWS API with proper error handling."""
+    headers = {
+        "User-Agent": USER_AGENT,
+        "Accept": "application/geo+json"
+    }
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(url, headers=headers, timeout=30.0)
+            response.raise_for_status()
+            return response.json()
+        except Exception:
+            return None
+
+def format_alert(feature: dict) -> str:
+    """Format an alert feature into a readable string."""
+    props = feature["properties"]
+    return f"""
+Event: {props.get('event', 'Unknown')}
+Area: {props.get('areaDesc', 'Unknown')}
+Severity: {props.get('severity', 'Unknown')}
+Description: {props.get('description', 'No description available')}
+Instructions: {props.get('instruction', 'No specific instructions provided')}
+"""
+​
+Implementing tool execution
+The tool execution handler is responsible for actually executing the logic of each tool. Let’s add it:
+
+
+Copy
+@mcp.tool()
+async def get_alerts(state: str) -> str:
+    """Get weather alerts for a US state.
+
+    Args:
+        state: Two-letter US state code (e.g. CA, NY)
+    """
+    url = f"{NWS_API_BASE}/alerts/active/area/{state}"
+    data = await make_nws_request(url)
+
+    if not data or "features" not in data:
+        return "Unable to fetch alerts or no alerts found."
+
+    if not data["features"]:
+        return "No active alerts for this state."
+
+    alerts = [format_alert(feature) for feature in data["features"]]
+    return "\n---\n".join(alerts)
+
+@mcp.tool()
+async def get_forecast(latitude: float, longitude: float) -> str:
+    """Get weather forecast for a location.
+
+    Args:
+        latitude: Latitude of the location
+        longitude: Longitude of the location
+    """
+    # First get the forecast grid endpoint
+    points_url = f"{NWS_API_BASE}/points/{latitude},{longitude}"
+    points_data = await make_nws_request(points_url)
+
+    if not points_data:
+        return "Unable to fetch forecast data for this location."
+
+    # Get the forecast URL from the points response
+    forecast_url = points_data["properties"]["forecast"]
+    forecast_data = await make_nws_request(forecast_url)
+
+    if not forecast_data:
+        return "Unable to fetch detailed forecast."
+
+    # Format the periods into a readable forecast
+    periods = forecast_data["properties"]["periods"]
+    forecasts = []
+    for period in periods[:5]:  # Only show next 5 periods
+        forecast = f"""
+{period['name']}:
+Temperature: {period['temperature']}°{period['temperatureUnit']}
+Wind: {period['windSpeed']} {period['windDirection']}
+Forecast: {period['detailedForecast']}
+"""
+        forecasts.append(forecast)
+
+    return "\n---\n".join(forecasts)
+​
+Running the server
+Finally, let’s initialize and run the server:
+
+
+Copy
+if __name__ == "__main__":
+    # Initialize and run the server
+    mcp.run(transport='stdio')
+Your server is complete! Run uv run weather.py to confirm that everything’s working.
+
+Let’s now test your server from an existing MCP host, Claude for Desktop.
