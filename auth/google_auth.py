@@ -3,7 +3,7 @@
 import os
 import json
 import logging
-from typing import List, Optional, Tuple, Dict, Any
+from typing import List, Optional, Tuple, Dict, Any, Callable
 
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow, InstalledAppFlow
@@ -11,13 +11,16 @@ from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
+from auth.callback_server import OAuthCallbackServer
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Constants
 DEFAULT_CREDENTIALS_DIR = ".credentials"
-DEFAULT_REDIRECT_URI = "http://localhost:8080/callback" # Example, should be configurable
+DEFAULT_REDIRECT_URI = "http://localhost:8080/callback"
+DEFAULT_SERVER_PORT = 8080
 
 # --- Helper Functions ---
 
@@ -92,7 +95,14 @@ def load_client_secrets(client_secrets_path: str) -> Dict[str, Any]:
 
 # --- Core OAuth Logic ---
 
-def start_auth_flow(client_secrets_path: str, scopes: List[str], redirect_uri: str = DEFAULT_REDIRECT_URI) -> Tuple[str, str]:
+def start_auth_flow(
+    client_secrets_path: str,
+    scopes: List[str],
+    redirect_uri: str = DEFAULT_REDIRECT_URI,
+    auto_handle_callback: bool = False,
+    callback_function: Optional[Callable] = None,
+    port: int = DEFAULT_SERVER_PORT
+) -> Tuple[str, str]:
     """
     Initiates the OAuth 2.0 flow and returns the authorization URL and state.
 
@@ -100,23 +110,30 @@ def start_auth_flow(client_secrets_path: str, scopes: List[str], redirect_uri: s
         client_secrets_path: Path to the Google client secrets JSON file.
         scopes: List of OAuth scopes required.
         redirect_uri: The URI Google will redirect to after authorization.
+        auto_handle_callback: Whether to automatically handle the callback by
+                             starting a local server on the specified port.
+        callback_function: Function to call with the code and state when received.
+        port: Port to run the callback server on, if auto_handle_callback is True.
 
     Returns:
         A tuple containing the authorization URL and the state parameter.
     """
     try:
-        # Load client secrets using the helper
-        # Note: Flow.from_client_secrets_file handles loading internally,
-        # but loading separately allows access to client_id/secret if needed elsewhere.
-        # client_config = load_client_secrets(client_secrets_path) # Keep if needed
+        # Create and start the callback server if auto_handle_callback is enabled
+        server = None
+        if auto_handle_callback:
+            logger.info("Starting OAuth callback server")
+            server = OAuthCallbackServer(port=port, callback=callback_function, auto_open_browser=False)
+            server.start()
 
+        # Set up the OAuth flow
         flow = Flow.from_client_secrets_file(
             client_secrets_path,
             scopes=scopes,
             redirect_uri=redirect_uri
         )
 
-        # Indicate that the user *offline* access to retrieve a refresh token.
+        # Indicate that the user needs *offline* access to retrieve a refresh token.
         # 'prompt': 'consent' ensures the user sees the consent screen even if
         # they have previously granted permissions, which is useful for getting
         # a refresh token again if needed.
@@ -125,11 +142,19 @@ def start_auth_flow(client_secrets_path: str, scopes: List[str], redirect_uri: s
             prompt='consent'
         )
         logger.info(f"Generated authorization URL. State: {state}")
+        
+        # Auto-open the browser if requested
+        if auto_handle_callback and server:
+            server.open_browser(authorization_url)
+            
         return authorization_url, state
 
     except Exception as e:
         logger.error(f"Error starting OAuth flow: {e}")
-        raise # Re-raise the exception for the caller to handle
+        # If we created a server, shut it down
+        if auto_handle_callback and server:
+            server.stop()
+        raise  # Re-raise the exception for the caller to handle
 
 def handle_auth_callback(
     client_secrets_path: str,

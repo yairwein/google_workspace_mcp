@@ -17,13 +17,35 @@ SCOPES = [
 # Basic MCP server instance
 server = FastMCP(name="google_workspace")
 
-# Import tool modules to register them
-from gcalendar.calendar_tools import *
+# Import specific tool functions
+from gcalendar.calendar_tools import (
+    start_auth,
+    auth_status,
+    complete_auth,
+    list_calendars,
+    get_events,
+    create_event
+)
 
-# Define OAuth callback as a tool
+# Register calendar tools explicitly
+# Assuming server.add_tool(function, name="tool_name") signature
+# Using function name as tool name by default
+server.add_tool(start_auth, name="start_auth")
+server.add_tool(auth_status, name="auth_status")
+server.add_tool(complete_auth, name="complete_auth")
+server.add_tool(list_calendars, name="list_calendars")
+server.add_tool(get_events, name="get_events")
+server.add_tool(create_event, name="create_event")
+
+
+# Define OAuth callback as a tool (already registered via decorator)
 @server.tool("oauth2callback")
-async def oauth2callback(code: str = None, state: str = None):
-    """Handle OAuth2 callback from Google"""
+async def oauth2callback(code: str = None, state: str = None, redirect_uri: str = "http://localhost:8080/callback"):
+    """
+    Handle OAuth2 callback from Google - for integration with external servers.
+    
+    Most users should use the complete_auth tool instead.
+    """
     if not code:
         logger.error("Authorization code not found in callback request.")
         return {
@@ -34,17 +56,23 @@ async def oauth2callback(code: str = None, state: str = None):
     try:
         client_secrets_path = os.path.join(os.path.dirname(__file__), '..', 'client_secret.json')
         
+        # Construct full authorization response URL
+        full_callback_url = f"{redirect_uri}?code={code}"
+        if state:
+            full_callback_url += f"&state={state}"
+            
         # Exchange code for credentials
         user_id, credentials = handle_auth_callback(
             client_secrets_path=client_secrets_path,
             scopes=SCOPES,
-            authorization_response=code  # Pass the code directly
+            authorization_response=full_callback_url,
+            redirect_uri=redirect_uri
         )
         
         logger.info(f"Successfully exchanged code for credentials for user: {user_id}")
         return {
             "success": True,
-            "message": "Authentication successful"
+            "message": f"Authentication successful for user: {user_id}"
         }
     except RefreshError as e:
         logger.error(f"Failed to exchange authorization code for tokens: {e}", exc_info=True)
