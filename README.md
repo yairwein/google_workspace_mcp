@@ -1,295 +1,173 @@
-# Google Workspace MCP
+# Google Workspace MCP Server
 
-A Model Context Protocol (MCP) server for integrating Google Workspace services like Calendar into AI assistants.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+A Model Context Protocol (MCP) server designed to integrate Google Workspace services (like Google Calendar) with AI assistants and other applications.
 
 ## Overview
 
-This MCP server provides tools and resources for accessing Google Workspace APIs through the Model Context Protocol, allowing AI assistants to interact with your Google Workspace data.
+This server acts as a bridge, allowing applications that speak MCP to securely interact with your Google Workspace data via Google's APIs. It handles authentication using OAuth 2.0 and provides tools for accessing services like Google Calendar.
 
 ## Features
 
-- OAuth 2.0 authentication with Google
-- Calendar API integration
-- Extensible architecture for adding more Google Workspace services
+*   **OAuth 2.0 Authentication:** Securely connects to Google APIs using user-authorized credentials.
+*   **Google Calendar Integration:** Provides tools to list calendars and fetch events.
+*   **MCP Standard Compliance:** Implements the Model Context Protocol for seamless integration.
+*   **Stdio & HTTP Transport:** Supports both standard I/O (for direct integration) and HTTP (for development/testing).
+*   **Extensible:** Designed to easily add support for more Google Workspace APIs.
 
-## Installation
+## Prerequisites
 
-### Prerequisites
+Before you begin, ensure you have the following installed:
 
-- Python 3.12 or higher
-- [uv](https://github.com/astral-sh/uv) for package management
+*   **Python:** Version 3.12 or higher.
+*   **uv:** A fast Python package installer and resolver. ([Installation Guide](https://github.com/astral-sh/uv))
+*   **Node.js & npm/npx:** Required for using the MCP Inspector tool. ([Download Node.js](https://nodejs.org/))
+*   **Google Cloud Project:** You'll need a project set up in the Google Cloud Console with the necessary APIs enabled and OAuth 2.0 credentials configured.
 
-### Setup
+## Setup Instructions
 
-1. Clone the repository:
+1.  **Clone the Repository:**
+    ```bash
+    git clone https://github.com/your-username/google_workspace_mcp.git # Replace with the actual repo URL if different
+    cd google_workspace_mcp
+    ```
 
-```bash
-git clone https://github.com/your-username/google_workspace_mcp.git
-cd google_workspace_mcp
-```
+2.  **Install Dependencies:**
+    Use `uv` to install the project and its dependencies in editable mode. This allows you to make changes to the code and have them reflected immediately without reinstalling.
+    ```bash
+    uv pip install -e .
+    ```
+    *Note: Ensure your shell is configured to use the Python version managed by `uv` if you use a version manager like `pyenv`.*
 
-2. Install the package in development mode:
+3.  **Configure Google Cloud & OAuth 2.0:**
+    *   Go to the [Google Cloud Console](https://console.cloud.google.com/).
+    *   Create a new project or select an existing one.
+    *   **Enable APIs:** Navigate to "APIs & Services" > "Library" and enable the "Google Calendar API" (and any other Google Workspace APIs you intend to use).
+    *   **Configure OAuth Consent Screen:** Go to "APIs & Services" > "OAuth consent screen". Configure it for your application type (likely "External" unless restricted to an organization). Add necessary scopes (e.g., `https://www.googleapis.com/auth/calendar.readonly`).
+    *   **Create OAuth Client ID:** Go to "APIs & Services" > "Credentials". Click "Create Credentials" > "OAuth client ID".
+        *   Select "Desktop app" as the Application type.
+        *   Give it a name (e.g., "MCP Desktop Client").
+    *   **Download Credentials:** After creation, download the client secrets JSON file. Rename it to `client_secret.json` and place it in the **root directory** of this project (`google_workspace_mcp/`).
+        *   **Important:** This file contains sensitive application credentials. **Do not commit `client_secret.json` to version control.** Add it to your `.gitignore` file if it's not already there.
 
-```bash
-uv pip install -e .
-```
-
-3. Set up Google Cloud project and OAuth credentials:
-   - Go to the [Google Cloud Console](https://console.cloud.google.com/)
-   - Create a new project
-   - Enable the APIs you need (e.g., Google Calendar API)
-   - Configure the OAuth consent screen
-   - Create OAuth client ID credentials
-   - Download the credentials as `client_secret.json` and place it in the project root
+4.  **Understanding Token Storage:**
+    *   `client_secret.json`: Contains your *application's* credentials (client ID and secret) used to identify your application to Google.
+    *   `credentials.json` (or similar): When a *user* successfully authenticates via the OAuth flow, the server obtains access and refresh tokens specific to that user. These user tokens are typically stored locally (e.g., in a file named `credentials-<user_id_hash>.json` or similar within the project directory, managed by `auth/oauth_manager.py`).
+        *   **Security:** These user credential files are also sensitive and **must not be committed to version control.** Ensure patterns like `credentials-*.json` are included in your `.gitignore`.
 
 ## Running the Server
 
-### Quick Start with Inspector
+You can run the MCP server in several ways:
 
-The easiest way to start the server with the MCP Inspector for testing is to use the included startup script:
+### 1. With MCP Inspector (Recommended for Development & Debugging)
+
+The `with_inspector.sh` script simplifies running the server with the MCP Inspector, a graphical tool for testing MCP servers.
 
 ```bash
 ./with_inspector.sh
 ```
 
-This script will:
-- Verify all dependencies are installed
-- Create any missing __init__.py files
-- Install the package in development mode
-- Start the server with the MCP Inspector
+This script handles dependency checks and starts the server process, instructing the MCP Inspector (run via `npx`) to connect to it using `uv` for execution within the correct environment.
 
-### Manual Start
+The Inspector UI allows you to:
+*   Discover available tools and resources.
+*   Execute tools with specific arguments.
+*   View results and logs.
+*   Test the authentication flow interactively.
 
-To start the MCP server using stdio transport (for direct integration with AI assistants):
+### 2. Manual Start with Stdio (Production/Direct Integration)
+
+To run the server using standard input/output, which is how most MCP client applications will connect:
 
 ```bash
 python main.py
 ```
 
-This will start the server and listen for MCP requests on the standard input/output channels.
+The server will listen for MCP messages on stdin and send responses to stdout.
 
-### Using HTTP Transport
+### 3. Manual Start with HTTP (Development/Testing)
 
-For development and testing, you can run the server with HTTP transport:
+To run the server with an HTTP transport layer, useful for testing with tools like `curl` or other HTTP clients:
 
 ```bash
 python -c "from core.server import server; server.run(transport='http', port=8000)"
 ```
 
-This will start the server on http://localhost:8000.
+The server will be accessible at `http://localhost:8000`.
 
-## Connecting to MCP Clients
+## Authentication Flow & Handling Localhost Redirects
 
-### Direct Integration
+This server uses OAuth 2.0's "Authorization Code Grant" flow for desktop applications.
 
-AI assistants can connect directly to this server using the stdio transport. This is typically handled by the AI platform itself.
-
-### Using the MCP Inspector
-
-The MCP Inspector is an essential tool for testing and debugging your MCP server.
-
-#### Install MCP Inspector
-
-The MCP Inspector can be run directly with npx without installation:
-
-```bash
-npx @modelcontextprotocol/inspector <command>
-```
-
-#### Inspecting the Server
-
-To inspect your locally developed server:
-
-```bash
-npx @modelcontextprotocol/inspector uv --directory path/to/google_workspace_mcp run main.py
-```
-
-Or for the installed package:
-
-```bash
-npx @modelcontextprotocol/inspector python -m google_workspace_mcp
-```
-
-#### Inspector UI
-
-The Inspector provides a graphical interface for:
-- Browsing available tools and resources
-- Executing tools with different parameters
-- Viewing tool execution results
-- Testing authentication flows
-- Debugging issues
-
-## Available Tools
+1.  **Initiation:** When a tool requiring authentication is called (e.g., `list_calendars`) or the `start_auth` tool is explicitly used, the server generates a unique Google authorization URL.
+2.  **User Authorization:**
+    *   If using `start_auth` or running interactively where possible, the server attempts to automatically open this URL in the user's default web browser.
+    *   If automatic opening fails or isn't supported, the URL is provided to the client/user to open manually.
+3.  **Google Consent:** The user logs into their Google account (if necessary) and grants the requested permissions (scopes) defined in your Google Cloud Console consent screen.
+4.  **Redirection with Code:** After authorization, Google redirects the user's browser back to a specific `redirect_uri`.
+    *   **Handling `http://localhost`:** Google requires HTTPS for redirect URIs in production, but allows `http://localhost:<port>` for testing and desktop apps. This server handles this by:
+        *   Starting a temporary local HTTP server (see `auth/callback_server.py`) on a predefined port (e.g., 8080).
+        *   Constructing the authorization URL with `redirect_uri` set to `http://localhost:<port>/callback` (e.g., `http://localhost:8080/callback`).
+        *   **Crucial:** You **must** add this exact `http://localhost:<port>/callback` URI to the "Authorized redirect URIs" list in your OAuth client ID settings within the Google Cloud Console.
+    *   The temporary server listens for the callback, extracts the `authorization_code` and `state` parameters from the redirect request.
+5.  **Token Exchange:** The server securely exchanges this `authorization_code` (along with the `client_secret.json` credentials) with Google for an `access_token` and a `refresh_token`.
+6.  **Token Storage:** The obtained user tokens are stored locally (e.g., `credentials-<user_id_hash>.json`) for future use, managed by the `OAuthManager`. The refresh token allows the server to obtain new access tokens when the current one expires without requiring the user to re-authenticate constantly.
+7.  **Completion:** The authentication process is complete, and the original tool request can now proceed using the stored credentials.
 
 ### Authentication Tools
 
-- Tool: `start_auth`
-- Description: Starts the authentication process with automatic browser handling
-- Parameters:
-  - `user_id`: Email address of the user
+*   `start_auth(user_id)`: Initiates the automatic browser-based flow.
+*   `auth_status(user_id)`: Checks if valid credentials exist for the user.
+*   `complete_auth(user_id, authorization_code)`: Used for manual code entry if the automatic callback fails (requires manually copying the code from the browser's address bar after authorization).
 
-- Tool: `auth_status`
-- Description: Checks the status of an authentication process
-- Parameters:
-  - `user_id`: Email address of the user
+## Debugging
 
-- Tool: `complete_auth`
-- Description: Completes the authentication process with a manual code
-- Parameters:
-  - `user_id`: Email address of the user
-  - `authorization_code`: The code received from Google
+*   **MCP Inspector:** The primary tool for debugging. It shows request/response payloads, tool execution results, and errors. Use `./with_inspector.sh`.
+*   **Python Logging:** Increase logging verbosity by adding the following near the start of `main.py` (or configure logging as needed):
+    ```python
+    import logging
+    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-- Tool: `oauth2callback` (Advanced)
-- Description: Low-level callback handler for OAuth 2.0 redirects
-- Parameters:
-  - `code`: Authorization code from Google
-  - `state`: State parameter for security verification
-  - `redirect_uri`: Custom redirect URI (optional)
+    # You might want to specifically set levels for libraries like google-auth
+    logging.getLogger('google_auth_oauthlib').setLevel(logging.INFO)
+    logging.getLogger('googleapiclient').setLevel(logging.INFO)
+    ```
+*   **Check `client_secret.json`:** Ensure it's present in the project root and correctly configured in Google Cloud Console.
+*   **Check Redirect URIs:** Double-check that `http://localhost:<port>/callback` (e.g., `http://localhost:8080/callback`) is listed in your Google Cloud OAuth Client's authorized redirect URIs.
+*   **Check Enabled APIs:** Verify the Google Calendar API (and others) are enabled in your Google Cloud project.
 
-### Calendar Tools
+## Available Tools
 
-- Tool: `list_calendars`
-- Description: Lists the user's calendars
-- Parameters: None
+*(Based on the original README)*
 
-- Tool: `get_events`
-- Description: Gets events from a specified calendar
-- Parameters:
-  - `calendar_id`: ID of the calendar to fetch events from
-  - `time_min`: Start time in ISO format (optional)
-  - `time_max`: End time in ISO format (optional)
-  - `max_results`: Maximum number of results to return (optional)
+### Authentication
+*   `start_auth`: Starts automatic OAuth flow. Requires `user_id`.
+*   `auth_status`: Checks current auth status. Requires `user_id`.
+*   `complete_auth`: Completes flow with manual code. Requires `user_id`, `authorization_code`.
+*   `oauth2callback` (Advanced): Low-level handler. Requires `code`, `state`. Optional `redirect_uri`.
 
-## Authentication
-
-This server uses OAuth 2.0 for authentication with Google APIs. There are two ways to authenticate:
-
-### Method 1: Automatic Browser-based Authentication (Recommended)
-
-1. Use the `start_auth` tool:
-   ```
-   start_auth
-   user_id: your.email@gmail.com
-   ```
-2. A browser window will open automatically to the Google authorization page
-3. After authorizing, you'll be redirected to a success page
-4. Check authentication status if needed:
-   ```
-   auth_status
-   user_id: your.email@gmail.com
-   ```
-
-### Method 2: Manual Code Entry
-
-For cases where automatic authentication doesn't work:
-
-1. Use any calendar tool which will prompt for authentication
-2. Open the authentication URL in your browser
-3. After authorizing, extract the `code` parameter from the redirect URL
-4. Complete authentication with:
-   ```
-   complete_auth
-   user_id: your.email@gmail.com
-   authorization_code: [PASTE CODE HERE]
-   ```
-
-Behind the scenes, the authentication flow works as follows:
-
-1. The client requests an action that requires authentication
-2. The server returns an authentication URL
-3. The user authorizes access at this URL
-4. Google redirects back with an authorization code
-5. The code is exchanged for access and refresh tokens
-6. The server stores these credentials for future requests
-
-## Examples
-
-### Example 1: List Calendars
-
-```python
-from mcp.client import ClientSession
-
-async with ClientSession() as session:
-    result = await session.execute_tool(
-        server_name="google_workspace",
-        tool_name="list_calendars"
-    )
-    print(result)
-```
-
-### Example 2: Get Calendar Events
-
-```python
-from mcp.client import ClientSession
-from datetime import datetime, timedelta
-
-# Get events for the next 7 days
-time_min = datetime.now().isoformat()
-time_max = (datetime.now() + timedelta(days=7)).isoformat()
-
-async with ClientSession() as session:
-    result = await session.execute_tool(
-        server_name="google_workspace",
-        tool_name="get_events",
-        arguments={
-            "calendar_id": "primary",
-            "time_min": time_min,
-            "time_max": time_max,
-            "max_results": 10
-        }
-    )
-    print(result)
-```
+### Calendar
+*   `list_calendars`: Lists user's calendars. No parameters.
+*   `get_events`: Gets events from a calendar. Requires `calendar_id`. Optional `time_min`, `time_max`, `max_results`.
 
 ## Development
 
-### Project Structure
-
-- `core/`: Core server implementation
-- `auth/`: Authentication modules
-- `gcalendar/`: Google Calendar integration
-- `main.py`: Server entry point
-
-### Adding New Tools
-
-To add a new tool:
-
-1. Create a new function in an appropriate module
-2. Decorate it with `@server.tool`
-3. Define the required parameters
-4. Implement the logic
-5. Return the result as a dictionary
-
-Example:
-
-```python
-@server.tool("my_new_tool")
-async def my_new_tool(param1: str, param2: int = None):
-    """Description of what this tool does"""
-    # Implementation
-    return {
-        "success": True,
-        "data": result
-    }
-```
-
-## Troubleshooting
-
-### Common Issues
-
-1. **ModuleNotFoundError**: Make sure you've installed the package in development mode
-2. **Authentication errors**: Verify that your `client_secret.json` file is in the correct location
-3. **API errors**: Check that you've enabled the required APIs in the Google Cloud Console
-
-### Debugging
-
-For more detailed logging:
-
-```python
-import logging
-logging.basicConfig(level=logging.DEBUG)
-```
+*   **Project Structure:**
+    *   `core/`: Core MCP server logic.
+    *   `auth/`: Authentication handling (OAuth flow, token management, callback server).
+    *   `gcalendar/`: Google Calendar specific tools.
+    *   `main.py`: Main entry point for running the server.
+    *   `pyproject.toml`: Project metadata and dependencies.
+    *   `with_inspector.sh`: Helper script for running with MCP Inspector.
+*   **Adding New Tools:**
+    1.  Create the tool function within an appropriate module (e.g., a new `gmail/gmail_tools.py`).
+    2.  Decorate it with `@server.tool("your_tool_name")` from `core.server`.
+    3.  Define parameters using type hints.
+    4.  Implement the logic, potentially using helper functions for API calls and authentication checks.
+    5.  Ensure the function is imported so the decorator registers it (e.g., in the module's `__init__.py` or `main.py`).
+    6.  Return results as a dictionary.
 
 ## License
 
-[MIT License](LICENSE)
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

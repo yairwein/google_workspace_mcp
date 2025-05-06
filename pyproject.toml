@@ -11,6 +11,8 @@ dependencies = [
     "google-auth-oauthlib>=1.2.2",
     "httpx>=0.28.1",
     "mcp[cli]>=1.6.0",
+    "sse-starlette>=2.3.3",
+    "uvicorn>=0.34.2",
 ]
 
 [tool.setuptools]

@@ -20,6 +20,8 @@ class OAuthCallbackHandler(http.server.BaseHTTPRequestHandler):
     
     def do_GET(self):
         """Handle GET requests to the callback endpoint."""
+        request_thread_id = threading.get_ident()
+        logger.info(f"[Handler {request_thread_id}] GET request received for path: {self.path}")
         try:
             # Parse the URL and extract query parameters
             parsed_url = urllib.parse.urlparse(self.path)
@@ -92,18 +94,26 @@ class OAuthCallbackHandler(http.server.BaseHTTPRequestHandler):
                 
                 # Call the callback function if provided
                 if OAuthCallbackHandler.callback_function and code:
-                    threading.Thread(
+                    logger.info(f"[Handler {request_thread_id}] Preparing to call callback function in new thread.")
+                    callback_thread = threading.Thread(
                         target=OAuthCallbackHandler.callback_function,
                         args=(code, state),
                         daemon=True
-                    ).start()
-                
+                    )
+                    callback_thread.start()
+                    logger.info(f"[Handler {request_thread_id}] Callback function thread started (ID: {callback_thread.ident}).")
+                else:
+                     logger.warning(f"[Handler {request_thread_id}] No callback function set or no code received, skipping callback.")
+
                 # Signal the server to shutdown after handling the request
-                threading.Thread(
+                logger.info(f"[Handler {request_thread_id}] Preparing to signal server shutdown in new thread.")
+                shutdown_thread = threading.Thread(
                     target=self.server.shutdown,
                     daemon=True
-                ).start()
-                
+                )
+                shutdown_thread.start()
+                logger.info(f"[Handler {request_thread_id}] Server shutdown thread started (ID: {shutdown_thread.ident}). Request handling complete.")
+
             else:
                 # Handle other paths with a 404 response
                 self.send_response(404)
@@ -111,10 +121,14 @@ class OAuthCallbackHandler(http.server.BaseHTTPRequestHandler):
                 self.wfile.write(b"Not Found")
                 
         except Exception as e:
-            logger.error(f"Error handling callback request: {e}")
-            self.send_response(500)
-            self.end_headers()
-            self.wfile.write(f"Internal Server Error: {str(e)}".encode())
+            logger.error(f"[Handler {request_thread_id}] Error handling callback request: {e}", exc_info=True)
+            try:
+                self.send_response(500)
+                self.send_header('Content-Type', 'text/plain')
+                self.end_headers()
+                self.wfile.write(f"Internal Server Error: {str(e)}".encode())
+            except Exception as send_error:
+                 logger.error(f"[Handler {request_thread_id}] Error sending 500 response: {send_error}")
     
     def log_message(self, format, *args):
         """Override to use our logger instead of printing to stderr."""
@@ -155,14 +169,27 @@ class OAuthCallbackServer:
             logger.info(f"Starting OAuth callback server on port {self.port}")
             
             # Run the server in a separate thread
-            self.server_thread = threading.Thread(
-                target=self.server.serve_forever,
-                daemon=True
-            )
+            def serve():
+                thread_id = threading.get_ident()
+                logger.info(f"[Server Thread {thread_id}] Starting serve_forever loop.")
+                try:
+                    self.server.serve_forever()
+                except Exception as serve_e:
+                     logger.error(f"[Server Thread {thread_id}] Exception in serve_forever: {serve_e}", exc_info=True)
+                finally:
+                     logger.info(f"[Server Thread {thread_id}] serve_forever loop finished.")
+                     # Ensure server_close is called even if shutdown wasn't clean
+                     try:
+                         if self.server: self.server.server_close()
+                     except Exception as close_e:
+                          logger.error(f"[Server Thread {thread_id}] Error during server_close: {close_e}")
+
+
+            self.server_thread = threading.Thread(target=serve, daemon=True)
             self.server_thread.start()
-            
-            logger.info(f"OAuth callback server is running on http://localhost:{self.port}")
-            
+
+            logger.info(f"OAuth callback server thread started (ID: {self.server_thread.ident}) on http://localhost:{self.port}")
+
         except Exception as e:
             logger.error(f"Failed to start callback server: {e}")
             raise
@@ -171,10 +198,18 @@ class OAuthCallbackServer:
         """Stop the callback server."""
         if self.server:
             logger.info("Stopping OAuth callback server")
+            # shutdown() signals serve_forever to stop
             self.server.shutdown()
-            self.server.server_close()
+            logger.info("Server shutdown() called.")
+            # Wait briefly for the server thread to finish
+            if self.server_thread:
+                 self.server_thread.join(timeout=2.0) # Wait up to 2 seconds
+                 if self.server_thread.is_alive():
+                      logger.warning("Server thread did not exit cleanly after shutdown.")
+            # server_close() is now called in the 'finally' block of the serve() function
             self.server = None
             self.server_thread = None
+            logger.info("Server resources released.")
         else:
             logger.warning("Server is not running")
     
