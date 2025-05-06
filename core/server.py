@@ -11,7 +11,7 @@ except ImportError:
         # Fall back to the alternative import path
         from fastmcp import FastMCP
     except ImportError:
-        print("ERROR: Could not import FastMCP. Please ensure 'mcp[cli]' and 'fastmcp' are installed.")
+        logger.error("Could not import FastMCP. Please ensure 'mcp[cli]' and 'fastmcp' are installed.")
         sys.exit(1)
 
 from google.auth.exceptions import RefreshError
