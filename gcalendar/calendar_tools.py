@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 # --- Tool Implementations ---
 
-@server.tool() # Added decorator
+@server.tool()
 async def start_auth(user_id: str) -> str:
     """
     Start the Google OAuth authentication process with automatic callback handling.
