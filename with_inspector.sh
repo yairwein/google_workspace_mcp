@@ -89,7 +89,9 @@ echo "Press Ctrl+C to stop the server."
 echo ""
 
 # Start the server with the MCP Inspector
+echo "[DEBUG] About to start npx inspector command..."
 npx -y @modelcontextprotocol/inspector uv --directory "$SCRIPT_DIR" run main.py
+echo "[DEBUG] npx inspector command exited." # This might not be reached if Ctrl+C
 
 # This part will execute if npx is interrupted with Ctrl+C
 echo ""
