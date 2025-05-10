@@ -42,10 +42,11 @@ CONFIG_PORT = int(os.getenv("OAUTH_CALLBACK_PORT", 8080))
 CONFIG_REDIRECT_URI = os.getenv("OAUTH_REDIRECT_URI", f"http://localhost:{CONFIG_PORT}/callback")
 # ---
 
-async def _initiate_auth_and_get_message(user_id: str, scopes: List[str]) -> str:
+async def _initiate_auth_and_get_message(user_id: str, scopes: List[str]) -> Dict:
     """
     Initiates the Google OAuth flow and returns a message for the user.
     Handles the callback internally to exchange the code for tokens.
+    Returns a standard envelope with status and data/error.
     """
     logger.info(f"Initiating auth for user '{user_id}' with scopes: {scopes}")
 
@@ -67,10 +68,13 @@ async def _initiate_auth_and_get_message(user_id: str, scopes: List[str]) -> str
                 authorization_response=full_auth_response_url,
                 redirect_uri=CONFIG_REDIRECT_URI
             )
-            # Credentials are saved by handle_auth_callback
+            # Credentials are saved by handle_auth_callback under the email
+            # Update our reference to use the email as user_id for consistency
+            if current_user_id_for_flow == 'default':
+                current_user_id_for_flow = authenticated_user_email
+                logger.info(f"Updated user_id from 'default' to {authenticated_user_email}")
+            
             logger.info(f"Successfully exchanged token and saved credentials for {authenticated_user_email} (flow initiated for '{current_user_id_for_flow}').")
-            # Optionally, could signal completion if a wait mechanism was in place.
-            # For "auth-then-retry", this log is the primary confirmation.
 
         except Exception as e:
             logger.error(f"Error during token exchange for user '{current_user_id_for_flow}', state '{received_state}': {e}", exc_info=True)
@@ -92,25 +96,52 @@ async def _initiate_auth_and_get_message(user_id: str, scopes: List[str]) -> str
         )
         logger.info(f"Auth flow started for user '{user_id}'. State: {state}. Advise user to visit: {auth_url}")
 
-        return (
+        message = (
             f"ACTION REQUIRED for user '{user_id}':\n"
             f"1. Please visit this URL to authorize access: {auth_url}\n"
             f"2. A browser window should open automatically. Complete the authorization.\n"
             f"3. After successful authorization, please **RETRY** your original command.\n\n"
             f"(OAuth callback server is listening on port {CONFIG_PORT} for the redirect)."
         )
+        
+        return {
+            "status": "ok",
+            "data": {
+                "auth_required": True,
+                "auth_url": auth_url,
+                "message": message
+            },
+            "error": None
+        }
     except Exception as e:
-        logger.error(f"Failed to start the OAuth flow for user '{user_id}': {e}", exc_info=True)
-        return f"Error: Could not initiate authentication for user '{user_id}'. {str(e)}"
+        error_message = f"Could not initiate authentication for user '{user_id}'. {str(e)}"
+        logger.error(f"Failed to start the OAuth flow: {e}", exc_info=True)
+        return {
+            "status": "error",
+            "data": None,
+            "error": {
+                "type": "auth_initialization_error",
+                "message": error_message
+            }
+        }
 
 # --- Tool Implementations ---
 
 @server.tool()
-async def start_auth(user_id: str) -> str:
+async def start_auth(user_id: str) -> Dict:
     """
     Starts the Google OAuth authentication process.
     The user will be prompted to visit a URL and then retry their command.
     This tool is useful for pre-authentication or if other tools fail due to auth.
+    
+    Args:
+        user_id (str): The user identifier to authenticate
+        
+    Returns:
+        A JSON envelope with:
+        - status: "ok" or "error"
+        - data: Contains auth_required (bool), auth_url, and message if status is "ok"
+        - error: Error details if status is "error"
     """
     logger.info(f"Tool 'start_auth' invoked for user: {user_id}")
     # Define desired scopes for general authentication, including userinfo
@@ -123,13 +154,34 @@ async def start_auth(user_id: str) -> str:
 
 
 @server.tool()
-async def list_calendars(user_id: str) -> str:
+async def list_calendars(user_id: str) -> Dict:
     """
     Lists the Google Calendars the user has access to.
     If not authenticated, prompts the user to authenticate and retry.
+    
+    Args:
+        user_id (str): The user identifier to list calendars for
+        
+    Returns:
+        A JSON envelope with:
+        - status: "ok" or "error"
+        - data: Contains calendars list if status is "ok"
+        - error: Error details if status is "error"
     """
     logger.info(f"Attempting to list calendars for user: {user_id}")
     required_scopes = [CALENDAR_READONLY_SCOPE]
+    
+    # If user_id is 'default', try to find existing credentials
+    if user_id == 'default':
+        creds_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '.credentials')
+        if os.path.exists(creds_dir):
+            for file in os.listdir(creds_dir):
+                if file.endswith('.json'):
+                    potential_user_id = file[:-5]  # Remove .json extension
+                    if '@' in potential_user_id:  # Looks like an email
+                        user_id = potential_user_id
+                        logger.info(f"Found existing credentials, using user_id: {user_id}")
+                        break
 
     try:
         credentials = await asyncio.to_thread(
@@ -141,7 +193,14 @@ async def list_calendars(user_id: str) -> str:
         logger.debug(f"get_credentials returned: {credentials}")
     except Exception as e:
         logger.error(f"Error getting credentials for {user_id}: {e}", exc_info=True)
-        return f"Failed to get credentials: {e}. You might need to authenticate using the 'start_auth' tool."
+        return {
+            "status": "error",
+            "data": None,
+            "error": {
+                "type": "credential_error",
+                "message": f"Failed to get credentials: {e}. You might need to authenticate using the 'start_auth' tool."
+            }
+        }
 
     if not credentials or not credentials.valid:
         logger.warning(f"Missing or invalid credentials for user '{user_id}' for list_calendars. Initiating auth.")
@@ -154,24 +213,46 @@ async def list_calendars(user_id: str) -> str:
         calendar_list = await asyncio.to_thread(service.calendarList().list().execute)
         items = calendar_list.get('items', [])
 
-        if not items:
-            return "You don't seem to have access to any calendars."
-
-        output = "Here are the calendars you have access to:\n"
+        calendars = []
         for calendar in items:
-            summary = calendar.get('summary', 'No Summary')
-            cal_id = calendar['id']
-            output += f"- {summary} (ID: {cal_id})\n"
+            calendars.append({
+                "id": calendar['id'],
+                "summary": calendar.get('summary', 'No Summary'),
+                "description": calendar.get('description', ''),
+                "primary": calendar.get('primary', False),
+                "accessRole": calendar.get('accessRole', '')
+            })
+            
         logger.info(f"Successfully listed {len(items)} calendars for user: {user_id}")
-        return output.strip()
+        
+        return {
+            "status": "ok",
+            "data": {
+                "calendars": calendars
+            },
+            "error": None
+        }
 
     except HttpError as error:
         logger.error(f"An API error occurred for user {user_id} listing calendars: {error}", exc_info=True)
-        # TODO: Check error details for specific auth issues (e.g., revoked token)
-        return f"An API error occurred: {error}. You might need to re-authenticate using 'start_auth'."
+        return {
+            "status": "error",
+            "data": None,
+            "error": {
+                "type": "api_error",
+                "message": f"An API error occurred: {error}. You might need to re-authenticate using 'start_auth'."
+            }
+        }
     except Exception as e:
         logger.exception(f"An unexpected error occurred while listing calendars for {user_id}: {e}")
-        return f"An unexpected error occurred: {e}"
+        return {
+            "status": "error",
+            "data": None,
+            "error": {
+                "type": "unexpected_error",
+                "message": f"An unexpected error occurred: {e}"
+            }
+        }
 
 @server.tool()
 async def get_events(
@@ -180,10 +261,23 @@ async def get_events(
     time_min: Optional[str] = None,
     time_max: Optional[str] = None,
     max_results: int = 25,
-) -> str:
+) -> Dict:
     """
     Lists events from a specified Google Calendar within a given time range.
     If not authenticated, prompts the user to authenticate and retry.
+    
+    Args:
+        user_id (str): The user identifier to get events for
+        calendar_id (str): The calendar ID to fetch events from (default: 'primary')
+        time_min (Optional[str]): The start time for fetching events (RFC3339 timestamp)
+        time_max (Optional[str]): The end time for fetching events (RFC3339 timestamp)
+        max_results (int): Maximum number of events to return (default: 25)
+        
+    Returns:
+        A JSON envelope with:
+        - status: "ok" or "error"
+        - data: Contains events list if status is "ok"
+        - error: Error details if status is "error"
     """
     logger.info(f"Attempting to get events for user: {user_id}, calendar: {calendar_id}")
     required_scopes = [CALENDAR_READONLY_SCOPE]
@@ -198,7 +292,14 @@ async def get_events(
         logger.debug(f"get_credentials returned: {credentials}")
     except Exception as e:
         logger.error(f"Error getting credentials for {user_id}: {e}", exc_info=True)
-        return f"Failed to get credentials: {e}. You might need to authenticate using the 'start_auth' tool."
+        return {
+            "status": "error",
+            "data": None,
+            "error": {
+                "type": "credential_error",
+                "message": f"Failed to get credentials: {e}. You might need to authenticate using the 'start_auth' tool."
+            }
+        }
 
     if not credentials or not credentials.valid:
         logger.warning(f"Missing or invalid credentials for user '{user_id}' for get_events. Initiating auth.")
@@ -225,29 +326,50 @@ async def get_events(
         )
         events = events_result.get('items', [])
 
-        if not events:
-            return f"No upcoming events found in calendar '{calendar_id}' for the specified period."
-
-        output = f"Events for calendar '{calendar_id}':\n"
+        parsed_events = []
         for event in events:
-            start = event['start'].get('dateTime', event['start'].get('date'))
-            end = event['end'].get('dateTime', event['end'].get('date'))
-            summary = event.get('summary', 'No Title')
-            event_id = event['id']
-            location = event.get('location', 'N/A')
-            output += f"- {summary} (ID: {event_id})\n"
-            output += f"  Start: {start}\n"
-            output += f"  End:   {end}\n"
-            output += f"  Location: {location}\n"
+            parsed_events.append({
+                "id": event['id'],
+                "summary": event.get('summary', 'No Title'),
+                "start": event['start'].get('dateTime', event['start'].get('date')),
+                "end": event['end'].get('dateTime', event['end'].get('date')),
+                "location": event.get('location', ''),
+                "description": event.get('description', ''),
+                "htmlLink": event.get('htmlLink', '')
+            })
+            
         logger.info(f"Successfully retrieved {len(events)} events for user: {user_id}, calendar: {calendar_id}")
-        return output.strip()
+        
+        return {
+            "status": "ok",
+            "data": {
+                "calendar_id": calendar_id,
+                "events": parsed_events,
+                "event_count": len(parsed_events)
+            },
+            "error": None
+        }
 
     except HttpError as error:
         logger.error(f"An API error occurred for user {user_id} getting events: {error}", exc_info=True)
-        return f"An API error occurred while fetching events: {error}. You might need to re-authenticate using 'start_auth'."
+        return {
+            "status": "error",
+            "data": None,
+            "error": {
+                "type": "api_error",
+                "message": f"An API error occurred while fetching events: {error}. You might need to re-authenticate using 'start_auth'."
+            }
+        }
     except Exception as e:
         logger.exception(f"An unexpected error occurred while getting events for {user_id}: {e}")
-        return f"An unexpected error occurred: {e}"
+        return {
+            "status": "error",
+            "data": None,
+            "error": {
+                "type": "unexpected_error",
+                "message": f"An unexpected error occurred: {e}"
+            }
+        }
 
 
 @server.tool()
@@ -261,10 +383,27 @@ async def create_event(
     location: Optional[str] = None,
     attendees: Optional[List[str]] = None,
     timezone: Optional[str] = None,
-) -> str:
+) -> Dict:
     """
     Creates a new event in a specified Google Calendar.
     If not authenticated, prompts the user to authenticate and retry.
+    
+    Args:
+        user_id (str): The user identifier to create the event for
+        summary (str): The event title/summary
+        start_time (str): The event start time (RFC3339 timestamp)
+        end_time (str): The event end time (RFC3339 timestamp)
+        calendar_id (str): The calendar ID to create the event in (default: 'primary')
+        description (Optional[str]): Event description
+        location (Optional[str]): Event location
+        attendees (Optional[List[str]]): List of attendee email addresses
+        timezone (Optional[str]): Timezone for the event
+        
+    Returns:
+        A JSON envelope with:
+        - status: "ok" or "error"
+        - data: Contains created event details if status is "ok"
+        - error: Error details if status is "error"
     """
     logger.info(f"Attempting to create event for user: {user_id}, calendar: {calendar_id}")
     required_scopes = [CALENDAR_EVENTS_SCOPE] # Write scope needed
@@ -279,7 +418,14 @@ async def create_event(
         logger.debug(f"get_credentials returned: {credentials}")
     except Exception as e:
         logger.error(f"Error getting credentials for {user_id}: {e}", exc_info=True)
-        return f"Failed to get credentials: {e}. You might need to authenticate using the 'start_auth' tool."
+        return {
+            "status": "error",
+            "data": None,
+            "error": {
+                "type": "credential_error",
+                "message": f"Failed to get credentials: {e}. You might need to authenticate using the 'start_auth' tool."
+            }
+        }
 
     if not credentials or not credentials.valid:
         logger.warning(f"Missing or invalid credentials for user '{user_id}' for create_event. Initiating auth.")
@@ -313,13 +459,37 @@ async def create_event(
             ).execute
         )
 
-        event_link = created_event.get('htmlLink')
         logger.info(f"Successfully created event for user: {user_id}, event ID: {created_event['id']}")
-        return f"Event created successfully! View it here: {event_link}"
+        
+        return {
+            "status": "ok",
+            "data": {
+                "event_id": created_event['id'],
+                "html_link": created_event.get('htmlLink', ''),
+                "summary": created_event.get('summary', ''),
+                "calendar_id": calendar_id,
+                "created": created_event.get('created', '')
+            },
+            "error": None
+        }
 
     except HttpError as error:
         logger.error(f"An API error occurred for user {user_id} creating event: {error}", exc_info=True)
-        return f"An API error occurred while creating the event: {error}. You might need to re-authenticate using 'start_auth'."
+        return {
+            "status": "error",
+            "data": None,
+            "error": {
+                "type": "api_error",
+                "message": f"An API error occurred while creating the event: {error}. You might need to re-authenticate using 'start_auth'."
+            }
+        }
     except Exception as e:
         logger.exception(f"An unexpected error occurred while creating event for {user_id}: {e}")
-        return f"An unexpected error occurred: {e}"
+        return {
+            "status": "error",
+            "data": None,
+            "error": {
+                "type": "unexpected_error",
+                "message": f"An unexpected error occurred: {e}"
+            }
+        }

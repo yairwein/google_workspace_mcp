@@ -5,13 +5,15 @@ import json
 import logging
 from typing import List, Optional, Tuple, Dict, Any, Callable
 
+from oauthlib.oauth2.rfc6749.errors import InsecureTransportError
+
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow, InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-from auth.callback_server import OAuthCallbackServer
+from auth.callback_server import OAuthCallbackServer, OAuthCallbackHandler
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -21,6 +23,11 @@ logger = logging.getLogger(__name__)
 DEFAULT_CREDENTIALS_DIR = ".credentials"
 DEFAULT_REDIRECT_URI = "http://localhost:8080/callback"
 DEFAULT_SERVER_PORT = 8080
+
+# --- Global Variables ---
+
+# Singleton OAuth callback server instance
+_oauth_callback_server = None
 
 # --- Helper Functions ---
 
@@ -111,20 +118,39 @@ def start_auth_flow(
         scopes: List of OAuth scopes required.
         redirect_uri: The URI Google will redirect to after authorization.
         auto_handle_callback: Whether to automatically handle the callback by
-                             starting a local server on the specified port.
+                              using the persistent callback server.
         callback_function: Function to call with the code and state when received.
-        port: Port to run the callback server on, if auto_handle_callback is True.
+        port: Port to run the callback server on, if one is not already running.
 
     Returns:
         A tuple containing the authorization URL and the state parameter.
     """
+    global _oauth_callback_server
+    
     try:
-        # Create and start the callback server if auto_handle_callback is enabled
-        server = None
+        # Allow HTTP for localhost in development
+        if 'OAUTHLIB_INSECURE_TRANSPORT' not in os.environ:
+            logger.warning("OAUTHLIB_INSECURE_TRANSPORT not set. Setting it for localhost development.")
+            os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+
+        # Use or initialize the persistent callback server
         if auto_handle_callback:
-            logger.info("Starting OAuth callback server")
-            server = OAuthCallbackServer(port=port, callback=callback_function, auto_open_browser=False)
-            server.start()
+            if _oauth_callback_server is None:
+                logger.info("Starting OAuth callback server (persistent instance)")
+                _oauth_callback_server = OAuthCallbackServer(port=port, auto_open_browser=False)
+                result = _oauth_callback_server.start()
+                
+                if not result['success']:
+                    logger.error(f"Failed to start callback server: {result['message']}")
+                    return None, None
+                
+                # Store the actual port being used for future redirect_uri construction
+                port = result['port']
+            else:
+                logger.info(f"Using existing OAuth callback server on port {port}")
+            
+            # Always use the port from the running server
+            redirect_uri = f"http://localhost:{port}/callback"
 
         # Set up the OAuth flow
         flow = Flow.from_client_secrets_file(
@@ -143,17 +169,21 @@ def start_auth_flow(
         )
         logger.info(f"Generated authorization URL. State: {state}")
         
+        # Register the callback function with the state
+        if auto_handle_callback and callback_function:
+            OAuthCallbackHandler.register_callback(state, callback_function)
+            logger.info(f"Registered callback function for state: {state}")
+        
         # Auto-open the browser if requested
-        if auto_handle_callback and server:
-            server.open_browser(authorization_url)
+        if auto_handle_callback and _oauth_callback_server:
+            _oauth_callback_server.open_browser(authorization_url)
             
         return authorization_url, state
 
     except Exception as e:
         logger.error(f"Error starting OAuth flow: {e}")
-        # If we created a server, shut it down
-        if auto_handle_callback and server:
-            server.stop()
+        # We no longer shut down the server after completing the flow
+        # The persistent server will handle multiple auth flows over time
         raise  # Re-raise the exception for the caller to handle
 
 def handle_auth_callback(
@@ -183,6 +213,11 @@ def handle_auth_callback(
         HttpError: If fetching user info fails.
     """
     try:
+        # Allow HTTP for localhost in development
+        if 'OAUTHLIB_INSECURE_TRANSPORT' not in os.environ:
+            logger.warning("OAUTHLIB_INSECURE_TRANSPORT not set. Setting it for localhost development.")
+            os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+
         flow = Flow.from_client_secrets_file(
             client_secrets_path,
             scopes=scopes,

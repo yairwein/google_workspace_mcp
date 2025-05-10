@@ -1,6 +1,7 @@
 import logging
 import os
 import sys
+from typing import Dict
 
 # Explicitly try both import paths for FastMCP
 try:
@@ -33,17 +34,32 @@ server = FastMCP(name="google_workspace")
 
 # Define OAuth callback as a tool (already registered via decorator)
 @server.tool("oauth2callback")
-async def oauth2callback(code: str = None, state: str = None, redirect_uri: str = "http://localhost:8080/callback"):
+async def oauth2callback(code: str = None, state: str = None, redirect_uri: str = "http://localhost:8080/callback") -> Dict:
     """
     Handle OAuth2 callback from Google - for integration with external servers.
 
     Most users should use the complete_auth tool instead.
+    
+    Args:
+        code (str, optional): Authorization code from OAuth callback
+        state (str, optional): State parameter from OAuth callback
+        redirect_uri (str, optional): Redirect URI for OAuth callback
+
+    Returns:
+        A JSON envelope with:
+        - status: "ok" or "error"
+        - data: Contains user_id if status is "ok"
+        - error: Error details if status is "error"
     """
     if not code:
         logger.error("Authorization code not found in callback request.")
         return {
-            "success": False,
-            "error": "Authorization code not found"
+            "status": "error",
+            "data": None,
+            "error": {
+                "type": "missing_code",
+                "message": "Authorization code not found"
+            }
         }
 
     try:
@@ -64,18 +80,30 @@ async def oauth2callback(code: str = None, state: str = None, redirect_uri: str 
 
         logger.info(f"Successfully exchanged code for credentials for user: {user_id}")
         return {
-            "success": True,
-            "message": f"Authentication successful for user: {user_id}"
+            "status": "ok",
+            "data": {
+                "user_id": user_id,
+                "message": f"Authentication successful for user: {user_id}"
+            },
+            "error": None
         }
     except RefreshError as e:
         logger.error(f"Failed to exchange authorization code for tokens: {e}", exc_info=True)
         return {
-            "success": False,
-            "error": f"Could not exchange authorization code for tokens: {str(e)}"
+            "status": "error",
+            "data": None,
+            "error": {
+                "type": "refresh_error",
+                "message": f"Could not exchange authorization code for tokens: {str(e)}"
+            }
         }
     except Exception as e:
         logger.error(f"An unexpected error occurred during OAuth callback: {e}", exc_info=True)
         return {
-            "success": False,
-            "error": f"An unexpected error occurred: {str(e)}"
+            "status": "error",
+            "data": None,
+            "error": {
+                "type": "unexpected_error",
+                "message": f"An unexpected error occurred: {str(e)}"
+            }
         }
