@@ -141,8 +141,6 @@ This server uses OAuth 2.0's "Authorization Code Grant" flow for desktop applica
 
 ## Available Tools
 
-*(Based on the original README)*
-
 ### Authentication
 *   `start_auth`: Starts automatic OAuth flow. Requires `user_id`.
 *   `auth_status`: Checks current auth status. Requires `user_id`.
