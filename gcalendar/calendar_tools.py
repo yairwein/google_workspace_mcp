@@ -98,8 +98,8 @@ async def _initiate_auth_and_get_message(user_id: str, scopes: List[str]) -> Dic
 
         message = (
             f"ACTION REQUIRED for user '{user_id}':\n"
-            f"1. Please visit this URL to authorize access: {auth_url}\n"
-            f"2. A browser window should open automatically. Complete the authorization.\n"
+            f"1. You must instruct them to visit this URL to authorize access: {auth_url}\n"
+            f"2. If you have the ability to trigger browser use, open the window automatically. Complete the authorization.\n"
             f"3. After successful authorization, please **RETRY** your original command.\n\n"
             f"(OAuth callback server is listening on port {CONFIG_PORT} for the redirect)."
         )
