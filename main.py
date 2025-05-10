@@ -1,30 +1,50 @@
-"""
-Google Workspace MCP Server - Main Entry Point
-
-This module initializes and runs the Google Workspace MCP server with properly registered tools.
-"""
-import sys
-import logging
 import asyncio
+import logging
+import os
+import sys
+
+# Local imports
 from core.server import server
 
-# Configure logging for main module
+# Configure basic console logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-# Explicitly import calendar tools to register them
+# Set up detailed file logging
+try:
+    root_logger = logging.getLogger()
+    log_file_dir = os.path.dirname(os.path.abspath(__file__))
+    log_file_path = os.path.join(log_file_dir, 'mcp_server_debug.log')
+    
+    file_handler = logging.FileHandler(log_file_path, mode='a')
+    file_handler.setLevel(logging.DEBUG)
+    
+    file_formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(process)d - %(threadName)s '
+        '[%(module)s.%(funcName)s:%(lineno)d] - %(message)s'
+    )
+    file_handler.setFormatter(file_formatter)
+    root_logger.addHandler(file_handler)
+    
+    logger.info(f"Detailed file logging configured to: {log_file_path}")
+except Exception as e:
+    sys.stderr.write(f"CRITICAL: Failed to set up file logging to '{log_file_path}': {e}\n")
+
+# Import calendar tools to register them with the MCP server via decorators
+# Tools are registered when this module is imported
 import gcalendar.calendar_tools
 
 def main():
-    """Main entry point for the MCP server"""
+    """
+    Main entry point for the Google Workspace MCP server.
+    Uses stdio transport for MCP Inspector communication.
+    """
     try:
         logger.info("Google Workspace MCP server starting")
-        # Run with no parameters to use the stdio transport
-        # that MCP Inspector expects
-        server.run()
+        server.run()  # Uses stdio transport for MCP Inspector
     except KeyboardInterrupt:
         logger.info("Server shutdown requested via keyboard interrupt")
         sys.exit(0)

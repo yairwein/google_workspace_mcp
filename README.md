@@ -64,6 +64,8 @@ You can run the MCP server in several ways:
 
 The `with_inspector.sh` script simplifies running the server with the MCP Inspector, a graphical tool for testing MCP servers.
 
+Set `OAUTHLIB_INSECURE_TRANSPORT=1` if testing on localhost without https for OAuth to work.
+
 ```bash
 ./with_inspector.sh
 ```
