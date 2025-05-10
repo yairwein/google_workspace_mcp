@@ -34,7 +34,6 @@ def get_response_html(
     Returns:
         HTML content as a string
     """
-    icon = "✅" if status == "success" else "⚠️"
     color = "#4CAF50" if status == "success" else "#d32f2f"
     
     close_button = """
@@ -81,7 +80,7 @@ def get_response_html(
     </style>
 </head>
 <body>
-    <div class="status">{icon} {title}</div>
+    <div class="status">{title}</div>
     <div class="message">{message}</div>
     {close_button}
     {auto_close_script}
