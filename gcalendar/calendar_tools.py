@@ -6,9 +6,9 @@ This module provides MCP tools for interacting with Google Calendar API.
 import datetime
 import logging
 import asyncio
-import os # Added for os.getenv
+import os
 import sys
-from typing import List, Optional, Dict # Added Dict
+from typing import List, Optional, Dict
 
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
@@ -16,7 +16,6 @@ from googleapiclient.errors import HttpError
 
 # Use functions directly from google_auth
 from auth.google_auth import get_credentials, start_auth_flow, handle_auth_callback
-# Removed: from auth.oauth_manager import start_oauth_flow, check_auth_status, stop_oauth_flow
 
 # Configure module logger
 logger = logging.getLogger(__name__)
@@ -42,9 +41,6 @@ else:
 CONFIG_PORT = int(os.getenv("OAUTH_CALLBACK_PORT", 8080))
 CONFIG_REDIRECT_URI = os.getenv("OAUTH_REDIRECT_URI", f"http://localhost:{CONFIG_PORT}/callback")
 # ---
-
-# Removed duplicate logging.basicConfig(level=logging.INFO)
-# logger = logging.getLogger(__name__) # This is fine, but basicConfig should be in main
 
 async def _initiate_auth_and_get_message(user_id: str, scopes: List[str]) -> str:
     """
@@ -125,8 +121,6 @@ async def start_auth(user_id: str) -> str:
     ]))
     return await _initiate_auth_and_get_message(user_id, auth_scopes)
 
-# Removed auth_status tool
-# Removed complete_auth tool
 
 @server.tool()
 async def list_calendars(user_id: str) -> str:
