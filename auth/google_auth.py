@@ -13,21 +13,13 @@ from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-from auth.callback_server import OAuthCallbackServer, OAuthCallbackHandler
-
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Constants
 DEFAULT_CREDENTIALS_DIR = ".credentials"
-DEFAULT_REDIRECT_URI = "http://localhost:8080/callback"
-DEFAULT_SERVER_PORT = 8080
-
-# --- Global Variables ---
-
-# Singleton OAuth callback server instance
-_oauth_callback_server = None
+DEFAULT_REDIRECT_URI = "http://localhost:8000/oauth2callback"
 
 # --- Helper Functions ---
 
@@ -105,10 +97,7 @@ def load_client_secrets(client_secrets_path: str) -> Dict[str, Any]:
 def start_auth_flow(
     client_secrets_path: str,
     scopes: List[str],
-    redirect_uri: str = DEFAULT_REDIRECT_URI,
-    auto_handle_callback: bool = False,
-    callback_function: Optional[Callable] = None,
-    port: int = DEFAULT_SERVER_PORT
+    redirect_uri: str = DEFAULT_REDIRECT_URI
 ) -> Tuple[str, str]:
     """
     Initiates the OAuth 2.0 flow and returns the authorization URL and state.
@@ -117,40 +106,15 @@ def start_auth_flow(
         client_secrets_path: Path to the Google client secrets JSON file.
         scopes: List of OAuth scopes required.
         redirect_uri: The URI Google will redirect to after authorization.
-        auto_handle_callback: Whether to automatically handle the callback by
-                              using the persistent callback server.
-        callback_function: Function to call with the code and state when received.
-        port: Port to run the callback server on, if one is not already running.
 
     Returns:
         A tuple containing the authorization URL and the state parameter.
     """
-    global _oauth_callback_server
-    
     try:
         # Allow HTTP for localhost in development
         if 'OAUTHLIB_INSECURE_TRANSPORT' not in os.environ:
             logger.warning("OAUTHLIB_INSECURE_TRANSPORT not set. Setting it for localhost development.")
             os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
-
-        # Use or initialize the persistent callback server
-        if auto_handle_callback:
-            if _oauth_callback_server is None:
-                logger.info("Starting OAuth callback server (persistent instance)")
-                _oauth_callback_server = OAuthCallbackServer(port=port, auto_open_browser=False)
-                result = _oauth_callback_server.start()
-                
-                if not result['success']:
-                    logger.error(f"Failed to start callback server: {result['message']}")
-                    return None, None
-                
-                # Store the actual port being used for future redirect_uri construction
-                port = result['port']
-            else:
-                logger.info(f"Using existing OAuth callback server on port {port}")
-            
-            # Always use the port from the running server
-            redirect_uri = f"http://localhost:{port}/callback"
 
         # Set up the OAuth flow
         flow = Flow.from_client_secrets_file(
@@ -169,15 +133,6 @@ def start_auth_flow(
         )
         logger.info(f"Generated authorization URL. State: {state}")
         
-        # Register the callback function with the state
-        if auto_handle_callback and callback_function:
-            OAuthCallbackHandler.register_callback(state, callback_function)
-            logger.info(f"Registered callback function for state: {state}")
-        
-        # Auto-open the browser if requested
-        if auto_handle_callback and _oauth_callback_server:
-            _oauth_callback_server.open_browser(authorization_url)
-            
         return authorization_url, state
 
     except Exception as e:
@@ -266,44 +221,53 @@ def get_credentials(
     Returns:
         Valid Credentials object if found and valid/refreshed, otherwise None.
     """
+    logger.info(f"[get_credentials] Called for user_id: '{user_id}', required_scopes: {required_scopes}")
+    credential_file_path = _get_user_credential_path(user_id, credentials_base_dir)
+    logger.info(f"[get_credentials] Attempting to load credentials from: {credential_file_path}")
+
     credentials = _load_credentials(user_id, credentials_base_dir)
 
     if not credentials:
-        logger.info(f"No stored credentials found for user {user_id}.")
+        logger.info(f"[get_credentials] No stored credentials found for user '{user_id}' at {credential_file_path}.")
         return None
+    
+    logger.info(f"[get_credentials] Successfully loaded credentials for user '{user_id}'. Scopes: {credentials.scopes}, Valid: {credentials.valid}, Expired: {credentials.expired}")
 
     # Check if scopes are sufficient
     if not all(scope in credentials.scopes for scope in required_scopes):
-        logger.warning(f"Stored credentials for user {user_id} lack required scopes. Need: {required_scopes}, Have: {credentials.scopes}")
+        logger.warning(f"[get_credentials] Stored credentials for user '{user_id}' lack required scopes. Need: {required_scopes}, Have: {credentials.scopes}")
         # Re-authentication is needed to grant missing scopes
         return None
+    
+    logger.info(f"[get_credentials] Stored credentials for user '{user_id}' have sufficient scopes.")
 
     # Check if credentials are still valid or need refresh
     if credentials.valid:
-        logger.info(f"Stored credentials for user {user_id} are valid.")
+        logger.info(f"[get_credentials] Stored credentials for user '{user_id}' are valid.")
         return credentials
     elif credentials.expired and credentials.refresh_token:
-        logger.info(f"Credentials for user {user_id} expired. Attempting refresh.")
+        logger.info(f"[get_credentials] Credentials for user '{user_id}' expired. Attempting refresh.")
         if not client_secrets_path:
-             logger.error("Client secrets path is required to refresh credentials but was not provided.")
+             logger.error("[get_credentials] Client secrets path is required to refresh credentials but was not provided.")
              # Cannot refresh without client secrets info
              return None
         try:
             # Load client secrets to provide info for refresh
             # Note: Credentials object holds client_id/secret if available from initial flow,
             # but loading from file is safer if they weren't stored or if using InstalledAppFlow secrets.
+            logger.info(f"[get_credentials] Attempting to refresh token for user '{user_id}' using client_secrets_path: {client_secrets_path}")
             client_config = load_client_secrets(client_secrets_path)
             credentials.refresh(Request()) # Pass client_id/secret if needed and not in creds
-            logger.info(f"Credentials for user {user_id} refreshed successfully.")
+            logger.info(f"[get_credentials] Credentials for user '{user_id}' refreshed successfully.")
             # Save the updated credentials (with potentially new access token)
             _save_credentials(user_id, credentials, credentials_base_dir)
             return credentials
         except Exception as e: # Catch specific refresh errors like google.auth.exceptions.RefreshError
-            logger.error(f"Error refreshing credentials for user {user_id}: {e}")
+            logger.error(f"[get_credentials] Error refreshing credentials for user '{user_id}': {e}", exc_info=True)
             # Failed to refresh, re-authentication is needed
             return None
     else:
-        logger.warning(f"Credentials for user {user_id} are invalid or missing refresh token.")
+        logger.warning(f"[get_credentials] Credentials for user '{user_id}' are invalid and/or missing refresh token. Valid: {credentials.valid}, Refresh Token Present: {credentials.refresh_token is not None}")
         # Invalid and cannot be refreshed, re-authentication needed
         return None
 

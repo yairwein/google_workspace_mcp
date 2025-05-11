@@ -22,21 +22,10 @@ A Model Context Protocol (MCP) server that integrates Google Workspace services 
 3. **Configuration:**
    - Create OAuth 2.0 credentials in [Google Cloud Console](https://console.cloud.google.com/)
    - Download credentials as `client_secret.json` to project root
-   - Add the following redirect URIs to your OAuth client in Google Cloud Console:
+   - Add the following redirect URI to your OAuth client in Google Cloud Console:
      ```
-     http://localhost:8080/callback
-     http://localhost:8081/callback
-     http://localhost:8082/callback
-     http://localhost:8083/callback
-     http://localhost:8084/callback
-     http://localhost:8085/callback
-     http://localhost:8086/callback
-     http://localhost:8087/callback
-     http://localhost:8088/callback
-     http://localhost:8089/callback
-     http://localhost:8090/callback
+     http://localhost:8000/oauth2callback
      ```
-     This allows the server to use alternate ports if 8080 is unavailable.
 
 4. **Environment Setup:**
    The server uses HTTP for localhost OAuth callbacks in development. Set this environment variable:
@@ -65,7 +54,7 @@ A Model Context Protocol (MCP) server that integrates Google Workspace services 
    ```
 
    **Important Ports:**
-   - OAuth Callback: `8080-8090` (automatically selects first available)
+   - OAuth Callback: `8000` (handled by MCP custom route)
    - HTTP Mode: `8000` (when running in HTTP mode)
    - mcpo API: `8000` (default when using mcpo)
 
@@ -73,7 +62,7 @@ A Model Context Protocol (MCP) server that integrates Google Workspace services 
 
    The server supports multiple connection methods:
 
-   - **Using mcpo (Recommended for API Access)**:
+   - **Using mcpo (Recommended for OpenAPI Spec Access ie Open WebUI usage)**:
      - Install mcpo: `pip install mcpo` or `uvx mcpo`
      - Run with provided config: `mcpo --config config.json`
      - Access API at: `http://localhost:8000/gworkspace`
@@ -128,7 +117,7 @@ A Model Context Protocol (MCP) server that integrates Google Workspace services 
    - Start the server using one of the methods above
    - First API call will trigger OAuth flow
    - Browser will open to Google login
-   - The server will automatically select an available port (8080-8090) for the OAuth callback
+   - OAuth callback is handled by the MCP server on port 8000
    - After authorization, server stores credentials for future use
 
 ## Features
@@ -165,12 +154,11 @@ google_workspace_mcp/
 ```
 
 ### Port Handling
-The server implements intelligent port selection for OAuth callbacks:
-- Starts with port 8080 (default)
-- If port is in use, tries next port up to 8090
-- Logs port reassignment for transparency
-- Returns port information in authentication response
-- Automatically updates redirect URI for selected port
+The server handles OAuth callbacks through a custom MCP route:
+- Uses port 8000 for all OAuth callbacks
+- Callback endpoint at /oauth2callback
+- Integrated with MCP server's HTTP transport
+- Handles credential exchange and storage
 - Requires OAUTHLIB_INSECURE_TRANSPORT=1 for HTTP callbacks
 
 ### Debugging
