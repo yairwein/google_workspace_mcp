@@ -40,11 +40,13 @@ import gcalendar.calendar_tools
 def main():
     """
     Main entry point for the Google Workspace MCP server.
-    Uses stdio transport for MCP Inspector communication.
+    Uses streamable-http transport for HTTP-based communication.
     """
     try:
-        logger.info("Google Workspace MCP server starting")
-        server.run()  # Uses stdio transport for MCP Inspector
+        logger.info("Google Workspace MCP server starting with Streamable HTTP transport")
+        server.run(
+            transport="streamable-http"
+        )
     except KeyboardInterrupt:
         logger.info("Server shutdown requested via keyboard interrupt")
         sys.exit(0)
