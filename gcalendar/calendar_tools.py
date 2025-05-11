@@ -8,7 +8,7 @@ import logging
 import asyncio
 import os
 import sys
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Required
 
 # Import MCP types for proper response formatting
 from mcp import types
@@ -19,7 +19,6 @@ from googleapiclient.errors import HttpError
 
 # Use functions directly from google_auth
 from auth.google_auth import get_credentials, handle_auth_callback
-from auth.auth_session_manager import auth_session_manager
 
 # Configure module logger
 logger = logging.getLogger(__name__)
@@ -46,80 +45,90 @@ else:
 CONFIG_REDIRECT_URI = OAUTH_REDIRECT_URI
 # ---
 
-async def _initiate_auth_and_get_message(scopes: List[str]) -> types.CallToolResult:
+async def _initiate_auth_and_get_message(scopes: List[str], user_google_email: Optional[str] = None) -> types.CallToolResult:
     """
-    Initiates the Google OAuth flow using AuthSessionManager and returns a message for the user.
-    The MCP server's OAuth resource endpoint handles callback.
-    Returns a CallToolResult with auth URL and session ID.
+    Initiates the Google OAuth flow and returns an actionable message for the user.
+    The user will be directed to an auth URL. The LLM must guide the user on next steps,
+    including providing their email if it wasn't known beforehand.
     """
-    logger.info(f"[_initiate_auth_and_get_message] Called with scopes: {scopes}")
+    initial_email_provided = bool(user_google_email and user_google_email.strip() and user_google_email.lower() != 'default')
+
+    if initial_email_provided:
+        user_display_name = f"Google account for '{user_google_email}'"
+    else:
+        user_display_name = "your Google account"
+
+    logger.info(f"[_initiate_auth_and_get_message] Initiating auth for {user_display_name} (email provided: {initial_email_provided}) with scopes: {scopes}")
 
     try:
-        # Create a new authentication session
-        auth_session = auth_session_manager.create_session()
-        session_id_for_state = auth_session.session_id
-        logger.info(f"[_initiate_auth_and_get_message] Created auth session ID (for state): {session_id_for_state}")
-
-        # Ensure OAUTHLIB_INSECURE_TRANSPORT is set
-        if 'OAUTHLIB_INSECURE_TRANSPORT' not in os.environ:
+        # Ensure OAUTHLIB_INSECURE_TRANSPORT is set for localhost development
+        if 'OAUTHLIB_INSECURE_TRANSPORT' not in os.environ and "localhost" in CONFIG_REDIRECT_URI:
             logger.warning("OAUTHLIB_INSECURE_TRANSPORT not set. Setting it for localhost development.")
             os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
             
-        # Set up the OAuth flow using the MCP server's callback endpoint
+        # Set up the OAuth flow
         from google_auth_oauthlib.flow import Flow
+        # Generate a simple state for CSRF, though the library might do this too.
+        # This state isn't used for session tracking anymore in this simplified flow.
+        oauth_state = os.urandom(16).hex()
+        
         flow = Flow.from_client_secrets_file(
             CONFIG_CLIENT_SECRETS_PATH,
             scopes=scopes,
             redirect_uri=CONFIG_REDIRECT_URI,
-            state=session_id_for_state # Pass the session_id as state
+            state=oauth_state
         )
         
-        # Generate the authorization URL
-        auth_url, state_from_flow = flow.authorization_url(
-            access_type='offline',
-            prompt='consent'
+        auth_url, returned_state = flow.authorization_url(
+            access_type='offline', # To get a refresh token
+            prompt='consent'       # Ensures user sees consent screen, good for re-auth if needed
         )
-        # Verify state consistency (state_from_flow should match session_id_for_state)
-        if state_from_flow != session_id_for_state:
-            error_message = "OAuth state mismatch during flow generation. This is an internal server error."
-            logger.error(f"OAuth state mismatch! Expected {session_id_for_state}, got {state_from_flow}. Aborting auth initiation.")
-            auth_session_manager.fail_session(session_id_for_state, "OAuth state mismatch during flow generation.")
-            return types.CallToolResult(
-                isError=True,
-                content=[types.TextContent(type="text", text=error_message)]
-            )
+        
+        logger.info(f"Auth flow started for {user_display_name}. State: {returned_state}. Advise user to visit: {auth_url}")
+        
+        message_lines = [
+            f"**ACTION REQUIRED: Google Authentication Needed for {user_display_name}**\n",
+            "To proceed, the user must authorize this application.",
+            "**LLM, please present this exact authorization URL to the user as a clickable hyperlink:**",
+            f"Authorization URL: {auth_url}",
+            f"Markdown for hyperlink: [Click here to authorize Google Calendar access]({auth_url})\n",
+            "**LLM, after presenting the link, instruct the user as follows:**",
+            "1. Click the link and complete the authorization in their browser.",
+        ]
+        if not initial_email_provided:
+            message_lines.extend([
+                "2. After successful authorization, the browser page will display the authenticated email address.",
+                "   **LLM: Instruct the user to provide you with this email address.**",
+                "3. Once you have the email, **retry their original command, ensuring you include this `user_google_email`.**"
+            ])
+        else:
+            message_lines.append("2. After successful authorization, **retry their original command**.")
 
-        logger.info(f"Auth flow started. State: {state_from_flow}. Advise user to visit: {auth_url}")
+        message_lines.append(f"\nThe application will use the new credentials. If '{user_google_email}' was provided, it must match the authenticated account.")
+        message = "\n".join(message_lines)
         
-        # Return MCP-formatted response with auth URL and session ID
-        instructional_message = (
-            f"**ACTION REQUIRED: Authentication Needed**\n\n"
-            f"1. To proceed, please [click here to authorize Google Calendar access]({auth_url}).\n\n"
-            f"2. After successful authorization in your browser, you will receive an `auth_session_id` (it is: `{session_id_for_state}`).\n\n"
-            f"3. Call the `get_auth_result` tool, providing this `auth_session_id`, to obtain your verified `user_id`.\n\n"
-            f"4. Once you have your `user_id`, you can retry your original command."
-        )
         return types.CallToolResult(
-            isError=True, # Indicates an action is required from the user/LLM before proceeding
+            isError=True, # True because the original action is blocked until auth is complete.
             content=[
                 types.TextContent(
                     type="text",
-                    text=instructional_message
+                    text=message
                 )
             ]
         )
+    except FileNotFoundError as e:
+        error_text = f"OAuth client secrets file not found: {e}. Please ensure '{CONFIG_CLIENT_SECRETS_PATH}' is correctly configured."
+        logger.error(error_text, exc_info=True)
+        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=error_text)])
     except Exception as e:
-        error_message = f"Could not initiate authentication due to an unexpected error: {str(e)}"
-        logger.error(f"Failed to start the OAuth flow: {e}", exc_info=True)
-        # If session was created, mark it as failed
-        if 'auth_session' in locals() and auth_session: # Check if auth_session was defined
-            auth_session_manager.fail_session(auth_session.session_id, f"OAuth flow initiation error: {e}")
+        error_text = f"Could not initiate authentication for {user_display_name} due to an unexpected error: {str(e)}"
+        logger.error(f"Failed to start the OAuth flow for {user_display_name}: {e}", exc_info=True)
         return types.CallToolResult(
             isError=True,
             content=[
                 types.TextContent(
                     type="text",
-                    text=error_message
+                    text=error_text
                 )
             ]
         )
@@ -127,152 +136,93 @@ async def _initiate_auth_and_get_message(scopes: List[str]) -> types.CallToolRes
 # --- Tool Implementations ---
 
 @server.tool()
-async def start_auth() -> types.CallToolResult:
+async def start_auth(user_google_email: str) -> types.CallToolResult:
     """
-    Starts the Google OAuth authentication process using a session-based flow.
-    The user will be prompted to visit an authorization URL.
-    After authorization, they must call 'get_auth_result' with the provided
-    'auth_session_id' to obtain their verified user_id for subsequent tool calls.
-    
+    Starts the Google OAuth authentication process. Requires the user's Google email.
+    If the email is not known, the LLM must ask the user for it before calling this tool.
+    This tool is typically called when other tools indicate authentication is required
+    and the user's Google email is available.
+
+    The tool will return a message containing a special hyperlink for the user to click.
+    **LLM Instructions:**
+    - You MUST present the `auth_url` provided in the `TextContent` as a clickable hyperlink.
+    - Clearly instruct the user to click the link to authorize the application for the specified `user_google_email`.
+    - After they complete authorization, instruct them to **retry their original command**.
+    - If the initial attempt to get credentials failed because the email was unknown or not yet authenticated,
+      the message from this tool will guide you to ask the user for their email after they complete the browser flow.
+
+    Args:
+        user_google_email (str): The user's Google email address (e.g., 'example@gmail.com').
+                                 This is REQUIRED. Do not pass an empty string or "default".
     Returns:
-        A CallToolResult with the authentication URL, an auth_session_id, and instructions.
+        A CallToolResult (with `isError=True` because the original action is blocked)
+        containing `TextContent` with a Markdown-formatted hyperlink to the Google
+        authorization URL and clear instructions for the user and LLM.
     """
-    logger.info(f"Tool 'start_auth' invoked. This will initiate a new session-based OAuth flow.")
-    # Define desired scopes for general authentication, including userinfo
-    # These are the broadest scopes needed for any calendar operation.
-    auth_scopes = SCOPES # Use the comprehensive SCOPES from core.server
+    if not user_google_email or not isinstance(user_google_email, str) or '@' not in user_google_email:
+        error_msg = "Invalid or missing 'user_google_email'. This parameter is required and must be a valid email address. LLM, please ask the user for their Google email address."
+        logger.error(f"[start_auth] {error_msg}")
+        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=error_msg)])
+
+    logger.info(f"Tool 'start_auth' invoked for user_google_email: '{user_google_email}'. This will initiate a new OAuth flow.")
+    
+    auth_scopes = SCOPES
     
     logger.info(f"[start_auth] Using scopes: {auth_scopes}")
-    # The user_id is not known at this point; it will be determined after OAuth.
-    return await _initiate_auth_and_get_message(auth_scopes)
-
+    return await _initiate_auth_and_get_message(scopes=auth_scopes, user_google_email=user_google_email)
 
 @server.tool()
-async def get_auth_result(auth_session_id: str) -> types.CallToolResult:
-    """
-    Retrieves the result of an authentication attempt using the auth_session_id.
-    This tool should be called after the user completes the OAuth flow initiated by 'start_auth'.
-
-    Args:
-        auth_session_id (str): The session ID provided by the 'start_auth' tool.
-
-    Returns:
-        A CallToolResult containing the verified user_id if authentication was successful,
-        or an error message if it failed or is still pending.
-    """
-    logger.info(f"[get_auth_result] Tool invoked with auth_session_id: '{auth_session_id}'")
-    session = auth_session_manager.get_session(auth_session_id)
-
-    if not session:
-        message = f"Authentication session ID '{auth_session_id}' not found. Please ensure you are using the correct ID provided by 'start_auth' or restart the authentication process with 'start_auth'."
-        logger.warning(f"[get_auth_result] Auth session not found for ID: '{auth_session_id}'")
-        return types.CallToolResult(
-            isError=True,
-            content=[types.TextContent(type="text", text=message)]
-        )
-
-    if session.status == "pending":
-        message = "Authentication is still pending. Please ensure you have completed the authorization steps in your browser. Then, call this tool again."
-        logger.info(f"[get_auth_result] Auth session '{auth_session_id}' is still pending.")
-        return types.CallToolResult(
-            isError=True, # Still an error in the sense that the original goal isn't met
-            content=[types.TextContent(type="text", text=message)]
-        )
-    elif session.status == "completed" and session.user_id:
-        message = f"Authentication successful. Your verified user_id is: {session.user_id}. You can now use this user_id to retry your original command."
-        logger.info(f"[get_auth_result] Auth session '{auth_session_id}' completed. Verified user_id: '{session.user_id}'.")
-        return types.CallToolResult(
-            content=[
-                types.TextContent(type="text", text=message)
-            ]
-        )
-    elif session.status == "failed":
-        message = f"Authentication failed for session '{auth_session_id}'. Error: {session.error_message or 'Unknown reason.'}. Please try running 'start_auth' again."
-        logger.warning(f"[get_auth_result] Auth session '{auth_session_id}' failed. Error: {session.error_message}")
-        return types.CallToolResult(
-            isError=True,
-            content=[types.TextContent(type="text", text=message)]
-        )
-    else: # Should not happen
-        message = f"Authentication session '{auth_session_id}' is in an unknown state: {session.status}. This is an internal server error."
-        logger.error(f"[get_auth_result] Auth session '{auth_session_id}' is in an unknown state: {session.status}")
-        return types.CallToolResult(
-            isError=True,
-            content=[types.TextContent(type="text", text=message)]
-        )
-
-
-async def list_calendars(user_id: str) -> types.CallToolResult:
+async def list_calendars(user_google_email: str) -> types.CallToolResult:
     """
     Lists the Google Calendars the user has access to.
-    If not authenticated, prompts the user to authenticate and retry.
+    Requires the user's Google email. If not authenticated, prompts for authentication.
+    LLM: Ensure `user_google_email` is provided. If auth fails, the response will guide you.
     
     Args:
-        user_id (str): The user identifier to list calendars for
+        user_google_email (str): The user's Google email address (e.g., 'example@gmail.com'). REQUIRED.
         
     Returns:
         A CallToolResult with TextContent describing the list of calendars or an error message.
     """
-    logger.info(f"[list_calendars] Tool invoked for user: {user_id}")
-    # Always use full scopes to ensure future operations work
-    required_scopes = SCOPES
-    
-    # If user_id is 'default', try to find existing credentials
-    if user_id == 'default':
-        creds_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '.credentials')
-        if os.path.exists(creds_dir):
-            for file in os.listdir(creds_dir):
-                if file.endswith('.json'):
-                    potential_user_id = file[:-5]  # Remove .json extension
-                    if '@' in potential_user_id:  # Looks like an email
-                        user_id = potential_user_id
-                        logger.info(f"Found existing credentials, using user_id: {user_id}")
-                        break
+    if not user_google_email or not isinstance(user_google_email, str) or '@' not in user_google_email:
+        error_msg = "Invalid or missing 'user_google_email'. This parameter is required and must be a valid email address. LLM, please ask the user for their Google email address."
+        logger.error(f"[list_calendars] {error_msg}")
+        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=error_msg)])
 
+    logger.info(f"[list_calendars] Tool invoked for user_google_email: {user_google_email}")
+    required_scopes = SCOPES 
+    
     try:
-        logger.info(f"[list_calendars] Attempting to get_credentials for user_id: '{user_id}'")
+        logger.info(f"[list_calendars] Attempting to get_credentials for user_google_email: '{user_google_email}'")
         credentials = await asyncio.to_thread(
             get_credentials,
-            user_id,
+            user_google_email, 
             required_scopes,
-            client_secrets_path=CONFIG_CLIENT_SECRETS_PATH # Use config
+            client_secrets_path=CONFIG_CLIENT_SECRETS_PATH
         )
         logger.debug(f"get_credentials returned: {credentials}")
     except Exception as e:
-        message = f"Failed to get credentials for user '{user_id}': {e}. This might be an internal issue or the stored credentials might be corrupted. You can try to re-authenticate using the 'start_auth' tool."
-        logger.error(f"Error getting credentials for {user_id}: {e}", exc_info=True)
+        message = f"Failed to get credentials for user '{user_google_email}': {e}. This might be an internal issue. You can try to re-authenticate using the 'start_auth' tool (ensure you provide the user_google_email)."
+        logger.error(f"Error getting credentials for {user_google_email}: {e}", exc_info=True)
         return types.CallToolResult(
             isError=True,
             content=[types.TextContent(type="text", text=message)]
         )
 
     if not credentials or not credentials.valid:
-        tool_name = "list_calendars"
-        message = (
-            f"**Authentication Required for '{tool_name}'**\n\n"
-            f"Valid credentials for user '{user_id}' are missing or invalid.\n\n"
-            f"Please follow these steps:\n"
-            f"1. Call the `start_auth` tool (it takes no arguments). This will provide an authorization URL and an `auth_session_id`.\n"
-            f"2. Complete the authorization flow in your browser.\n"
-            f"3. Call the `get_auth_result` tool with the `auth_session_id` obtained in step 1. This will return your verified `user_id`.\n"
-            f"4. Retry the `{tool_name}` command using the verified `user_id`."
-        )
-        logger.warning(f"[{tool_name}] Missing or invalid credentials for user '{user_id}'. Instructing LLM to use 'start_auth' and 'get_auth_result'.")
-        return types.CallToolResult(
-            isError=True, # Action required from user/LLM
-            content=[types.TextContent(type="text", text=message)]
-        )
+        logger.warning(f"[list_calendars] Missing or invalid credentials for user '{user_google_email}'. Triggering auth flow.")
+        return await _initiate_auth_and_get_message(scopes=SCOPES, user_google_email=user_google_email)
 
     try:
         service = build('calendar', 'v3', credentials=credentials)
-        logger.info(f"Successfully built calendar service for user: {user_id}")
+        logger.info(f"Successfully built calendar service for user: {user_google_email}")
 
         calendar_list_response = await asyncio.to_thread(service.calendarList().list().execute)
         items = calendar_list_response.get('items', [])
 
         if not items:
             return types.CallToolResult(
-                content=[types.TextContent(type="text", text=f"No calendars found for user '{user_id}'.")]
+                content=[types.TextContent(type="text", text=f"No calendars found for user '{user_google_email}'.")]
             )
 
         calendars_summary_list = []
@@ -282,8 +232,8 @@ async def list_calendars(user_id: str) -> types.CallToolResult:
             primary_indicator = " (Primary)" if calendar.get('primary') else ""
             calendars_summary_list.append(f"- \"{summary}\"{primary_indicator} (ID: {cal_id})")
         
-        calendars_text_output = f"Successfully listed {len(items)} calendars for user '{user_id}':\n" + "\n".join(calendars_summary_list)
-        logger.info(f"Successfully listed {len(items)} calendars for user: {user_id}")
+        calendars_text_output = f"Successfully listed {len(items)} calendars for user '{user_google_email}':\n" + "\n".join(calendars_summary_list)
+        logger.info(f"Successfully listed {len(items)} calendars for user: {user_google_email}")
         
         return types.CallToolResult(
             content=[
@@ -292,15 +242,15 @@ async def list_calendars(user_id: str) -> types.CallToolResult:
         )
 
     except HttpError as error:
-        message = f"An API error occurred while listing calendars for user '{user_id}': {error}. This might be due to insufficient permissions or an issue with the Google Calendar API. You might need to re-authenticate using 'start_auth'."
-        logger.error(f"An API error occurred for user {user_id} listing calendars: {error}", exc_info=True)
+        message = f"An API error occurred while listing calendars for user '{user_google_email}': {error}. This might be due to insufficient permissions or an issue with the Google Calendar API. You might need to re-authenticate using 'start_auth' (ensure you provide the user_google_email)."
+        logger.error(f"An API error occurred for user {user_google_email} listing calendars: {error}", exc_info=True)
         return types.CallToolResult(
             isError=True,
             content=[types.TextContent(type="text", text=message)]
         )
     except Exception as e:
-        message = f"An unexpected error occurred while listing calendars for user '{user_id}': {e}."
-        logger.exception(f"An unexpected error occurred while listing calendars for {user_id}: {e}")
+        message = f"An unexpected error occurred while listing calendars for user '{user_google_email}': {e}."
+        logger.exception(f"An unexpected error occurred while listing calendars for {user_google_email}: {e}")
         return types.CallToolResult(
             isError=True,
             content=[types.TextContent(type="text", text=message)]
@@ -308,80 +258,73 @@ async def list_calendars(user_id: str) -> types.CallToolResult:
 
 @server.tool()
 async def get_events(
-    user_id: str,
+    user_google_email: str,
     calendar_id: str = 'primary',
     time_min: Optional[str] = None,
     time_max: Optional[str] = None,
     max_results: int = 25,
 ) -> types.CallToolResult:
     """
-    Lists events from a specified Google Calendar within a given time range.
-    If not authenticated, prompts the user to authenticate and retry.
+    Lists events from a specified Google Calendar. Requires the user's Google email.
+    If not authenticated, prompts for authentication.
+    LLM: Ensure `user_google_email` is provided. If auth fails, the response will guide you.
     
     Args:
-        user_id (str): The user identifier to get events for
-        calendar_id (str): The calendar ID to fetch events from (default: 'primary')
-        time_min (Optional[str]): The start time for fetching events (RFC3339 timestamp)
-        time_max (Optional[str]): The end time for fetching events (RFC3339 timestamp)
-        max_results (int): Maximum number of events to return (default: 25)
+        user_google_email (str): The user's Google email address (e.g., 'example@gmail.com'). REQUIRED.
+        calendar_id (str): The calendar ID to fetch events from (default: 'primary').
+        time_min (Optional[str]): The start time for fetching events (RFC3339 timestamp).
+        time_max (Optional[str]): The end time for fetching events (RFC3339 timestamp).
+        max_results (int): Maximum number of events to return (default: 25).
         
     Returns:
         A CallToolResult with TextContent describing the list of events or an error message.
     """
-    logger.info(f"[get_events] Tool invoked for user: {user_id}, calendar: {calendar_id}")
-    required_scopes = [CALENDAR_READONLY_SCOPE]
+    if not user_google_email or not isinstance(user_google_email, str) or '@' not in user_google_email:
+        error_msg = "Invalid or missing 'user_google_email'. This parameter is required and must be a valid email address. LLM, please ask the user for their Google email address."
+        logger.error(f"[get_events] {error_msg}")
+        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=error_msg)])
+
+    logger.info(f"[get_events] Tool invoked for user_google_email: {user_google_email}, calendar: {calendar_id}")
+    required_scopes_for_check = [CALENDAR_READONLY_SCOPE] 
 
     try:
-        logger.info(f"[get_events] Attempting to get_credentials for user_id: '{user_id}' with scopes: {required_scopes}") # ADDED LOG
+        logger.info(f"[get_events] Attempting to get_credentials for user_google_email: '{user_google_email}' with specific check for scopes: {required_scopes_for_check}")
         credentials = await asyncio.to_thread(
             get_credentials,
-            user_id,
-            required_scopes,
-            client_secrets_path=CONFIG_CLIENT_SECRETS_PATH # Use config
+            user_google_email, 
+            required_scopes_for_check, 
+            client_secrets_path=CONFIG_CLIENT_SECRETS_PATH
         )
         logger.debug(f"get_credentials returned: {credentials}")
     except Exception as e:
-        message = f"Failed to get credentials for user '{user_id}': {e}. This might be an internal issue or the stored credentials might be corrupted. You can try to re-authenticate using the 'start_auth' tool."
-        logger.error(f"Error getting credentials for {user_id}: {e}", exc_info=True)
+        message = f"Failed to get credentials for user '{user_google_email}': {e}. This might be an internal issue. You can try to re-authenticate using the 'start_auth' tool (ensure you provide the user_google_email)."
+        logger.error(f"Error getting credentials for {user_google_email}: {e}", exc_info=True)
         return types.CallToolResult(
             isError=True,
             content=[types.TextContent(type="text", text=message)]
         )
 
     if not credentials or not credentials.valid:
-        tool_name = "get_events"
-        message = (
-            f"**Authentication Required for '{tool_name}'**\n\n"
-            f"Valid credentials for user '{user_id}' are missing or invalid.\n\n"
-            f"Please follow these steps:\n"
-            f"1. Call the `start_auth` tool (it takes no arguments). This will provide an authorization URL and an `auth_session_id`.\n"
-            f"2. Complete the authorization flow in your browser.\n"
-            f"3. Call the `get_auth_result` tool with the `auth_session_id` obtained in step 1. This will return your verified `user_id`.\n"
-            f"4. Retry the `{tool_name}` command using the verified `user_id`."
-        )
-        logger.warning(f"[{tool_name}] Missing or invalid credentials for user '{user_id}'. Instructing LLM to use 'start_auth' and 'get_auth_result'.")
-        return types.CallToolResult(
-            isError=True, # Action required from user/LLM
-            content=[types.TextContent(type="text", text=message)]
-        )
+        logger.warning(f"[get_events] Missing or invalid credentials for user '{user_google_email}'. Triggering auth flow with full SCOPES.")
+        return await _initiate_auth_and_get_message(scopes=SCOPES, user_google_email=user_google_email)
 
     try:
         service = build('calendar', 'v3', credentials=credentials)
-        logger.info(f"Successfully built calendar service for user: {user_id}")
+        logger.info(f"Successfully built calendar service for user: {user_google_email}")
 
         effective_time_min = time_min
         if effective_time_min is None:
-            effective_time_min = datetime.datetime.utcnow().isoformat() + 'Z' # Default to now
+            effective_time_min = datetime.datetime.utcnow().isoformat() + 'Z' 
             logger.info(f"Defaulting time_min to current time: {effective_time_min}")
         
         time_max_log = f"and {time_max}" if time_max else "indefinitely (no end time specified)"
-        logger.info(f"Fetching events for {user_id} from calendar '{calendar_id}' starting {effective_time_min} {time_max_log}, max results: {max_results}")
+        logger.info(f"Fetching events for {user_google_email} from calendar '{calendar_id}' starting {effective_time_min} {time_max_log}, max results: {max_results}")
 
         events_result = await asyncio.to_thread(
             service.events().list(
                 calendarId=calendar_id,
                 timeMin=effective_time_min,
-                timeMax=time_max, # Can be None
+                timeMax=time_max, 
                 maxResults=max_results,
                 singleEvents=True,
                 orderBy='startTime'
@@ -391,24 +334,24 @@ async def get_events(
 
         if not items:
             return types.CallToolResult(
-                content=[types.TextContent(type="text", text=f"No events found for user '{user_id}' in calendar '{calendar_id}' for the specified time range.")]
+                content=[types.TextContent(type="text", text=f"No events found for user '{user_google_email}' in calendar '{calendar_id}' for the specified time range.")]
             )
 
-        event_summary_list = []
-        for event_item in items:
+        event_details_list = []
+        for event_item in items: 
             summary = event_item.get('summary', 'No Title')
             start_obj = event_item['start']
-            start_time_str = start_obj.get('dateTime', start_obj.get('date')) # Handles all-day events
-            event_id = event_item['id']
-            event_link = event_item.get('htmlLink', '')
+            start_time_str = start_obj.get('dateTime', start_obj.get('date')) 
+            event_id = event_item['id'] 
+            event_link = event_item.get('htmlLink', '') 
             
             event_desc = f"- \"{summary}\" starting at {start_time_str} (ID: {event_id})"
             if event_link:
                 event_desc += f" [Link: {event_link}]"
-            event_summary_list.append(event_desc)
+            event_details_list.append(event_desc) 
             
-        events_text_output = f"Successfully fetched {len(items)} events for user '{user_id}' from calendar '{calendar_id}':\n" + "\n".join(event_summary_list)
-        logger.info(f"Successfully retrieved {len(items)} events for user: {user_id}, calendar: {calendar_id}")
+        events_text_output = f"Successfully fetched {len(items)} events for user '{user_google_email}' from calendar '{calendar_id}':\n" + "\n".join(event_details_list) 
+        logger.info(f"Successfully retrieved {len(items)} events for user: {user_google_email}, calendar: {calendar_id}")
         
         return types.CallToolResult(
             content=[
@@ -417,15 +360,15 @@ async def get_events(
         )
 
     except HttpError as error:
-        message = f"An API error occurred while fetching events for user '{user_id}': {error}. This might be due to insufficient permissions or an issue with the Google Calendar API. You might need to re-authenticate using 'start_auth'."
-        logger.error(f"An API error occurred for user {user_id} getting events: {error}", exc_info=True)
+        message = f"An API error occurred while fetching events for user '{user_google_email}': {error}. This might be due to insufficient permissions or an issue with the Google Calendar API. You might need to re-authenticate using 'start_auth' (ensure you provide the user_google_email)."
+        logger.error(f"An API error occurred for user {user_google_email} getting events: {error}", exc_info=True)
         return types.CallToolResult(
             isError=True,
             content=[types.TextContent(type="text", text=message)]
         )
     except Exception as e:
-        message = f"An unexpected error occurred while fetching events for user '{user_id}': {e}."
-        logger.exception(f"An unexpected error occurred while getting events for {user_id}: {e}")
+        message = f"An unexpected error occurred while fetching events for user '{user_google_email}': {e}."
+        logger.exception(f"An unexpected error occurred while getting events for {user_google_email}: {e}")
         return types.CallToolResult(
             isError=True,
             content=[types.TextContent(type="text", text=message)]
@@ -434,10 +377,10 @@ async def get_events(
 
 @server.tool()
 async def create_event(
-    user_id: str,
+    user_google_email: str,
     summary: str,
-    start_time: str,
-    end_time: str,
+    start_time: str, 
+    end_time: str,   
     calendar_id: str = 'primary',
     description: Optional[str] = None,
     location: Optional[str] = None,
@@ -445,76 +388,68 @@ async def create_event(
     timezone: Optional[str] = None,
 ) -> types.CallToolResult:
     """
-    Creates a new event in a specified Google Calendar.
-    If not authenticated, prompts the user to authenticate and retry.
+    Creates a new event in a specified Google Calendar. Requires the user's Google email.
+    If not authenticated, prompts for authentication.
+    LLM: Ensure `user_google_email` is provided. If auth fails, the response will guide you.
     
     Args:
-        user_id (str): The user identifier to create the event for
-        summary (str): The event title/summary
-        start_time (str): The event start time (RFC3339 timestamp)
-        end_time (str): The event end time (RFC3339 timestamp)
-        calendar_id (str): The calendar ID to create the event in (default: 'primary')
-        description (Optional[str]): Event description
-        location (Optional[str]): Event location
-        attendees (Optional[List[str]]): List of attendee email addresses
-        timezone (Optional[str]): Timezone for the event
+        user_google_email (str): The user's Google email address (e.g., 'example@gmail.com'). REQUIRED.
+        summary (str): The event title/summary.
+        start_time (str): The event start time (RFC3339 timestamp, e.g., "2023-10-27T10:00:00-07:00" or "2023-10-27" for all-day).
+        end_time (str): The event end time (RFC3339 timestamp, e.g., "2023-10-27T11:00:00-07:00" or "2023-10-28" for all-day).
+        calendar_id (str): The calendar ID to create the event in (default: 'primary').
+        description (Optional[str]): Event description.
+        location (Optional[str]): Event location.
+        attendees (Optional[List[str]]): List of attendee email addresses.
+        timezone (Optional[str]): Timezone for the event (e.g., "America/New_York"). Required if start/end times are not UTC and not all-day.
         
     Returns:
         A CallToolResult with TextContent confirming event creation or an error message.
     """
-    logger.info(f"Attempting to create event for user: {user_id}, calendar: {calendar_id}")
-    required_scopes = [CALENDAR_EVENTS_SCOPE] # Write scope needed
-    logger.info(f"[create_event] Requesting credentials with scopes: {required_scopes}")
+    if not user_google_email or not isinstance(user_google_email, str) or '@' not in user_google_email:
+        error_msg = "Invalid or missing 'user_google_email'. This parameter is required and must be a valid email address. LLM, please ask the user for their Google email address."
+        logger.error(f"[create_event] {error_msg}")
+        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=error_msg)])
+
+    logger.info(f"[create_event] Tool invoked for user_google_email: {user_google_email}, summary: {summary}")
+    required_scopes_for_check = [CALENDAR_EVENTS_SCOPE] 
 
     try:
+        logger.info(f"[create_event] Attempting to get_credentials for user_google_email: '{user_google_email}' with specific check for scopes: {required_scopes_for_check}")
         credentials = await asyncio.to_thread(
             get_credentials,
-            user_id,
-            required_scopes,
-            client_secrets_path=CONFIG_CLIENT_SECRETS_PATH # Use config
+            user_google_email, 
+            required_scopes_for_check, 
+            client_secrets_path=CONFIG_CLIENT_SECRETS_PATH
         )
         logger.debug(f"get_credentials returned: {credentials}")
     except Exception as e:
-        message = f"Failed to get credentials for user '{user_id}': {e}. This might be an internal issue or the stored credentials might be corrupted. You can try to re-authenticate using the 'start_auth' tool."
-        logger.error(f"Error getting credentials for {user_id}: {e}", exc_info=True)
-        return types.CallToolResult(
-            isError=True,
-            content=[types.TextContent(type="text", text=message)]
-        )
+        message = f"Failed to get credentials for user '{user_google_email}': {e}. This might be an internal issue. You can try to re-authenticate using the 'start_auth' tool (ensure you provide the user_google_email)."
+        logger.error(f"Error getting credentials for {user_google_email}: {e}", exc_info=True)
+        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=message)])
 
     if not credentials or not credentials.valid:
-        tool_name = "create_event"
-        message = (
-            f"**Authentication Required for '{tool_name}'**\n\n"
-            f"Valid credentials for user '{user_id}' are missing or invalid.\n\n"
-            f"Please follow these steps:\n"
-            f"1. Call the `start_auth` tool (it takes no arguments). This will provide an authorization URL and an `auth_session_id`.\n"
-            f"2. Complete the authorization flow in your browser.\n"
-            f"3. Call the `get_auth_result` tool with the `auth_session_id` obtained in step 1. This will return your verified `user_id`.\n"
-            f"4. Retry the `{tool_name}` command using the verified `user_id`."
-        )
-        logger.warning(f"[{tool_name}] Missing or invalid credentials for user '{user_id}'. Instructing LLM to use 'start_auth' and 'get_auth_result'.")
-        return types.CallToolResult(
-            isError=True, # Action required from user/LLM
-            content=[types.TextContent(type="text", text=message)]
-        )
+        logger.warning(f"[create_event] Missing or invalid credentials for user '{user_google_email}'. Triggering auth flow with full SCOPES.")
+        return await _initiate_auth_and_get_message(scopes=SCOPES, user_google_email=user_google_email)
 
     try:
         service = build('calendar', 'v3', credentials=credentials)
-        logger.info(f"Successfully built calendar service for user: {user_id}")
+        logger.info(f"Successfully built calendar service for user: {user_google_email}")
 
         event_body: Dict[str, Any] = {
             'summary': summary,
-            'start': {'dateTime': start_time}, # Timezone will be added if provided
-            'end': {'dateTime': end_time},     # Timezone will be added if provided
+            'start': {'date': start_time} if 'T' not in start_time else {'dateTime': start_time},
+            'end': {'date': end_time} if 'T' not in end_time else {'dateTime': end_time},
         }
         if location:
             event_body['location'] = location
         if description:
             event_body['description'] = description
-        if timezone: # Apply timezone to start and end if provided
-            event_body['start']['timeZone'] = timezone
-            event_body['end']['timeZone'] = timezone
+        if timezone: 
+            if 'dateTime' in event_body['start']:
+                 event_body['start']['timeZone'] = timezone
+            if 'dateTime' in event_body['end']:
+                event_body['end']['timeZone'] = timezone
         if attendees:
             event_body['attendees'] = [{'email': email_address} for email_address in attendees]
 
@@ -532,7 +467,7 @@ async def create_event(
         event_link_text = created_event_details.get('htmlLink', 'N/A')
         created_time_text = created_event_details.get('created', 'N/A')
 
-        logger.info(f"Successfully created event for user: {user_id}, event ID: {event_id_text}, Link: {event_link_text}")
+        logger.info(f"Successfully created event for user: {user_google_email}, event ID: {event_id_text}, Link: {event_link_text}")
         
         success_message = (
             f"Successfully created event: \"{event_summary_text}\".\n"
@@ -542,22 +477,14 @@ async def create_event(
             f"- Created at: {created_time_text}"
         )
         return types.CallToolResult(
-            content=[
-                types.TextContent(type="text", text=success_message)
-            ]
+            content=[types.TextContent(type="text", text=success_message)]
         )
 
     except HttpError as error:
-        message = f"An API error occurred while creating event for user '{user_id}': {error}. This could be due to invalid event details (e.g., time format), insufficient permissions, or an issue with the Google Calendar API. You might need to re-authenticate using 'start_auth'."
-        logger.error(f"An API error occurred for user {user_id} creating event: {error}", exc_info=True)
-        return types.CallToolResult(
-            isError=True,
-            content=[types.TextContent(type="text", text=message)]
-        )
+        message = f"An API error occurred while creating event for user '{user_google_email}': {error}. This could be due to invalid event details (e.g., time format), insufficient permissions, or an issue with the Google Calendar API. You might need to re-authenticate using 'start_auth' (ensure you provide the user_google_email)."
+        logger.error(f"An API error occurred for user {user_google_email} creating event: {error}", exc_info=True)
+        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=message)])
     except Exception as e:
-        message = f"An unexpected error occurred while creating event for user '{user_id}': {e}."
-        logger.exception(f"An unexpected error occurred while creating event for {user_id}: {e}")
-        return types.CallToolResult(
-            isError=True,
-            content=[types.TextContent(type="text", text=message)]
-        )
+        message = f"An unexpected error occurred while creating event for user '{user_google_email}': {e}."
+        logger.exception(f"An unexpected error occurred while creating event for {user_google_email}: {e}")
+        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=message)])

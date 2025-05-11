@@ -13,7 +13,7 @@ from mcp.server.fastmcp import FastMCP
 
 from google.auth.exceptions import RefreshError
 from auth.google_auth import handle_auth_callback, load_client_secrets
-from auth.auth_session_manager import auth_session_manager
+# auth_session_manager is no longer used here with the simplified flow
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -58,162 +58,97 @@ OAUTH_REDIRECT_URI = f"http://localhost:{DEFAULT_PORT}/oauth2callback"
 async def oauth2_callback(request: Request) -> HTMLResponse:
     """
     Handle OAuth2 callback from Google via a custom route.
-    Updates the AuthSessionManager with the result.
+    This endpoint exchanges the authorization code for credentials and saves them.
+    It then displays a success or error page to the user.
     """
+    # State is used by google-auth-library for CSRF protection and should be present.
+    # We don't need to track it ourselves in this simplified flow.
     state = request.query_params.get("state")
     code = request.query_params.get("code")
     error = request.query_params.get("error")
 
-    if not state:
-        logger.error("OAuth callback missing 'state' parameter.")
-        # Cannot update session manager without state
-        return HTMLResponse(content="Authentication Error: Critical 'state' parameter missing from callback.", status_code=400)
-
     if error:
-        error_message = f"OAuth provider returned an error: {error}"
-        logger.error(f"OAuth callback error for state '{state}': {error_message}")
-        auth_session_manager.fail_session(state, error_message)
+        error_message = f"Authentication failed: Google returned an error: {error}. State: {state}."
+        logger.error(error_message)
         return HTMLResponse(content=f"""
             <html><head><title>Authentication Error</title></head>
-            <body><h2>Authentication Error</h2><p>{error_message}</p><p>You can close this window.</p></body></html>
+            <body><h2>Authentication Error</h2><p>{error_message}</p>
+            <p>Please ensure you grant the requested permissions. You can close this window and try again.</p></body></html>
         """, status_code=400)
 
     if not code:
-        error_message = "Missing authorization code in OAuth callback."
-        logger.error(f"OAuth callback error for state '{state}': {error_message}")
-        auth_session_manager.fail_session(state, error_message)
+        error_message = "Authentication failed: No authorization code received from Google."
+        logger.error(error_message)
         return HTMLResponse(content=f"""
             <html><head><title>Authentication Error</title></head>
-            <body><h2>Authentication Error</h2><p>{error_message}</p><p>You can close this window.</p></body></html>
+            <body><h2>Authentication Error</h2><p>{error_message}</p><p>You can close this window and try again.</p></body></html>
         """, status_code=400)
 
     try:
         client_secrets_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'client_secret.json')
         if not os.path.exists(client_secrets_path):
-            logger.error(f"Client secrets file not found at {client_secrets_path}")
-            raise FileNotFoundError("Client secrets configuration is missing.")
+            logger.error(f"OAuth client secrets file not found at {client_secrets_path}")
+            # This is a server configuration error, should not happen in a deployed environment.
+            return HTMLResponse(content="Server Configuration Error: Client secrets not found.", status_code=500)
 
-        logger.info(f"OAuth callback for state '{state}': Received code. Attempting to exchange for tokens.")
+        logger.info(f"OAuth callback: Received code (state: {state}). Attempting to exchange for tokens.")
         
-        # Exchange code for credentials using full scopes
-        user_id, credentials = handle_auth_callback(
+        # Exchange code for credentials. handle_auth_callback will save them.
+        # The user_id returned here is the Google-verified email.
+        verified_user_id, credentials = handle_auth_callback(
             client_secrets_path=client_secrets_path,
-            scopes=SCOPES,
-            authorization_response=str(request.url), # handle_auth_callback expects the full URL
-            redirect_uri=OAUTH_REDIRECT_URI # This should match what was used to generate auth_url
+            scopes=SCOPES, # Ensure all necessary scopes are requested
+            authorization_response=str(request.url),
+            redirect_uri=OAUTH_REDIRECT_URI
         )
         
-        logger.info(f"Successfully exchanged code for credentials for state '{state}'. User ID: {user_id}")
-        auth_session_manager.complete_session(state, user_id)
+        logger.info(f"OAuth callback: Successfully authenticated and saved credentials for user: {verified_user_id} (state: {state}).")
         
-        # Return success page to the user
-        return HTMLResponse(content="""
+        # Return a more informative success page
+        success_page_content = f"""
             <html>
             <head>
                 <title>Authentication Successful</title>
                 <style>
-                    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; max-width: 500px; margin: 40px auto; padding: 20px; text-align: center; color: #333; }
-                    .status { color: #4CAF50; font-size: 24px; margin-bottom: 20px; }
-                    .message { margin-bottom: 30px; line-height: 1.5; }
-                    .button { background-color: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
+                    body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; text-align: center; color: #333; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
+                    .status {{ color: #4CAF50; font-size: 24px; margin-bottom: 15px; }}
+                    .message {{ margin-bottom: 20px; line-height: 1.6; }}
+                    .user-id {{ font-weight: bold; color: #2a2a2a; }}
+                    .button {{ background-color: #4CAF50; color: white; padding: 12px 25px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; text-decoration: none; display: inline-block; margin-top: 10px; }}
+                    .note {{ font-size: 0.9em; color: #555; margin-top: 25px; }}
                 </style>
-                <script> setTimeout(function() { window.close(); }, 5000); </script>
+                <script> setTimeout(function() {{ window.close(); }}, 10000); </script>
             </head>
             <body>
-                <div class="status">Authentication Successful</div>
-                <div class="message">You have successfully authenticated. You can now close this window and return to your application.</div>
+                <div class="status">✅ Authentication Successful</div>
+                <div class="message">
+                    You have successfully authenticated as <span class="user-id">{verified_user_id}</span>.
+                    Credentials have been saved.
+                </div>
+                <div class="message">
+                    You can now close this window and **retry your original command** in the application.
+                </div>
                 <button class="button" onclick="window.close()">Close Window</button>
+                <div class="note">This window will close automatically in 10 seconds.</div>
             </body>
             </html>
-        """)
+        """
+        return HTMLResponse(content=success_page_content)
         
     except Exception as e:
-        error_message_detail = f"Error processing OAuth callback for state '{state}': {str(e)}"
+        error_message_detail = f"Error processing OAuth callback (state: {state}): {str(e)}"
         logger.error(error_message_detail, exc_info=True)
-        auth_session_manager.fail_session(state, error_message_detail)
+        # Generic error page for any other issues during token exchange or credential saving
         return HTMLResponse(content=f"""
             <html>
-            <head><title>Authentication Error</title></head>
+            <head><title>Authentication Processing Error</title></head>
             <body>
                 <h2 style="color: #d32f2f;">Authentication Processing Error</h2>
-                <p>An error occurred while processing your authentication: {str(e)}</p>
-                <p>You can close this window and try again.</p>
+                <p>An unexpected error occurred while processing your authentication: {str(e)}</p>
+                <p>Please try again. You can close this window.</p>
             </body>
             </html>
         """, status_code=500)
 
-# Define OAuth callback as a tool (already registered via decorator)
-@server.tool("oauth2callback")
-async def oauth2callback(code: str = None, state: str = None, redirect_uri: str = f"http://localhost:{DEFAULT_PORT}/oauth2callback") -> types.CallToolResult:
-    """
-    Handle OAuth2 callback from Google - for integration with external servers.
-    
-    Args:
-        code (str, optional): Authorization code from OAuth callback
-        state (str, optional): State parameter from OAuth callback
-        redirect_uri (str, optional): Redirect URI for OAuth callback
-
-    Returns:
-        A CallToolResult with TextContent indicating success or failure of the callback processing.
-    """
-    if not state:
-        message = "OAuth callback tool error: 'state' parameter is missing. Cannot process this callback."
-        logger.error(message)
-        return types.CallToolResult(
-            isError=True,
-            content=[types.TextContent(type="text", text=message)]
-        )
-
-    if not code:
-        message = f"OAuth callback tool error for state '{state}': Authorization code not found in callback request."
-        logger.error(message)
-        auth_session_manager.fail_session(state, "Authorization code not provided to callback tool.")
-        return types.CallToolResult(
-            isError=True,
-            content=[types.TextContent(type="text", text=message)]
-        )
-
-    try:
-        client_secrets_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'client_secret.json')
-        if not os.path.exists(client_secrets_path):
-            logger.error(f"Client secrets file not found at {client_secrets_path} for oauth2callback tool.")
-            raise FileNotFoundError("Client secrets configuration is missing for oauth2callback tool.")
-
-        # Construct full authorization response URL as expected by handle_auth_callback
-        # The redirect_uri here should be the one this tool itself is "simulating" or was configured with.
-        # It might differ from OAUTH_REDIRECT_URI if this tool is called by an external system with a different callback.
-        full_callback_url = f"{redirect_uri}?code={code}&state={state}"
-        
-        logger.info(f"OAuth2Callback Tool: Processing for state '{state}'. Attempting to exchange code.")
-        user_id, credentials = handle_auth_callback(
-            client_secrets_path=client_secrets_path,
-            scopes=SCOPES,
-            authorization_response=full_callback_url, # Pass the constructed full URL
-            redirect_uri=redirect_uri # The redirect_uri used in this specific flow
-        )
-
-        logger.info(f"OAuth2Callback Tool: Successfully exchanged code for state '{state}'. User ID: {user_id}")
-        auth_session_manager.complete_session(state, user_id)
-        
-        success_message = f"OAuth callback processed successfully for session '{state}'. User identified as: {user_id}. You can now use 'get_auth_result' with this session ID if needed, or proceed with operations requiring this user_id."
-        return types.CallToolResult(
-            content=[
-                types.TextContent(type="text", text=success_message)
-            ]
-        )
-    except RefreshError as e:
-        error_message = f"OAuth callback tool error for state '{state}': Could not exchange authorization code for tokens. {str(e)}"
-        logger.error(error_message, exc_info=True)
-        auth_session_manager.fail_session(state, f"Token refresh/exchange error: {e}")
-        return types.CallToolResult(
-            isError=True,
-            content=[types.TextContent(type="text", text=error_message)]
-        )
-    except Exception as e:
-        error_message = f"OAuth callback tool error for state '{state}': An unexpected error occurred. {str(e)}"
-        logger.error(error_message, exc_info=True)
-        auth_session_manager.fail_session(state, f"Unexpected callback processing error: {e}")
-        return types.CallToolResult(
-            isError=True,
-            content=[types.TextContent(type="text", text=error_message)]
-        )
+# The @server.tool("oauth2callback") is removed as it's redundant with the custom HTTP route
+# and the simplified "authorize and retry" flow.
