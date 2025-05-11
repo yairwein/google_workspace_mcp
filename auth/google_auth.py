@@ -21,18 +21,24 @@ logger = logging.getLogger(__name__)
 DEFAULT_CREDENTIALS_DIR = ".credentials"
 DEFAULT_REDIRECT_URI = "http://localhost:8000/oauth2callback"
 
+# In-memory cache for session credentials
+# Maps session_id to Credentials object
+# This should be a more robust cache in a production system (e.g., Redis)
+_SESSION_CREDENTIALS_CACHE: Dict[str, Credentials] = {}
+
+
 # --- Helper Functions ---
 
-def _get_user_credential_path(user_id: str, base_dir: str = DEFAULT_CREDENTIALS_DIR) -> str:
+def _get_user_credential_path(user_google_email: str, base_dir: str = DEFAULT_CREDENTIALS_DIR) -> str:
     """Constructs the path to a user's credential file."""
     if not os.path.exists(base_dir):
         os.makedirs(base_dir)
         logger.info(f"Created credentials directory: {base_dir}")
-    return os.path.join(base_dir, f"{user_id}.json")
+    return os.path.join(base_dir, f"{user_google_email}.json")
 
-def _save_credentials(user_id: str, credentials: Credentials, base_dir: str = DEFAULT_CREDENTIALS_DIR):
+def save_credentials_to_file(user_google_email: str, credentials: Credentials, base_dir: str = DEFAULT_CREDENTIALS_DIR):
     """Saves user credentials to a file."""
-    creds_path = _get_user_credential_path(user_id, base_dir)
+    creds_path = _get_user_credential_path(user_google_email, base_dir)
     creds_data = {
         'token': credentials.token,
         'refresh_token': credentials.refresh_token,
@@ -44,22 +50,26 @@ def _save_credentials(user_id: str, credentials: Credentials, base_dir: str = DE
     try:
         with open(creds_path, 'w') as f:
             json.dump(creds_data, f)
-        logger.info(f"Credentials saved for user {user_id} to {creds_path}")
+        logger.info(f"Credentials saved for user {user_google_email} to {creds_path}")
     except IOError as e:
-        logger.error(f"Error saving credentials for user {user_id} to {creds_path}: {e}")
+        logger.error(f"Error saving credentials for user {user_google_email} to {creds_path}: {e}")
         raise
 
-def _load_credentials(user_id: str, base_dir: str = DEFAULT_CREDENTIALS_DIR) -> Optional[Credentials]:
+def save_credentials_to_session(session_id: str, credentials: Credentials):
+    """Saves user credentials to the in-memory session cache."""
+    _SESSION_CREDENTIALS_CACHE[session_id] = credentials
+    logger.info(f"Credentials saved to session cache for session_id: {session_id}")
+
+def load_credentials_from_file(user_google_email: str, base_dir: str = DEFAULT_CREDENTIALS_DIR) -> Optional[Credentials]:
     """Loads user credentials from a file."""
-    creds_path = _get_user_credential_path(user_id, base_dir)
+    creds_path = _get_user_credential_path(user_google_email, base_dir)
     if not os.path.exists(creds_path):
-        logger.info(f"No credentials file found for user {user_id} at {creds_path}")
+        logger.info(f"No credentials file found for user {user_google_email} at {creds_path}")
         return None
 
     try:
         with open(creds_path, 'r') as f:
             creds_data = json.load(f)
-        # Ensure all necessary keys are present, especially refresh_token which might be None
         credentials = Credentials(
             token=creds_data.get('token'),
             refresh_token=creds_data.get('refresh_token'),
@@ -68,12 +78,20 @@ def _load_credentials(user_id: str, base_dir: str = DEFAULT_CREDENTIALS_DIR) -> 
             client_secret=creds_data.get('client_secret'),
             scopes=creds_data.get('scopes')
         )
-        logger.info(f"Credentials loaded for user {user_id} from {creds_path}")
+        logger.info(f"Credentials loaded for user {user_google_email} from {creds_path}")
         return credentials
     except (IOError, json.JSONDecodeError, KeyError) as e:
-        logger.error(f"Error loading or parsing credentials for user {user_id} from {creds_path}: {e}")
-        # Consider deleting the corrupted file or handling it differently
+        logger.error(f"Error loading or parsing credentials for user {user_google_email} from {creds_path}: {e}")
         return None
+
+def load_credentials_from_session(session_id: str) -> Optional[Credentials]:
+    """Loads user credentials from the in-memory session cache."""
+    credentials = _SESSION_CREDENTIALS_CACHE.get(session_id)
+    if credentials:
+        logger.info(f"Credentials loaded from session cache for session_id: {session_id}")
+    else:
+        logger.info(f"No credentials found in session cache for session_id: {session_id}")
+    return credentials
 
 def load_client_secrets(client_secrets_path: str) -> Dict[str, Any]:
     """Loads the client secrets file."""
@@ -146,21 +164,24 @@ def handle_auth_callback(
     scopes: List[str],
     authorization_response: str,
     redirect_uri: str = DEFAULT_REDIRECT_URI,
-    credentials_base_dir: str = DEFAULT_CREDENTIALS_DIR
+    credentials_base_dir: str = DEFAULT_CREDENTIALS_DIR,
+    session_id: Optional[str] = None
 ) -> Tuple[str, Credentials]:
     """
     Handles the callback from Google, exchanges the code for credentials,
-    fetches user info, determines user_id, saves credentials, and returns them.
+    fetches user info, determines user_google_email, saves credentials (file & session),
+    and returns them.
 
     Args:
         client_secrets_path: Path to the Google client secrets JSON file.
-        scopes: List of OAuth scopes requested (should match `start_auth_flow`).
-        authorization_response: The full callback URL received from Google.
-        redirect_uri: The redirect URI configured in the Google Cloud Console and used in start_auth_flow.
-        credentials_base_dir: Base directory to store credential files.
+        scopes: List of OAuth scopes requested.
+        authorization_response: The full callback URL from Google.
+        redirect_uri: The redirect URI.
+        credentials_base_dir: Base directory for credential files.
+        session_id: Optional MCP session ID to associate with the credentials.
 
     Returns:
-        A tuple containing the user_id (email) and the obtained Credentials object.
+        A tuple containing the user_google_email and the obtained Credentials object.
 
     Raises:
         ValueError: If the state is missing or doesn't match.
@@ -191,84 +212,98 @@ def handle_auth_callback(
              logger.error("Could not retrieve user email from Google.")
              raise ValueError("Failed to get user email for identification.")
 
-        user_id = user_info['email']
-        logger.info(f"Identified user ID: {user_id}")
+        user_google_email = user_info['email']
+        logger.info(f"Identified user_google_email: {user_google_email}")
 
-        # Save the credentials for this user
-        _save_credentials(user_id, credentials, credentials_base_dir)
+        # Save the credentials to file
+        save_credentials_to_file(user_google_email, credentials, credentials_base_dir)
 
-        return user_id, credentials
+        # If session_id is provided, also save to session cache
+        if session_id:
+            save_credentials_to_session(session_id, credentials)
+
+        return user_google_email, credentials
 
     except Exception as e: # Catch specific exceptions like FlowExchangeError if needed
         logger.error(f"Error handling auth callback: {e}")
         raise # Re-raise for the caller
 
 def get_credentials(
-    user_id: str,
+    user_google_email: Optional[str], # Can be None if relying on session_id
     required_scopes: List[str],
-    client_secrets_path: Optional[str] = None, # Needed for refresh
-    credentials_base_dir: str = DEFAULT_CREDENTIALS_DIR
+    client_secrets_path: Optional[str] = None,
+    credentials_base_dir: str = DEFAULT_CREDENTIALS_DIR,
+    session_id: Optional[str] = None
 ) -> Optional[Credentials]:
     """
-    Retrieves stored credentials for a user, refreshes if necessary.
+    Retrieves stored credentials, prioritizing session, then file. Refreshes if necessary.
+    If credentials are loaded from file and a session_id is present, they are cached in the session.
 
     Args:
-        user_id: The unique identifier for the user (e.g., email).
+        user_google_email: Optional user's Google email.
         required_scopes: List of scopes the credentials must have.
-        client_secrets_path: Path to client secrets, required *only* if refresh might be needed.
-        credentials_base_dir: Base directory where credential files are stored.
+        client_secrets_path: Path to client secrets, required for refresh if not in creds.
+        credentials_base_dir: Base directory for credential files.
+        session_id: Optional MCP session ID.
 
     Returns:
-        Valid Credentials object if found and valid/refreshed, otherwise None.
+        Valid Credentials object or None.
     """
-    logger.info(f"[get_credentials] Called for user_id: '{user_id}', required_scopes: {required_scopes}")
-    credential_file_path = _get_user_credential_path(user_id, credentials_base_dir)
-    logger.info(f"[get_credentials] Attempting to load credentials from: {credential_file_path}")
+    credentials: Optional[Credentials] = None
+    loaded_from_session = False
 
-    credentials = _load_credentials(user_id, credentials_base_dir)
+    logger.info(f"[get_credentials] Called for user_google_email: '{user_google_email}', session_id: '{session_id}', required_scopes: {required_scopes}")
+
+    if session_id:
+        credentials = load_credentials_from_session(session_id)
+        if credentials:
+            logger.info(f"[get_credentials] Loaded credentials from session for session_id '{session_id}'.")
+            loaded_from_session = True
+
+    if not credentials and user_google_email:
+        logger.info(f"[get_credentials] No session credentials, trying file for user_google_email '{user_google_email}'.")
+        credentials = load_credentials_from_file(user_google_email, credentials_base_dir)
+        if credentials and session_id:
+            logger.info(f"[get_credentials] Loaded from file for user '{user_google_email}', caching to session '{session_id}'.")
+            save_credentials_to_session(session_id, credentials) # Cache for current session
 
     if not credentials:
-        logger.info(f"[get_credentials] No stored credentials found for user '{user_id}' at {credential_file_path}.")
+        logger.info(f"[get_credentials] No credentials found for user '{user_google_email}' or session '{session_id}'.")
         return None
     
-    logger.info(f"[get_credentials] Successfully loaded credentials for user '{user_id}'. Scopes: {credentials.scopes}, Valid: {credentials.valid}, Expired: {credentials.expired}")
+    logger.info(f"[get_credentials] Credentials found. Scopes: {credentials.scopes}, Valid: {credentials.valid}, Expired: {credentials.expired}")
 
-    # Check if scopes are sufficient
     if not all(scope in credentials.scopes for scope in required_scopes):
-        logger.warning(f"[get_credentials] Stored credentials for user '{user_id}' lack required scopes. Need: {required_scopes}, Have: {credentials.scopes}")
-        # Re-authentication is needed to grant missing scopes
-        return None
+        logger.warning(f"[get_credentials] Credentials lack required scopes. Need: {required_scopes}, Have: {credentials.scopes}. User: '{user_google_email}', Session: '{session_id}'")
+        return None # Re-authentication needed for scopes
     
-    logger.info(f"[get_credentials] Stored credentials for user '{user_id}' have sufficient scopes.")
+    logger.info(f"[get_credentials] Credentials have sufficient scopes. User: '{user_google_email}', Session: '{session_id}'")
 
-    # Check if credentials are still valid or need refresh
     if credentials.valid:
-        logger.info(f"[get_credentials] Stored credentials for user '{user_id}' are valid.")
+        logger.info(f"[get_credentials] Credentials are valid. User: '{user_google_email}', Session: '{session_id}'")
         return credentials
     elif credentials.expired and credentials.refresh_token:
-        logger.info(f"[get_credentials] Credentials for user '{user_id}' expired. Attempting refresh.")
+        logger.info(f"[get_credentials] Credentials expired. Attempting refresh. User: '{user_google_email}', Session: '{session_id}'")
         if not client_secrets_path:
-             logger.error("[get_credentials] Client secrets path is required to refresh credentials but was not provided.")
-             # Cannot refresh without client secrets info
+             logger.error("[get_credentials] Client secrets path required for refresh but not provided.")
              return None
         try:
-            # Load client secrets to provide info for refresh
-            # Note: Credentials object holds client_id/secret if available from initial flow,
-            # but loading from file is safer if they weren't stored or if using InstalledAppFlow secrets.
-            logger.info(f"[get_credentials] Attempting to refresh token for user '{user_id}' using client_secrets_path: {client_secrets_path}")
-            client_config = load_client_secrets(client_secrets_path)
-            credentials.refresh(Request()) # Pass client_id/secret if needed and not in creds
-            logger.info(f"[get_credentials] Credentials for user '{user_id}' refreshed successfully.")
-            # Save the updated credentials (with potentially new access token)
-            _save_credentials(user_id, credentials, credentials_base_dir)
+            logger.info(f"[get_credentials] Refreshing token using client_secrets_path: {client_secrets_path}")
+            # client_config = load_client_secrets(client_secrets_path) # Not strictly needed if creds have client_id/secret
+            credentials.refresh(Request())
+            logger.info(f"[get_credentials] Credentials refreshed successfully. User: '{user_google_email}', Session: '{session_id}'")
+            
+            # Save refreshed credentials
+            if user_google_email: # Always save to file if email is known
+                save_credentials_to_file(user_google_email, credentials, credentials_base_dir)
+            if session_id: # Update session cache if it was the source or is active
+                save_credentials_to_session(session_id, credentials)
             return credentials
-        except Exception as e: # Catch specific refresh errors like google.auth.exceptions.RefreshError
-            logger.error(f"[get_credentials] Error refreshing credentials for user '{user_id}': {e}", exc_info=True)
-            # Failed to refresh, re-authentication is needed
-            return None
+        except Exception as e:
+            logger.error(f"[get_credentials] Error refreshing credentials: {e}. User: '{user_google_email}', Session: '{session_id}'", exc_info=True)
+            return None # Failed to refresh
     else:
-        logger.warning(f"[get_credentials] Credentials for user '{user_id}' are invalid and/or missing refresh token. Valid: {credentials.valid}, Refresh Token Present: {credentials.refresh_token is not None}")
-        # Invalid and cannot be refreshed, re-authentication needed
+        logger.warning(f"[get_credentials] Credentials invalid/cannot refresh. Valid: {credentials.valid}, Refresh Token: {credentials.refresh_token is not None}. User: '{user_google_email}', Session: '{session_id}'")
         return None
 
 

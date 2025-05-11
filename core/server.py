@@ -1,7 +1,7 @@
 import logging
 import os
 import sys
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from fastapi import Request
 from fastapi.responses import HTMLResponse
@@ -17,6 +17,9 @@ from auth.google_auth import handle_auth_callback, load_client_secrets
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
+# Temporary map to associate OAuth state with MCP session ID
+# This should ideally be a more robust cache in a production system (e.g., Redis)
+OAUTH_STATE_TO_SESSION_ID_MAP: Dict[str, str] = {}
 logger = logging.getLogger(__name__)
 
 # Individual OAuth Scope Constants
@@ -93,16 +96,24 @@ async def oauth2_callback(request: Request) -> HTMLResponse:
 
         logger.info(f"OAuth callback: Received code (state: {state}). Attempting to exchange for tokens.")
         
+        mcp_session_id: Optional[str] = OAUTH_STATE_TO_SESSION_ID_MAP.pop(state, None)
+        if mcp_session_id:
+            logger.info(f"OAuth callback: Retrieved MCP session ID '{mcp_session_id}' for state '{state}'.")
+        else:
+            logger.warning(f"OAuth callback: No MCP session ID found for state '{state}'. Auth will not be tied to a specific session directly via this callback.")
+
         # Exchange code for credentials. handle_auth_callback will save them.
         # The user_id returned here is the Google-verified email.
         verified_user_id, credentials = handle_auth_callback(
             client_secrets_path=client_secrets_path,
             scopes=SCOPES, # Ensure all necessary scopes are requested
             authorization_response=str(request.url),
-            redirect_uri=OAUTH_REDIRECT_URI
+            redirect_uri=OAUTH_REDIRECT_URI,
+            session_id=mcp_session_id # Pass session_id if available
         )
         
-        logger.info(f"OAuth callback: Successfully authenticated and saved credentials for user: {verified_user_id} (state: {state}).")
+        log_session_part = f" (linked to session: {mcp_session_id})" if mcp_session_id else ""
+        logger.info(f"OAuth callback: Successfully authenticated user: {verified_user_id} (state: {state}){log_session_part}.")
         
         # Return a more informative success page
         success_page_content = f"""
