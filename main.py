@@ -36,6 +36,7 @@ except Exception as e:
 # Import calendar tools to register them with the MCP server via decorators
 # Tools are registered when this module is imported
 import gcalendar.calendar_tools
+import gdrive.drive_tools # Import Drive tools to register them
 
 def main():
     """
