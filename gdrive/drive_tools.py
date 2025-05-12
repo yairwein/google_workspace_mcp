@@ -5,6 +5,7 @@ This module provides MCP tools for interacting with Google Drive API.
 """
 import logging
 import asyncio
+import re
 import os
 from typing import List, Optional, Dict, Any
 
@@ -139,9 +140,23 @@ async def search_drive_files(
     try:
         service = build('drive', 'v3', credentials=credentials)
         user_email_from_creds = credentials.id_token.get('email') if credentials.id_token else 'Unknown (Drive)'
+
+        # Check if the query looks like a structured Drive query or free text
+        # Basic check for operators or common keywords used in structured queries
+        drive_query_pattern = r"(\w+\s*(=|!=|>|<|contains|in|has)\s*['\"]?.+?['\"]?|\w+\s*(=|!=|>|<)\s*\d+|trashed\s*=\s*(true|false)|starred\s*=\s*(true|false)|properties\s+has\s*\{.*?\}|appProperties\s+has\s*\{.*?\}|'[^']+'\s+in\s+parents)"
+        is_structured_query = re.search(drive_query_pattern, query, re.IGNORECASE)
+
+        if is_structured_query:
+            final_query = query # Use as is
+        else:
+            # Assume free text search, escape single quotes and wrap
+            escaped_query = query.replace("'", "\\'")
+            final_query = f"fullText contains '{escaped_query}'"
+            logger.info(f"[search_drive_files] Reformatting free text query '{query}' to '{final_query}'")
+
         results = await asyncio.to_thread(
             service.files().list(
-                q=query,
+                q=final_query, # Use the potentially modified query
                 pageSize=page_size,
                 fields="nextPageToken, files(id, name, mimeType, webViewLink, iconLink, modifiedTime, size)"
             ).execute
