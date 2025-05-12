@@ -131,16 +131,29 @@ async def _initiate_auth_and_get_message(
 @server.tool()
 async def start_auth(user_google_email: str, mcp_session_id: Optional[str] = Header(None, alias="Mcp-Session-Id")) -> types.CallToolResult:
     """
-    Starts the Google OAuth authentication process for a specific Google email.
-    This authentication will be linked to the active MCP session if `mcp_session_id` is available from the header.
-    LLM: This tool REQUIRES `user_google_email`. If unknown, ask the user first.
+    Initiates the Google OAuth 2.0 authentication flow for the specified user email.
+    This is the primary method to establish credentials when no valid session exists or when targeting a specific account.
+    It generates an authorization URL that the LLM must present to the user.
+    The authentication attempt is linked to the current MCP session via `mcp_session_id`.
+
+    LLM Guidance:
+    - Use this tool when you need to authenticate a user for Google services and don't have existing valid credentials for the session or specified email.
+    - You MUST provide the `user_google_email`. If you don't know it, ask the user first.
+    - After calling this tool, present the returned authorization URL clearly to the user and instruct them to:
+        1. Click the link and complete the sign-in/consent process in their browser.
+        2. Note the authenticated email displayed on the success page.
+        3. Provide that email back to you (the LLM).
+        4. Retry their original request, including the confirmed `user_google_email`.
 
     Args:
-        user_google_email (str): The user's Google email address (e.g., 'example@gmail.com'). REQUIRED.
-        mcp_session_id (Optional[str]): The active MCP session ID (injected by FastMCP from Mcp-Session-Id header).
-                                 
+        user_google_email (str): The user's full Google email address (e.g., 'example@gmail.com'). This is REQUIRED.
+        mcp_session_id (Optional[str]): The active MCP session ID (automatically injected by FastMCP from the Mcp-Session-Id header). Links the OAuth flow state to the session.
+
     Returns:
-        A CallToolResult (isError=True) with instructions for the user to complete auth.
+        types.CallToolResult: An error result (`isError=True`) containing:
+                              - A detailed message for the LLM with the authorization URL and instructions to guide the user through the authentication process.
+                              - An error message if `user_google_email` is invalid or missing.
+                              - An error message if the OAuth flow initiation fails.
     """
     if not user_google_email or not isinstance(user_google_email, str) or '@' not in user_google_email:
         error_msg = "Invalid or missing 'user_google_email'. This parameter is required and must be a valid email address. LLM, please ask the user for their Google email address."
@@ -155,15 +168,20 @@ async def start_auth(user_google_email: str, mcp_session_id: Optional[str] = Hea
 @server.tool()
 async def list_calendars(user_google_email: Optional[str] = None, mcp_session_id: Optional[str] = Header(None, alias="Mcp-Session-Id")) -> types.CallToolResult:
     """
-    Lists Google Calendars. Prioritizes authenticated MCP session, then `user_google_email`.
-    If no valid authentication is found, guides the LLM to obtain user's email or use `start_auth`.
-    
+    Retrieves a list of calendars accessible to the authenticated user.
+    Prioritizes authentication via the active MCP session (`mcp_session_id`).
+    If the session isn't authenticated for Calendar, it falls back to using `user_google_email`.
+    If neither provides valid credentials, it returns a message guiding the LLM to request the user's email
+    or initiate the authentication flow via the `start_auth` tool.
+
     Args:
-        user_google_email (Optional[str]): User's Google email. Used if session isn't authenticated.
-        mcp_session_id (Optional[str]): Active MCP session ID (injected by FastMCP from Mcp-Session-Id header).
-        
+        user_google_email (Optional[str]): The user's Google email address. Required if the MCP session is not already authenticated for Calendar access.
+        mcp_session_id (Optional[str]): The active MCP session ID (automatically injected by FastMCP from the Mcp-Session-Id header). Used for session-based authentication.
+
     Returns:
-        A CallToolResult with the list of calendars or an error/auth guidance message.
+        types.CallToolResult: Contains a list of the user's calendars (summary, ID, primary status),
+                              an error message if the API call fails,
+                              or an authentication guidance message if credentials are required.
     """
     logger.info(f"[list_calendars] Invoked. Session: '{mcp_session_id}', Email: '{user_google_email}'")
     credentials = await asyncio.to_thread(
@@ -216,19 +234,24 @@ async def get_events(
     mcp_session_id: Optional[str] = Header(None, alias="Mcp-Session-Id")
 ) -> types.CallToolResult:
     """
-    Lists events from a Google Calendar. Prioritizes authenticated MCP session, then `user_google_email`.
-    If no valid authentication is found, guides the LLM to obtain user's email or use `start_auth`.
-    
+    Retrieves a list of events from a specified Google Calendar within a given time range.
+    Prioritizes authentication via the active MCP session (`mcp_session_id`).
+    If the session isn't authenticated for Calendar, it falls back to using `user_google_email`.
+    If neither provides valid credentials, it returns a message guiding the LLM to request the user's email
+    or initiate the authentication flow via the `start_auth` tool.
+
     Args:
-        user_google_email (Optional[str]): User's Google email. Used if session isn't authenticated.
-        calendar_id (str): Calendar ID (default: 'primary').
-        time_min (Optional[str]): Start time (RFC3339). Defaults to now if not set.
-        time_max (Optional[str]): End time (RFC3339).
-        max_results (int): Max events to return.
-        mcp_session_id (Optional[str]): Active MCP session ID (injected by FastMCP from Mcp-Session-Id header).
-        
+        user_google_email (Optional[str]): The user's Google email address. Required if the MCP session is not already authenticated for Calendar access.
+        calendar_id (str): The ID of the calendar to query. Use 'primary' for the user's primary calendar. Defaults to 'primary'. Calendar IDs can be obtained using `list_calendars`.
+        time_min (Optional[str]): The start of the time range (inclusive) in RFC3339 format (e.g., '2024-05-12T10:00:00Z' or '2024-05-12'). If omitted, defaults to the current time.
+        time_max (Optional[str]): The end of the time range (exclusive) in RFC3339 format. If omitted, events starting from `time_min` onwards are considered (up to `max_results`).
+        max_results (int): The maximum number of events to return. Defaults to 25.
+        mcp_session_id (Optional[str]): The active MCP session ID (automatically injected by FastMCP from the Mcp-Session-Id header). Used for session-based authentication.
+
     Returns:
-        A CallToolResult with the list of events or an error/auth guidance message.
+        types.CallToolResult: Contains a list of events (summary, start time, link) within the specified range,
+                              an error message if the API call fails,
+                              or an authentication guidance message if credentials are required.
     """
     logger.info(f"[get_events] Invoked. Session: '{mcp_session_id}', Email: '{user_google_email}', Calendar: {calendar_id}")
     credentials = await asyncio.to_thread(

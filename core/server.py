@@ -28,6 +28,18 @@ OPENID_SCOPE = 'openid'
 CALENDAR_READONLY_SCOPE = 'https://www.googleapis.com/auth/calendar.readonly'
 CALENDAR_EVENTS_SCOPE = 'https://www.googleapis.com/auth/calendar.events'
 
+# Google Drive scopes
+DRIVE_READONLY_SCOPE = 'https://www.googleapis.com/auth/drive.readonly'
+# Add other Drive scopes here if needed in the future, e.g.:
+# DRIVE_METADATA_READONLY_SCOPE = 'https://www.googleapis.com/auth/drive.metadata.readonly'
+DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file' # Per-file access
+
+# Gmail API scopes
+GMAIL_READONLY_SCOPE   = 'https://www.googleapis.com/auth/gmail.readonly'
+GMAIL_SEND_SCOPE       = 'https://www.googleapis.com/auth/gmail.send'
+# Optional, if you later need label management:
+# GMAIL_LABELS_SCOPE     = 'https://www.googleapis.com/auth/gmail.labels'
+
 # Base OAuth scopes required for user identification
 BASE_SCOPES = [
     USERINFO_EMAIL_SCOPE,
@@ -40,8 +52,19 @@ CALENDAR_SCOPES = [
     CALENDAR_EVENTS_SCOPE
 ]
 
-# Combined scopes for calendar operations
-SCOPES = BASE_SCOPES + CALENDAR_SCOPES
+# Drive-specific scopes
+DRIVE_SCOPES = [
+    DRIVE_READONLY_SCOPE
+]
+
+# Gmail-specific scopes
+GMAIL_SCOPES = [
+    GMAIL_READONLY_SCOPE,
+    GMAIL_SEND_SCOPE,
+]
+
+# Combined scopes for all supported Google Workspace operations
+SCOPES = list(set(BASE_SCOPES + CALENDAR_SCOPES + DRIVE_SCOPES + GMAIL_SCOPES + [DRIVE_FILE_SCOPE])) # Add DRIVE_FILE_SCOPE and GMAIL_SCOPES
 
 DEFAULT_PORT = 8000
 # Basic MCP server instance
