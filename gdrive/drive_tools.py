@@ -101,7 +101,22 @@ async def search_drive_files(
     mcp_session_id: Optional[str] = Header(None, alias="Mcp-Session-Id")
 ) -> types.CallToolResult:
     """
-    Searches for files in Google Drive based on a query string.
+    Searches for files and folders within a user's Google Drive based on a query string.
+    Prioritizes authentication via the active MCP session (`mcp_session_id`).
+    If the session isn't authenticated for Drive, it falls back to using `user_google_email`.
+    If neither provides valid credentials, it returns a message guiding the LLM to request the user's email
+    or initiate the authentication flow via `_initiate_drive_auth_and_get_message`.
+
+    Args:
+        query (str): The search query string. Supports Google Drive search operators (e.g., 'name contains "report"', 'mimeType="application/vnd.google-apps.document"', 'parents in "folderId"').
+        user_google_email (Optional[str]): The user's Google email address. Required if the MCP session is not already authenticated for Drive access.
+        page_size (int): The maximum number of files to return. Defaults to 10.
+        mcp_session_id (Optional[str]): The active MCP session ID (automatically injected by FastMCP from the Mcp-Session-Id header). Used for session-based authentication.
+
+    Returns:
+        types.CallToolResult: Contains a list of found files/folders with their details (ID, name, type, size, modified time, link),
+                              an error message if the API call fails,
+                              or an authentication guidance message if credentials are required.
     """
     logger.info(f"[search_drive_files] Invoked. Session: '{mcp_session_id}', Email: '{user_google_email}', Query: '{query}'")
     tool_specific_scopes = [DRIVE_READONLY_SCOPE]
@@ -157,7 +172,22 @@ async def get_drive_file_content(
     mcp_session_id: Optional[str] = Header(None, alias="Mcp-Session-Id")
 ) -> types.CallToolResult:
     """
-    Gets the content of a specific file from Google Drive.
+    Retrieves the content of a specific file from Google Drive by its ID.
+    Handles both native Google Docs/Sheets/Slides (exporting them to plain text or CSV) and other file types (downloading directly).
+    Prioritizes authentication via the active MCP session (`mcp_session_id`).
+    If the session isn't authenticated for Drive, it falls back to using `user_google_email`.
+    If neither provides valid credentials, it returns a message guiding the LLM to request the user's email
+    or initiate the authentication flow via `_initiate_drive_auth_and_get_message`.
+
+    Args:
+        file_id (str): The unique ID of the Google Drive file to retrieve content from. This ID is typically obtained from `search_drive_files` or `list_drive_items`.
+        user_google_email (Optional[str]): The user's Google email address. Required if the MCP session is not already authenticated for Drive access.
+        mcp_session_id (Optional[str]): The active MCP session ID (automatically injected by FastMCP from the Mcp-Session-Id header). Used for session-based authentication.
+
+    Returns:
+        types.CallToolResult: Contains the file metadata (name, ID, type, link) and its content (decoded as UTF-8 if possible, otherwise indicates binary content),
+                              an error message if the API call fails or the file is not accessible/found,
+                              or an authentication guidance message if credentials are required.
     """
     logger.info(f"[get_drive_file_content] Invoked. File ID: '{file_id}'")
     tool_specific_scopes = [DRIVE_READONLY_SCOPE]
@@ -224,8 +254,23 @@ async def list_drive_items(
     mcp_session_id: Optional[str] = Header(None, alias="Mcp-Session-Id")
 ) -> types.CallToolResult:
     """
-    Lists files and folders within a specified Google Drive folder.
-    Defaults to listing items in the root folder if no folder_id is provided.
+    Lists files and folders directly within a specified Google Drive folder.
+    Defaults to the root folder if `folder_id` is not provided. Does not recurse into subfolders.
+    Prioritizes authentication via the active MCP session (`mcp_session_id`).
+    If the session isn't authenticated for Drive, it falls back to using `user_google_email`.
+    If neither provides valid credentials, it returns a message guiding the LLM to request the user's email
+    or initiate the authentication flow via `_initiate_drive_auth_and_get_message`.
+
+    Args:
+        folder_id (str): The ID of the Google Drive folder to list items from. Defaults to 'root'.
+        user_google_email (Optional[str]): The user's Google email address. Required if the MCP session is not already authenticated for Drive access.
+        page_size (int): The maximum number of items to return per page. Defaults to 100.
+        mcp_session_id (Optional[str]): The active MCP session ID (automatically injected by FastMCP from the Mcp-Session-Id header). Used for session-based authentication.
+
+    Returns:
+        types.CallToolResult: Contains a list of files/folders within the specified folder, including their details (ID, name, type, size, modified time, link),
+                              an error message if the API call fails or the folder is not accessible/found,
+                              or an authentication guidance message if credentials are required.
     """
     logger.info(f"[list_drive_items] Invoked. Session: '{mcp_session_id}', Email: '{user_google_email}', Folder ID: '{folder_id}'")
     tool_specific_scopes = [DRIVE_READONLY_SCOPE]
@@ -293,9 +338,25 @@ async def create_drive_file(
     mcp_session_id: Optional[str] = Header(None, alias="Mcp-Session-Id")
 ) -> types.CallToolResult:
     """
-    Creates a new file with specified content in a Google Drive folder.
-    Defaults to creating the file in the root folder if no folder_id is provided.
-    Requires the drive.file scope.
+    Creates a new plain text file with the specified name and content within a Google Drive folder.
+    Defaults to creating the file in the root folder if `folder_id` is not provided.
+    Requires write permissions (implicitly covered by `drive.file` or broader Drive scopes if granted).
+    Prioritizes authentication via the active MCP session (`mcp_session_id`).
+    If the session isn't authenticated for Drive, it falls back to using `user_google_email`.
+    If neither provides valid credentials, it returns a message guiding the LLM to request the user's email
+    or initiate the authentication flow via `_initiate_drive_auth_and_get_message`.
+
+    Args:
+        file_name (str): The desired name for the new file (e.g., "my_notes.txt").
+        content (str): The text content to write into the new file.
+        folder_id (str): The ID of the parent folder where the file should be created. Defaults to 'root'.
+        user_google_email (Optional[str]): The user's Google email address. Required if the MCP session is not already authenticated for Drive write access.
+        mcp_session_id (Optional[str]): The active MCP session ID (automatically injected by FastMCP from the Mcp-Session-Id header). Used for session-based authentication.
+
+    Returns:
+        types.CallToolResult: Contains details of the newly created file (ID, name, link),
+                              an error message if the API call fails (e.g., insufficient permissions, invalid folder ID),
+                              or an authentication guidance message if credentials are required.
     """
     logger.info(f"[create_drive_file] Invoked. Session: '{mcp_session_id}', Email: '{user_google_email}', File Name: '{file_name}', Folder ID: '{folder_id}'")
     
