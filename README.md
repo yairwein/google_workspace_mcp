@@ -153,7 +153,7 @@ A Model Context Protocol (MCP) server that integrates Google Workspace services 
     *   A URL will be printed to the console (or returned in the MCP response). Open this URL in your browser.
     *   Log in to your Google account and grant the requested permissions (Calendar, Drive, Gmail access).
     *   After authorization, Google will redirect your browser to `http://localhost:8000/oauth2callback`.
-    *   The running MCP server (or `mcpo` if used) will handle this callback, exchange the authorization code for tokens, and securely store the credentials (e.g., `credentials-<user_id_hash>.json`) in the project directory for future use.
+    *   The running MCP server (or `mcpo` if used) will handle this callback, exchange the authorization code for tokens, and securely store the credentials (e.g., in the `.credentials/your_email@example.com.json` file) for future use.
     *   Subsequent calls for the same user should work without requiring re-authentication until the refresh token expires or is revoked.
 
 ## Features
@@ -171,12 +171,9 @@ A Model Context Protocol (MCP) server that integrates Google Workspace services 
 
 *(Note: The first use of any tool for a specific Google service may trigger the OAuth authentication flow if valid credentials are not already stored.)*
 
-### Authentication
-*   [`start_auth`](auth/auth_flow.py:138): Manually initiates the OAuth flow for a user (usually handled automatically). Requires `user_id`.
-*   [`auth_status`](auth/auth_flow.py:139): Checks the current authentication status for a user. Requires `user_id`.
-*   [`complete_auth`](auth/auth_flow.py:140): Allows manual entry of an authorization code (alternative flow). Requires `user_id`, `authorization_code`.
-
 ### Calendar ([`gcalendar/calendar_tools.py`](gcalendar/calendar_tools.py))
+*   `start_auth`: Initiates the OAuth flow for Google Calendar access if required.
+    *   `user_google_email` (required): The user's Google email address.
 *   `list_calendars`: Lists the user's available calendars.
 *   `get_events`: Retrieves events from a specified calendar.
     *   `calendar_id` (required): The ID of the calendar (use `primary` for the main calendar).
@@ -213,7 +210,7 @@ A Model Context Protocol (MCP) server that integrates Google Workspace services 
 ```
 google_workspace_mcp/
 ├── .venv/             # Virtual environment (created by uv)
-├── auth/              # OAuth handling logic (auth_flow.py, google_auth.py, etc.)
+├── auth/              # OAuth handling logic (google_auth.py, oauth_manager.py)
 ├── core/              # Core MCP server logic (server.py)
 ├── gcalendar/         # Google Calendar tools (calendar_tools.py)
 ├── gdrive/            # Google Drive tools (drive_tools.py)
@@ -253,13 +250,29 @@ The server cleverly handles the OAuth 2.0 redirect URI (`/oauth2callback`) witho
 2.  Import necessary libraries (Google API client library, etc.).
 3.  Define an `async` function for your tool logic. Use type hints for parameters.
 4.  Decorate the function with `@server.tool("your_tool_name")`.
-5.  Inside the function, get authenticated credentials using `await get_credentials(user_id, SCOPES)` where `SCOPES` is a list of required Google API scopes for your tool.
+5.  Inside the function, get authenticated credentials. This typically involves calling `auth.google_auth.get_credentials` within an `asyncio.to_thread` call, for example:
+    ```python
+    from auth.google_auth import get_credentials, CONFIG_CLIENT_SECRETS_PATH
+    # ...
+    credentials = await asyncio.to_thread(
+        get_credentials,
+        user_google_email=your_user_email_variable, # Optional, can be None if session_id is primary
+        required_scopes=YOUR_SPECIFIC_SCOPES_LIST,  # e.g., [CALENDAR_READONLY_SCOPE]
+        client_secrets_path=CONFIG_CLIENT_SECRETS_PATH,
+        session_id=your_mcp_session_id_variable    # Usually injected via Header
+    )
+    if not credentials or not credentials.valid:
+        # Handle missing/invalid credentials, possibly by calling start_auth_flow
+        # from auth.google_auth (which is what service-specific start_auth tools do)
+        pass
+    ```
+    `YOUR_SPECIFIC_SCOPES_LIST` should contain the minimum scopes needed for your tool.
 6.  Build the Google API service client: `service = build('drive', 'v3', credentials=credentials)`.
 7.  Implement the logic to call the Google API.
 8.  Handle potential errors gracefully.
 9.  Return the results as a JSON-serializable dictionary or list.
 10. Import the tool function in [`main.py`](main.py) so it gets registered with the server.
-11. Define the necessary `SCOPES` constant in [`core/server.py`](core/server.py) and add it to the relevant tool imports.
+11. Define necessary service-specific scope constants (e.g., `MY_SERVICE_READ_SCOPE`) in your tool's module. The global `SCOPES` list in [`config/google_config.py`](config/google_config.py) is used for the initial OAuth consent screen and should include all possible scopes your server might request. Individual tools should request the minimal `required_scopes` they need when calling `get_credentials`.
 12. Update `pyproject.toml` if new dependencies are required.
 
 ## Security Notes
