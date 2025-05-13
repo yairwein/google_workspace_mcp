@@ -24,6 +24,23 @@ from auth.google_auth import get_credentials, start_auth_flow, CONFIG_CLIENT_SEC
 # Configure module logger
 logger = logging.getLogger(__name__)
 
+# Helper function to ensure time strings for API calls are correctly formatted
+def _correct_time_format_for_api(time_str: Optional[str], param_name: str) -> Optional[str]:
+    if not time_str:
+        return None
+    # Specifically address YYYY-MM-DDTHH:MM:SS by appending 'Z'
+    if len(time_str) == 19 and time_str[10] == 'T' and time_str.count(':') == 2 and \
+       not (time_str.endswith('Z') or ('+' in time_str[10:]) or ('-' in time_str[10:])):
+        try:
+            # Validate the format before appending 'Z'
+            datetime.datetime.strptime(time_str, "%Y-%m-%dT%H:%M:%S")
+            logger.info(f"Formatting {param_name} '{time_str}' by appending 'Z' for UTC.")
+            return time_str + "Z"
+        except ValueError:
+            logger.warning(f"{param_name} '{time_str}' looks like it needs 'Z' but is not valid YYYY-MM-DDTHH:MM:SS. Using as is.")
+            return time_str
+    return time_str
+
 # Import the server directly (will be initialized before this module is imported)
 # Also import the OAUTH_STATE_TO_SESSION_ID_MAP for linking OAuth state to MCP session
 from core.server import server, OAUTH_REDIRECT_URI, OAUTH_STATE_TO_SESSION_ID_MAP
@@ -119,16 +136,16 @@ async def list_calendars(user_google_email: Optional[str] = None, mcp_session_id
 
     try:
         service = build('calendar', 'v3', credentials=credentials)
-        user_email_from_creds = credentials.id_token.get('email') if credentials.id_token else 'Unknown'
-        logger.info(f"Successfully built calendar service. User associated with creds: {user_email_from_creds}")
+        log_user_email = user_google_email or (credentials.id_token.get('email') if credentials and credentials.id_token else 'Unknown')
+        logger.info(f"Successfully built calendar service. User associated with creds: {log_user_email}")
         calendar_list_response = await asyncio.to_thread(service.calendarList().list().execute)
         items = calendar_list_response.get('items', [])
         if not items:
-            return types.CallToolResult(content=[types.TextContent(type="text", text=f"No calendars found for {user_email_from_creds}.")])
+            return types.CallToolResult(content=[types.TextContent(type="text", text=f"No calendars found for {log_user_email}.")])
 
         calendars_summary_list = [f"- \"{cal.get('summary', 'No Summary')}\"{' (Primary)' if cal.get('primary') else ''} (ID: {cal['id']})" for cal in items]
-        text_output = f"Successfully listed {len(items)} calendars for {user_email_from_creds}:\n" + "\n".join(calendars_summary_list)
-        logger.info(f"Successfully listed {len(items)} calendars.")
+        text_output = f"Successfully listed {len(items)} calendars for {log_user_email}:\n" + "\n".join(calendars_summary_list)
+        logger.info(f"Successfully listed {len(items)} calendars for {log_user_email}.")
         return types.CallToolResult(content=[types.TextContent(type="text", text=text_output)])
     except HttpError as error:
         message = f"API error listing calendars: {error}. You might need to re-authenticate. LLM: Try 'start_auth' with user's email."
@@ -190,21 +207,31 @@ async def get_events(
 
     try:
         service = build('calendar', 'v3', credentials=credentials)
-        user_email_from_creds = credentials.id_token.get('email') if credentials.id_token else 'Unknown'
-        logger.info(f"Successfully built calendar service. User associated with creds: {user_email_from_creds}")
+        log_user_email = user_google_email or (credentials.id_token.get('email') if credentials and credentials.id_token else 'Unknown')
+        logger.info(f"Successfully built calendar service. User associated with creds: {log_user_email}")
 
-        effective_time_min = time_min or (datetime.datetime.utcnow().isoformat() + 'Z')
-        if time_min is None: logger.info(f"Defaulting time_min to current time: {effective_time_min}")
+        # Ensure time_min and time_max are correctly formatted for the API
+        formatted_time_min = _correct_time_format_for_api(time_min, "time_min")
+        effective_time_min = formatted_time_min or (datetime.datetime.utcnow().isoformat() + 'Z')
+        if time_min is None:
+            logger.info(f"time_min not provided, defaulting to current UTC time: {effective_time_min}")
+        elif formatted_time_min != time_min: # Log if original was modified by helper
+            logger.info(f"Original time_min '{time_min}' formatted to '{effective_time_min}' for API call.")
+
+        effective_time_max = _correct_time_format_for_api(time_max, "time_max")
+        if time_max and effective_time_max != time_max: # Log if original was modified by helper
+            logger.info(f"Original time_max '{time_max}' formatted to '{effective_time_max}' for API call.")
+
 
         events_result = await asyncio.to_thread(
             service.events().list(
-                calendarId=calendar_id, timeMin=effective_time_min, timeMax=time_max,
+                calendarId=calendar_id, timeMin=effective_time_min, timeMax=effective_time_max,
                 maxResults=max_results, singleEvents=True, orderBy='startTime'
             ).execute
         )
         items = events_result.get('items', [])
         if not items:
-            return types.CallToolResult(content=[types.TextContent(type="text", text=f"No events found in calendar '{calendar_id}' for {user_email_from_creds} for the specified time range.")])
+            return types.CallToolResult(content=[types.TextContent(type="text", text=f"No events found in calendar '{calendar_id}' for {log_user_email} for the specified time range.")])
 
         event_details_list = []
         for item in items:
@@ -213,8 +240,8 @@ async def get_events(
             link = item.get('htmlLink', 'No Link')
             event_details_list.append(f"- \"{summary}\" (Starts: {start}) Link: {link}")
 
-        text_output = f"Successfully retrieved {len(items)} events from calendar '{calendar_id}' for {user_email_from_creds}:\n" + "\n".join(event_details_list)
-        logger.info(f"Successfully retrieved {len(items)} events.")
+        text_output = f"Successfully retrieved {len(items)} events from calendar '{calendar_id}' for {log_user_email}:\n" + "\n".join(event_details_list)
+        logger.info(f"Successfully retrieved {len(items)} events for {log_user_email}.")
         return types.CallToolResult(content=[types.TextContent(type="text", text=text_output)])
     except HttpError as error:
         message = f"API error getting events: {error}. You might need to re-authenticate. LLM: Try 'start_auth' with user's email."
@@ -279,8 +306,8 @@ async def create_event(
 
     try:
         service = build('calendar', 'v3', credentials=credentials)
-        user_email_from_creds = credentials.id_token.get('email') if credentials.id_token else 'Unknown'
-        logger.info(f"Successfully built calendar service. User associated with creds: {user_email_from_creds}")
+        log_user_email = user_google_email or (credentials.id_token.get('email') if credentials and credentials.id_token else 'Unknown')
+        logger.info(f"Successfully built calendar service. User associated with creds: {log_user_email}")
 
         event_body: Dict[str, Any] = {
             'summary': summary,
@@ -299,11 +326,15 @@ async def create_event(
         )
 
         link = created_event.get('htmlLink', 'No link available')
-        confirmation_message = f"Successfully created event '{created_event.get('summary', summary)}' for {user_email_from_creds}. Link: {link}"
-        logger.info(f"Successfully created event. Link: {link}")
+        # Corrected confirmation_message to use log_user_email
+        confirmation_message = f"Successfully created event '{created_event.get('summary', summary)}' for {log_user_email}. Link: {link}"
+        # Corrected logger to use log_user_email and include event ID
+        logger.info(f"Event created successfully for {log_user_email}. ID: {created_event.get('id')}, Link: {link}")
         return types.CallToolResult(content=[types.TextContent(type="text", text=confirmation_message)])
     except HttpError as error:
-        message = f"API error creating event: {error}. Check event details or re-authenticate. LLM: Try 'start_auth' with user's email."
+        # Corrected error message to use log_user_email and provide better guidance
+        log_user_email_for_error = user_google_email or (credentials.id_token.get('email') if credentials and credentials.id_token else 'Unknown')
+        message = f"API error creating event: {error}. You might need to re-authenticate. LLM: Try 'start_auth' with the user's email ({log_user_email_for_error if log_user_email_for_error != 'Unknown' else 'target Google account'})."
         logger.error(message, exc_info=True)
         return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=message)])
     except Exception as e:
