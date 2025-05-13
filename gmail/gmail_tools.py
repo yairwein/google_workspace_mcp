@@ -12,27 +12,33 @@ from typing import List, Optional, Any # Keep Any
 
 from mcp import types
 from fastapi import Header
-# Remove unused Resource import
-# from googleapiclient.discovery import Resource as GoogleApiServiceResource
+from googleapiclient.discovery import build # Import build
 from googleapiclient.errors import HttpError
 
-# Import the decorator, config path, AND the context variable
-from auth.auth_flow import require_google_auth, CONFIG_CLIENT_SECRETS_PATH, current_google_service
-from core.server import server
+# Use functions directly from google_auth
+from auth.google_auth import get_credentials, start_auth_flow, CONFIG_CLIENT_SECRETS_PATH # Import get_credentials, start_auth_flow, CONFIG_CLIENT_SECRETS_PATH
+# Remove imports from auth.auth_flow
+# from auth.auth_flow import require_google_auth, CONFIG_CLIENT_SECRETS_PATH, current_google_service
+
+from core.server import server, OAUTH_REDIRECT_URI # Import OAUTH_REDIRECT_URI
 from core.server import (
     GMAIL_READONLY_SCOPE,
     GMAIL_SEND_SCOPE,
+    SCOPES # Import SCOPES for auth flow initiation
 )
 
 logger = logging.getLogger(__name__)
 
+# CONFIG_CLIENT_SECRETS_PATH is now imported from auth.google_auth
+
 @server.tool()
-@require_google_auth(
-    required_scopes=[GMAIL_READONLY_SCOPE],
-    service_name="Gmail",
-    api_name="gmail",
-    api_version="v1"
-)
+# Remove the decorator
+# @require_google_auth(
+#     required_scopes=[GMAIL_READONLY_SCOPE],
+#     service_name="Gmail",
+#     api_name="gmail",
+#     api_version="v1"
+# )
 async def search_gmail_messages( # Signature cleaned - no google_service param
     query: str,
     user_google_email: Optional[str] = None,
@@ -41,45 +47,49 @@ async def search_gmail_messages( # Signature cleaned - no google_service param
 ) -> types.CallToolResult:
     """
     Searches messages in a user's Gmail account based on a query.
-    Authentication and service object are handled by the @require_google_auth decorator using context variables.
+    Authentication is handled by get_credentials and start_auth_flow.
 
     Args:
         query (str): The search query. Supports standard Gmail search operators.
-        user_google_email (Optional[str]): The user's Google email address (used for context/logging).
+        user_google_email (Optional[str]): The user's Google email address. Required if the MCP session is not already authenticated for Gmail access.
         page_size (int): The maximum number of messages to return. Defaults to 10.
-        mcp_session_id (Optional[str]): The active MCP session ID (used for context/logging).
+        mcp_session_id (Optional[str]): The active MCP session ID (automatically injected by FastMCP from the Mcp-Session-Id header). Used for session-based authentication.
 
     Returns:
         types.CallToolResult: Contains a list of found message IDs or an error/auth guidance message.
     """
-    # *** Add logging and check here ***
     tool_name = "search_gmail_messages"
-    logger.debug(f"[{tool_name}] Entered function. Attempting to get service from context var...")
-    google_service = current_google_service.get()
-    logger.debug(f"[{tool_name}] Service retrieved from context var. Type: {type(google_service)}, id: {id(google_service)}")
+    logger.info(f"[{tool_name}] Invoked. Session: '{mcp_session_id}', Email: '{user_google_email}', Query: '{query}'")
 
-    if not google_service:
-         logger.error(f"[{tool_name}] Google service retrieved from context is None!")
-         return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text="Internal error: Google service unavailable in tool context.")])
+    # Use get_credentials to fetch credentials
+    credentials = await asyncio.to_thread(
+        get_credentials,
+        user_google_email=user_google_email,
+        required_scopes=[GMAIL_READONLY_SCOPE], # Specify required scopes for this tool
+        client_secrets_path=CONFIG_CLIENT_SECRETS_PATH, # Use imported constant
+        session_id=mcp_session_id
+    )
 
-    logger.info(f"[{tool_name}] Session: '{mcp_session_id}', Email: '{user_google_email}', Query: '{query}'")
-    try:
-        # More robust way to extract email from credentials
-        id_token = getattr(google_service._http.credentials, 'id_token', None)
-        if isinstance(id_token, dict) and 'email' in id_token:
-            user_email_from_creds = id_token.get('email')
+    # Check if credentials are valid, initiate auth flow if not
+    if not credentials or not credentials.valid:
+        logger.warning(f"[{tool_name}] No valid credentials. Session: '{mcp_session_id}', Email: '{user_google_email}'.")
+        if user_google_email and '@' in user_google_email:
+            logger.info(f"[{tool_name}] Valid email '{user_google_email}' provided, initiating auth flow for this email (requests all SCOPES).")
+            # Use the centralized start_auth_flow
+            return await start_auth_flow(mcp_session_id=mcp_session_id, user_google_email=user_google_email, service_name="Gmail", redirect_uri=OAUTH_REDIRECT_URI)
         else:
-            # Fallback to user_google_email parameter or default
-            user_email_from_creds = user_google_email or "Unknown (Gmail)"
-        logger.info(f"[{tool_name}] Using service for: {user_email_from_creds}")
-    except AttributeError as e:
-         logger.error(f"[{tool_name}] Error accessing credentials/email from google_service: {e}", exc_info=True)
-         user_email_from_creds = user_google_email or "Unknown (Gmail - Error)"
-
+            error_msg = "Gmail Authentication required. No active authenticated session, and no valid 'user_google_email' provided. LLM: Please ask the user for their Google email address and retry, or use the 'start_auth' tool with their email."
+            logger.info(f"[{tool_name}] {error_msg}")
+            return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=error_msg)])
 
     try:
+        # Build the service object directly
+        service = build('gmail', 'v1', credentials=credentials)
+        user_email_from_creds = credentials.id_token.get('email') if credentials.id_token else 'Unknown (Gmail)'
+        logger.info(f"[{tool_name}] Using service for: {user_email_from_creds}")
+
         response = await asyncio.to_thread(
-            google_service.users().messages().list(
+            service.users().messages().list(
                 userId='me',
                 q=query,
                 maxResults=page_size
@@ -96,20 +106,21 @@ async def search_gmail_messages( # Signature cleaned - no google_service param
         return types.CallToolResult(content=[types.TextContent(type="text", text="\n".join(lines))])
 
     except HttpError as e:
-        logger.error(f"Gmail API error searching messages: {e}", exc_info=True)
+        logger.error(f"[{tool_name}] Gmail API error searching messages: {e}", exc_info=True)
         return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=f"Gmail API error: {e}")])
     except Exception as e:
-        logger.exception(f"Unexpected error searching Gmail messages: {e}")
+        logger.exception(f"[{tool_name}] Unexpected error searching Gmail messages: {e}")
         return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=f"Unexpected error: {e}")])
 
 
 @server.tool()
-@require_google_auth(
-    required_scopes=[GMAIL_READONLY_SCOPE],
-    service_name="Gmail",
-    api_name="gmail",
-    api_version="v1"
-)
+# Remove the decorator
+# @require_google_auth(
+#     required_scopes=[GMAIL_READONLY_SCOPE],
+#     service_name="Gmail",
+#     api_name="gmail",
+#     api_version="v1"
+# )
 async def get_gmail_message_content( # Signature cleaned - no google_service param
     message_id: str,
     user_google_email: Optional[str] = None,
@@ -117,45 +128,49 @@ async def get_gmail_message_content( # Signature cleaned - no google_service par
 ) -> types.CallToolResult:
     """
     Retrieves the full content (subject, sender, plain text body) of a specific Gmail message.
-    Authentication and service object are handled by the @require_google_auth decorator using context variables.
+    Authentication is handled by get_credentials and start_auth_flow.
 
     Args:
         message_id (str): The unique ID of the Gmail message to retrieve.
-        user_google_email (Optional[str]): The user's Google email address (used for context/logging).
-        mcp_session_id (Optional[str]): The active MCP session ID (used for context/logging).
+        user_google_email (Optional[str]): The user's Google email address. Required if the MCP session is not already authenticated for Gmail access.
+        mcp_session_id (Optional[str]): The active MCP session ID (automatically injected by FastMCP from the Mcp-Session-Id header). Used for session-based authentication.
 
     Returns:
         types.CallToolResult: Contains the message details or an error/auth guidance message.
     """
-    # *** Add logging and check here ***
     tool_name = "get_gmail_message_content"
-    logger.debug(f"[{tool_name}] Entered function. Attempting to get service from context var...")
-    google_service = current_google_service.get()
-    logger.debug(f"[{tool_name}] Service retrieved from context var. Type: {type(google_service)}, id: {id(google_service)}")
+    logger.info(f"[{tool_name}] Invoked. Message ID: '{message_id}', Session: '{mcp_session_id}', Email: '{user_google_email}'")
 
-    if not google_service:
-         logger.error(f"[{tool_name}] Google service retrieved from context is None!")
-         return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text="Internal error: Google service unavailable in tool context.")])
+    # Use get_credentials to fetch credentials
+    credentials = await asyncio.to_thread(
+        get_credentials,
+        user_google_email=user_google_email,
+        required_scopes=[GMAIL_READONLY_SCOPE], # Specify required scopes for this tool
+        client_secrets_path=CONFIG_CLIENT_SECRETS_PATH, # Use imported constant
+        session_id=mcp_session_id
+    )
 
-    logger.info(f"[{tool_name}] Message ID: '{message_id}', Session: '{mcp_session_id}', Email: '{user_google_email}'")
-    try:
-        # More robust way to extract email from credentials
-        id_token = getattr(google_service._http.credentials, 'id_token', None)
-        if isinstance(id_token, dict) and 'email' in id_token:
-            user_email_from_creds = id_token.get('email')
+    # Check if credentials are valid, initiate auth flow if not
+    if not credentials or not credentials.valid:
+        logger.warning(f"[{tool_name}] No valid credentials. Session: '{mcp_session_id}', Email: '{user_google_email}'.")
+        if user_google_email and '@' in user_google_email:
+            logger.info(f"[{tool_name}] Valid email '{user_google_email}' provided, initiating auth flow for this email (requests all SCOPES).")
+            # Use the centralized start_auth_flow
+            return await start_auth_flow(mcp_session_id=mcp_session_id, user_google_email=user_google_email, service_name="Gmail", redirect_uri=OAUTH_REDIRECT_URI)
         else:
-            # Fallback to user_google_email parameter or default
-            user_email_from_creds = user_google_email or "Unknown (Gmail)"
-        logger.info(f"[{tool_name}] Using service for: {user_email_from_creds}")
-    except AttributeError as e:
-         logger.error(f"[{tool_name}] Error accessing credentials/email from google_service: {e}", exc_info=True)
-         user_email_from_creds = user_google_email or "Unknown (Gmail - Error)"
-
+            error_msg = "Gmail Authentication required. No active authenticated session, and no valid 'user_google_email' provided. LLM: Please ask the user for their Google email address and retry, or use the 'start_auth' tool with their email."
+            logger.info(f"[{tool_name}] {error_msg}")
+            return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=error_msg)])
 
     try:
+        # Build the service object directly
+        service = build('gmail', 'v1', credentials=credentials)
+        user_email_from_creds = credentials.id_token.get('email') if credentials.id_token else 'Unknown (Gmail)'
+        logger.info(f"[{tool_name}] Using service for: {user_email_from_creds}")
+
         # Fetch message metadata first to get headers
         message_metadata = await asyncio.to_thread(
-            google_service.users().messages().get(
+            service.users().messages().get(
                 userId='me',
                 id=message_id,
                 format='metadata',
@@ -169,7 +184,7 @@ async def get_gmail_message_content( # Signature cleaned - no google_service par
 
         # Now fetch the full message to get the body parts
         message_full = await asyncio.to_thread(
-             google_service.users().messages().get(
+             service.users().messages().get(
                 userId='me',
                 id=message_id,
                 format='full' # Request full payload for body
@@ -205,10 +220,10 @@ async def get_gmail_message_content( # Signature cleaned - no google_service par
         return types.CallToolResult(content=[types.TextContent(type="text", text=content_text)])
 
     except HttpError as e:
-        logger.error(f"Gmail API error getting message content: {e}", exc_info=True)
+        logger.error(f"[{tool_name}] Gmail API error getting message content: {e}", exc_info=True)
         return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=f"Gmail API error: {e}")])
     except Exception as e:
-        logger.exception(f"Unexpected error getting Gmail message content: {e}")
+        logger.exception(f"[{tool_name}] Unexpected error getting Gmail message content: {e}")
         return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=f"Unexpected error: {e}")])
 
 # Note: send_gmail_message tool would need GMAIL_SEND_SCOPE and similar refactoring if added.
