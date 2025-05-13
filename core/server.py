@@ -12,59 +12,62 @@ from mcp import types
 from mcp.server.fastmcp import FastMCP
 
 from google.auth.exceptions import RefreshError
-from auth.google_auth import handle_auth_callback, load_client_secrets
+from auth.google_auth import handle_auth_callback, CONFIG_CLIENT_SECRETS_PATH # Import handle_auth_callback and CONFIG_CLIENT_SECRETS_PATH
 # auth_session_manager is no longer used here with the simplified flow
+
+# Import shared configuration
+from config.google_config import (
+    OAUTH_STATE_TO_SESSION_ID_MAP,
+    USERINFO_EMAIL_SCOPE,
+    OPENID_SCOPE,
+    CALENDAR_READONLY_SCOPE,
+    CALENDAR_EVENTS_SCOPE,
+    DRIVE_READONLY_SCOPE,
+    DRIVE_FILE_SCOPE,
+    GMAIL_READONLY_SCOPE,
+    GMAIL_SEND_SCOPE,
+    BASE_SCOPES,
+    CALENDAR_SCOPES,
+    DRIVE_SCOPES,
+    GMAIL_SCOPES,
+    SCOPES
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
-# Temporary map to associate OAuth state with MCP session ID
-# This should ideally be a more robust cache in a production system (e.g., Redis)
-OAUTH_STATE_TO_SESSION_ID_MAP: Dict[str, str] = {}
+# OAUTH_STATE_TO_SESSION_ID_MAP is now imported from config.google_config
 logger = logging.getLogger(__name__)
 
-# Individual OAuth Scope Constants
-USERINFO_EMAIL_SCOPE = 'https://www.googleapis.com/auth/userinfo.email'
-OPENID_SCOPE = 'openid'
-CALENDAR_READONLY_SCOPE = 'https://www.googleapis.com/auth/calendar.readonly'
-CALENDAR_EVENTS_SCOPE = 'https://www.googleapis.com/auth/calendar.events'
+# Individual OAuth Scope Constants are now imported from config.google_config
+# USERINFO_EMAIL_SCOPE = ...
+# OPENID_SCOPE = ...
+# CALENDAR_READONLY_SCOPE = ...
+# CALENDAR_EVENTS_SCOPE = ...
 
-# Google Drive scopes
-DRIVE_READONLY_SCOPE = 'https://www.googleapis.com/auth/drive.readonly'
-# Add other Drive scopes here if needed in the future, e.g.:
-# DRIVE_METADATA_READONLY_SCOPE = 'https://www.googleapis.com/auth/drive.metadata.readonly'
-DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file' # Per-file access
+# Google Drive scopes are now imported from config.google_config
+# DRIVE_READONLY_SCOPE = ...
+# DRIVE_METADATA_READONLY_SCOPE = ...
+# DRIVE_FILE_SCOPE = ...
 
-# Gmail API scopes
-GMAIL_READONLY_SCOPE   = 'https://www.googleapis.com/auth/gmail.readonly'
-GMAIL_SEND_SCOPE       = 'https://www.googleapis.com/auth/gmail.send'
-# Optional, if you later need label management:
-# GMAIL_LABELS_SCOPE     = 'https://www.googleapis.com/auth/gmail.labels'
+# Gmail API scopes are now imported from config.google_config
+# GMAIL_READONLY_SCOPE   = ...
+# GMAIL_SEND_SCOPE       = ...
+# GMAIL_LABELS_SCOPE     = ...
 
-# Base OAuth scopes required for user identification
-BASE_SCOPES = [
-    USERINFO_EMAIL_SCOPE,
-    OPENID_SCOPE
-]
+# Base OAuth scopes required for user identification are now imported from config.google_config
+# BASE_SCOPES = [...]
 
-# Calendar-specific scopes
-CALENDAR_SCOPES = [
-    CALENDAR_READONLY_SCOPE,
-    CALENDAR_EVENTS_SCOPE
-]
+# Calendar-specific scopes are now imported from config.google_config
+# CALENDAR_SCOPES = [...]
 
-# Drive-specific scopes
-DRIVE_SCOPES = [
-    DRIVE_READONLY_SCOPE
-]
+# Drive-specific scopes are now imported from config.google_config
+# DRIVE_SCOPES = [...]
 
-# Gmail-specific scopes
-GMAIL_SCOPES = [
-    GMAIL_READONLY_SCOPE,
-    GMAIL_SEND_SCOPE,
-]
+# Gmail-specific scopes are now imported from config.google_config
+# GMAIL_SCOPES = [...]
 
-# Combined scopes for all supported Google Workspace operations
-SCOPES = list(set(BASE_SCOPES + CALENDAR_SCOPES + DRIVE_SCOPES + GMAIL_SCOPES + [DRIVE_FILE_SCOPE])) # Add DRIVE_FILE_SCOPE and GMAIL_SCOPES
+# Combined scopes for all supported Google Workspace operations are now imported from config.google_config
+# SCOPES = [...]
 
 DEFAULT_PORT = 8000
 # Basic MCP server instance
@@ -111,14 +114,15 @@ async def oauth2_callback(request: Request) -> HTMLResponse:
         """, status_code=400)
 
     try:
-        client_secrets_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'client_secret.json')
+        # Use the centralized CONFIG_CLIENT_SECRETS_PATH
+        client_secrets_path = CONFIG_CLIENT_SECRETS_PATH
         if not os.path.exists(client_secrets_path):
             logger.error(f"OAuth client secrets file not found at {client_secrets_path}")
             # This is a server configuration error, should not happen in a deployed environment.
             return HTMLResponse(content="Server Configuration Error: Client secrets not found.", status_code=500)
 
         logger.info(f"OAuth callback: Received code (state: {state}). Attempting to exchange for tokens.")
-        
+
         mcp_session_id: Optional[str] = OAUTH_STATE_TO_SESSION_ID_MAP.pop(state, None)
         if mcp_session_id:
             logger.info(f"OAuth callback: Retrieved MCP session ID '{mcp_session_id}' for state '{state}'.")
@@ -134,10 +138,10 @@ async def oauth2_callback(request: Request) -> HTMLResponse:
             redirect_uri=OAUTH_REDIRECT_URI,
             session_id=mcp_session_id # Pass session_id if available
         )
-        
+
         log_session_part = f" (linked to session: {mcp_session_id})" if mcp_session_id else ""
         logger.info(f"OAuth callback: Successfully authenticated user: {verified_user_id} (state: {state}){log_session_part}.")
-        
+
         # Return a more informative success page
         success_page_content = f"""
             <html>
@@ -168,7 +172,7 @@ async def oauth2_callback(request: Request) -> HTMLResponse:
             </html>
         """
         return HTMLResponse(content=success_page_content)
-        
+
     except Exception as e:
         error_message_detail = f"Error processing OAuth callback (state: {state}): {str(e)}"
         logger.error(error_message_detail, exc_info=True)
