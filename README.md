@@ -6,13 +6,9 @@
 [![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
 [![UV](https://img.shields.io/badge/Package%20Installer-UV-blueviolet)](https://github.com/astral-sh/uv)
 
-**Connect AI assistants to Google Workspace services through the Model Context Protocol**
+**Connect MCP Clients, AI Assistants and more to Google Workspace services through the Model Context Protocol**
 
 </div>
-
-<p align="center">
-  <img src="https://user-images.githubusercontent.com/assets/image-placeholder.svg" alt="Google Workspace MCP Logo" width="150">
-</p>
 
 ---
 
