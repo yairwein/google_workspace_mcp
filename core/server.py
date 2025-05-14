@@ -30,6 +30,8 @@ from config.google_config import (
     CALENDAR_SCOPES,
     DRIVE_SCOPES,
     GMAIL_SCOPES,
+    DOCS_READONLY_SCOPE,
+    DOCS_WRITE_SCOPE,
     SCOPES
 )
 

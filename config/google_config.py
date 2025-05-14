@@ -25,6 +25,10 @@ DRIVE_READONLY_SCOPE = 'https://www.googleapis.com/auth/drive.readonly'
 # DRIVE_METADATA_READONLY_SCOPE = 'https://www.googleapis.com/auth/drive.metadata.readonly'
 DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file' # Per-file access
 
+# Google Docs scopes
+DOCS_READONLY_SCOPE = 'https://www.googleapis.com/auth/documents.readonly'
+DOCS_WRITE_SCOPE = 'https://www.googleapis.com/auth/documents'
+
 # Gmail API scopes
 GMAIL_READONLY_SCOPE   = 'https://www.googleapis.com/auth/gmail.readonly'
 GMAIL_SEND_SCOPE       = 'https://www.googleapis.com/auth/gmail.send'
