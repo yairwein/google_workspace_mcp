@@ -52,7 +52,7 @@ The Google Workspace MCP Server integrates Google Workspace services (Calendar, 
 - **📁 Google Drive Integration**: Search files, list folder contents, read file content, and create new files
 - **📧 Gmail Integration**: Search for messages and retrieve message content (including body)
 - **📄 Google Docs Integration**: Search for documents, read document content, list documents in folders, and create new documents
-- **� Multiple Transport Options**: Streamable HTTP + SSE fallback
+- **🔄 Multiple Transport Options**: Streamable HTTP + SSE fallback
 - **🔌 `mcpo` Compatibility**: Easily expose the server as an OpenAPI endpoint for integration with tools like Open WebUI
 - **🧩 Extensible Design**: Simple structure for adding support for more Google Workspace APIs and tools
 - **🔄 Integrated OAuth Callback**: Handles the OAuth redirect directly within the server on port 8000
