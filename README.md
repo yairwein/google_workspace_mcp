@@ -6,13 +6,9 @@
 [![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
 [![UV](https://img.shields.io/badge/Package%20Installer-UV-blueviolet)](https://github.com/astral-sh/uv)
 
-**Connect AI assistants to Google Workspace services through the Model Context Protocol**
+**Connect MCP Clients, AI Assistants and more to Google Workspace services through the Model Context Protocol**
 
 </div>
-
-<p align="center">
-  <img src="https://user-images.githubusercontent.com/assets/image-placeholder.svg" alt="Google Workspace MCP Logo" width="150">
-</p>
 
 ---
 
@@ -54,7 +50,7 @@ The Google Workspace MCP Server integrates Google Workspace services (Calendar, 
 - **📅 Google Calendar Integration**: List calendars and fetch events
 - **📁 Google Drive Integration**: Search files, list folder contents, read file content, and create new files
 - **📧 Gmail Integration**: Search for messages and retrieve message content (including body)
-- **🔄 Multiple Transport Options**: Supports `stdio` for direct process integration and `HTTP` for network-based access
+- **🔄 Multiple Transport Options**: Streamable HTTP + SSE fallback
 - **🔌 `mcpo` Compatibility**: Easily expose the server as an OpenAPI endpoint for integration with tools like Open WebUI
 - **🧩 Extensible Design**: Simple structure for adding support for more Google Workspace APIs and tools
 - **🔄 Integrated OAuth Callback**: Handles the OAuth redirect directly within the server on port 8000
@@ -67,7 +63,6 @@ The Google Workspace MCP Server integrates Google Workspace services (Calendar, 
 
 - **Python 3.12+**
 - **[uv](https://github.com/astral-sh/uv)** package installer (or pip)
-- **[Node.js & npm](https://nodejs.org/)** (Required only if using the MCP Inspector UI via `with_inspector.sh`)
 - **Google Cloud Project** with OAuth 2.0 credentials enabled for required APIs (Calendar, Drive, Gmail)
 
 ### Installation
@@ -110,41 +105,19 @@ Without this, you might encounter an "OAuth 2 MUST utilize HTTPS" error during t
 Choose one of the following methods to run the server:
 
 <details>
-<summary><b>Development Mode with Inspector UI</b></summary>
-
-```bash
-./with_inspector.sh
-```
-
-This runs the server via `stdio` and launches the MCP Inspector web UI for debugging. Requires Node.js/npm.
-</details>
-
-<details>
-<summary><b>Production Mode (stdio)</b></summary>
-
-```bash
-python main.py
-# or using uv
-uv run main.py
-```
-
-This runs the server communicating over `stdin/stdout`, suitable for direct integration with MCP clients that manage the process lifecycle.
-</details>
-
-<details>
 <summary><b>HTTP Mode</b></summary>
 
 ```bash
-python -c "from core.server import server; server.run(transport='http', port=8000)"
+python main.py"
 # or using uv
-uv run -c "from core.server import server; server.run(transport='http', port=8000)"
+uv run main.py"
 ```
 
 Runs the server with an HTTP transport layer on port 8000.
 </details>
 
 <details>
-<summary><b>Using mcpo (Recommended for API Access / Open WebUI)</b></summary>
+<summary><b>Using mcpo (Recommended for Open WebUI and other OpenAPI spec compatible clients)</b></summary>
 
 Requires `mcpo` installed (`uv pip install mcpo` or `pip install mcpo`).
 
@@ -178,15 +151,6 @@ The server supports multiple connection methods:
 5. OpenAPI documentation (Swagger UI) available at: `http://localhost:8000/gworkspace/docs`
 </details>
 
-<details>
-<summary><b>Direct stdio (for MCP-compatible applications)</b></summary>
-
-1. Start the server directly: `python main.py` or `uv run main.py`
-2. The client application is responsible for launching and managing the server process and communicating via `stdin/stdout`
-3. No network port is used for MCP communication in this mode
-</details>
-
-<details>
 <summary><b>HTTP Mode</b></summary>
 
 1. Start the server in HTTP mode (see [Start the Server](#start-the-server))
@@ -312,7 +276,6 @@ google_workspace_mcp/
 ├── pyproject.toml     # Project metadata and dependencies (for uv/pip)
 ├── README.md          # This file
 ├── uv.lock            # uv lock file
-└── with_inspector.sh  # Script to run with MCP Inspector
 ```
 
 ### Port Handling for OAuth
@@ -326,12 +289,6 @@ The server cleverly handles the OAuth 2.0 redirect URI (`/oauth2callback`) witho
 - This requires `OAUTHLIB_INSECURE_TRANSPORT=1` to be set when running locally, as the callback uses `http://localhost`
 
 ### Debugging
-
-<details>
-<summary><b>MCP Inspector</b></summary>
-
-Use `./with_inspector.sh` to launch the server with a web UI for inspecting MCP messages.
-</details>
 
 <details>
 <summary><b>Log File</b></summary>
