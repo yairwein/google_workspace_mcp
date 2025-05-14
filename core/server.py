@@ -30,6 +30,8 @@ from config.google_config import (
     CALENDAR_SCOPES,
     DRIVE_SCOPES,
     GMAIL_SCOPES,
+    DOCS_READONLY_SCOPE,
+    DOCS_WRITE_SCOPE,
     SCOPES
 )
 
@@ -37,37 +39,6 @@ from config.google_config import (
 logging.basicConfig(level=logging.INFO)
 # OAUTH_STATE_TO_SESSION_ID_MAP is now imported from config.google_config
 logger = logging.getLogger(__name__)
-
-# Individual OAuth Scope Constants are now imported from config.google_config
-# USERINFO_EMAIL_SCOPE = ...
-# OPENID_SCOPE = ...
-# CALENDAR_READONLY_SCOPE = ...
-# CALENDAR_EVENTS_SCOPE = ...
-
-# Google Drive scopes are now imported from config.google_config
-# DRIVE_READONLY_SCOPE = ...
-# DRIVE_METADATA_READONLY_SCOPE = ...
-# DRIVE_FILE_SCOPE = ...
-
-# Gmail API scopes are now imported from config.google_config
-# GMAIL_READONLY_SCOPE   = ...
-# GMAIL_SEND_SCOPE       = ...
-# GMAIL_LABELS_SCOPE     = ...
-
-# Base OAuth scopes required for user identification are now imported from config.google_config
-# BASE_SCOPES = [...]
-
-# Calendar-specific scopes are now imported from config.google_config
-# CALENDAR_SCOPES = [...]
-
-# Drive-specific scopes are now imported from config.google_config
-# DRIVE_SCOPES = [...]
-
-# Gmail-specific scopes are now imported from config.google_config
-# GMAIL_SCOPES = [...]
-
-# Combined scopes for all supported Google Workspace operations are now imported from config.google_config
-# SCOPES = [...]
 
 DEFAULT_PORT = 8000
 # Basic MCP server instance

@@ -17,22 +17,15 @@ from googleapiclient.http import MediaIoBaseDownload # For file content
 import io # For file content
 
 # Use functions directly from google_auth
-from auth.google_auth import get_credentials, start_auth_flow, CONFIG_CLIENT_SECRETS_PATH # Import start_auth_flow and CONFIG_CLIENT_SECRETS_PATH
+from auth.google_auth import get_credentials, start_auth_flow, CONFIG_CLIENT_SECRETS_PATH
 from core.server import server, OAUTH_REDIRECT_URI, OAUTH_STATE_TO_SESSION_ID_MAP
-from core.server import ( # Import Drive scopes defined in core.server
+from core.server import (
     DRIVE_READONLY_SCOPE,
-    DRIVE_FILE_SCOPE, # Ensure DRIVE_FILE_SCOPE is imported
-    SCOPES # The combined list of all scopes for broad auth initiation
+    DRIVE_FILE_SCOPE,
+    SCOPES
 )
 
 logger = logging.getLogger(__name__)
-
-# CONFIG_CLIENT_SECRETS_PATH is now imported from auth.google_auth
-# OAUTH_REDIRECT_URI and OAUTH_STATE_TO_SESSION_ID_MAP are imported from core.server
-
-# Remove the local _initiate_drive_auth_and_get_message helper function
-# async def _initiate_drive_auth_and_get_message(...): ...
-
 
 @server.tool()
 async def search_drive_files(
