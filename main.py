@@ -38,6 +38,8 @@ except Exception as e:
 import gcalendar.calendar_tools
 import gdrive.drive_tools
 import gmail.gmail_tools
+import gdocs.docs_tools
+
 
 def main():
     """
