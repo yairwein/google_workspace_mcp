@@ -28,6 +28,7 @@
   - [Calendar](#calendar)
   - [Google Drive](#google-drive)
   - [Gmail](#gmail)
+  - [Google Docs](#google-docs)
 - [Development](#-development)
   - [Project Structure](#project-structure)
   - [Port Handling for OAuth](#port-handling-for-oauth)
@@ -40,7 +41,7 @@
 
 ## 🌐 Overview
 
-The Google Workspace MCP Server integrates Google Workspace services (Calendar, Drive, and Gmail) with AI assistants and other applications using the Model Context Protocol (MCP). This allows AI systems to access and interact with user data from Google Workspace applications securely and efficiently.
+The Google Workspace MCP Server integrates Google Workspace services (Calendar, Drive, Gmail, and Docs) with AI assistants and other applications using the Model Context Protocol (MCP). This allows AI systems to access and interact with user data from Google Workspace applications securely and efficiently.
 
 ---
 
@@ -50,7 +51,8 @@ The Google Workspace MCP Server integrates Google Workspace services (Calendar, 
 - **📅 Google Calendar Integration**: List calendars and fetch events
 - **📁 Google Drive Integration**: Search files, list folder contents, read file content, and create new files
 - **📧 Gmail Integration**: Search for messages and retrieve message content (including body)
-- **🔄 Multiple Transport Options**: Streamable HTTP + SSE fallback
+- **📄 Google Docs Integration**: Search for documents, read document content, list documents in folders, and create new documents
+- **� Multiple Transport Options**: Streamable HTTP + SSE fallback
 - **🔌 `mcpo` Compatibility**: Easily expose the server as an OpenAPI endpoint for integration with tools like Open WebUI
 - **🧩 Extensible Design**: Simple structure for adding support for more Google Workspace APIs and tools
 - **🔄 Integrated OAuth Callback**: Handles the OAuth redirect directly within the server on port 8000
@@ -63,7 +65,7 @@ The Google Workspace MCP Server integrates Google Workspace services (Calendar, 
 
 - **Python 3.12+**
 - **[uv](https://github.com/astral-sh/uv)** package installer (or pip)
-- **Google Cloud Project** with OAuth 2.0 credentials enabled for required APIs (Calendar, Drive, Gmail)
+- **Google Cloud Project** with OAuth 2.0 credentials enabled for required APIs (Calendar, Drive, Gmail, Docs)
 
 ### Installation
 
@@ -81,7 +83,7 @@ uv pip install -e .
 ### Configuration
 
 1. Create **OAuth 2.0 Credentials** (Desktop application type) in the [Google Cloud Console](https://console.cloud.google.com/).
-2. Enable the **Google Calendar API**, **Google Drive API**, and **Gmail API** for your project.
+2. Enable the **Google Calendar API**, **Google Drive API**, **Gmail API**, and **Google Docs API** for your project.
 3. Download the OAuth client credentials as `client_secret.json` and place it in the project's root directory.
 4. Add the following redirect URI to your OAuth client configuration in the Google Cloud Console:
    ```
@@ -254,6 +256,17 @@ Source: [`gmail/gmail_tools.py`](gmail/gmail_tools.py)
 
 > **Query Syntax**: For Gmail search queries, see [Gmail Search Query Syntax](https://support.google.com/mail/answer/7190)
 
+### Google Docs
+
+Source: [`gdocs/docs_tools.py`](gdocs/docs_tools.py)
+
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| `search_docs` | Searches for Google Docs by name across user's Drive | • `query` (required): Search query string (e.g., `report`)<br>• `user_google_email` (optional): The user's Google email address<br>• `page_size` (optional): Maximum number of documents to return |
+| `get_doc_content` | Retrieves the content of a specific Google Doc as plain text | • `document_id` (required): The ID of the document<br>• `user_google_email` (optional): The user's Google email address |
+| `list_docs_in_folder` | Lists Google Docs within a specific folder | • `folder_id` (optional): The ID of the folder to list (defaults to root)<br>• `user_google_email` (optional): The user's Google email address<br>• `page_size` (optional): Maximum number of documents to return |
+| `create_doc` | Creates a new Google Doc with a title and optional content | • `title` (required): The title for the new document<br>• `content` (optional): Initial text content for the document<br>• `user_google_email` (optional): The user's Google email address |
+
 ---
 
 ## 🛠️ Development
@@ -266,6 +279,7 @@ google_workspace_mcp/
 ├── auth/              # OAuth handling logic (google_auth.py, oauth_manager.py)
 ├── core/              # Core MCP server logic (server.py)
 ├── gcalendar/         # Google Calendar tools (calendar_tools.py)
+├── gdocs/             # Google Docs tools (docs_tools.py)
 ├── gdrive/            # Google Drive tools (drive_tools.py)
 ├── gmail/             # Gmail tools (gmail_tools.py)
 ├── .gitignore         # Git ignore file
