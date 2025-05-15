@@ -60,9 +60,11 @@ async def search_docs(
 
     try:
         drive = build('drive', 'v3', credentials=credentials)
+        escaped_query = query.replace("'", "\\'")
+
         response = await asyncio.to_thread(
             drive.files().list(
-                q=f"name contains '{query.replace("'", "\\'")}' and mimeType='application/vnd.google-apps.document' and trashed=false",
+                q=f"name contains '{escaped_query}' and mimeType='application/vnd.google-apps.document' and trashed=false",
                 pageSize=page_size,
                 fields="files(id, name, createdTime, modifiedTime, webViewLink)"
             ).execute
