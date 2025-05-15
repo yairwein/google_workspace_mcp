@@ -3,7 +3,7 @@
 # Google Workspace MCP Server
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![UV](https://img.shields.io/badge/Package%20Installer-UV-blueviolet)](https://github.com/astral-sh/uv)
 
 **Connect MCP Clients, AI Assistants and more to Google Workspace services through the Model Context Protocol**
@@ -63,7 +63,7 @@ The Google Workspace MCP Server integrates Google Workspace services (Calendar, 
 
 ### Prerequisites
 
-- **Python 3.12+**
+- **Python 3.11+**
 - **[uv](https://github.com/astral-sh/uv)** package installer (or pip)
 - **Google Cloud Project** with OAuth 2.0 credentials enabled for required APIs (Calendar, Drive, Gmail, Docs)
 
