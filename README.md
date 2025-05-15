@@ -121,6 +121,7 @@ Without this, you might encounter an "OAuth 2 MUST utilize HTTPS" error during t
 
 Choose one of the following methods to run the server:
 
+<details>
 <summary><b>HTTP Server Mode</b></summary>
 
 ```bash
@@ -130,7 +131,9 @@ uv run main.py
 ```
 
 Runs the server with an HTTP transport layer on port 8000.
+</details>
 
+<details>
 <summary><b>Using mcpo (Recommended for Open WebUI and other OpenAPI spec compatible clients)</b></summary>
 
 Requires `mcpo` installed (`uv pip install mcpo` or `pip install mcpo`).
@@ -141,6 +144,7 @@ mcpo --config config.json --port 8000
 ```
 
 See the [Integration with Open WebUI](#integration-with-open-webui) section for a `config.json` example.
+</details>
 
 #### Important Ports
 
@@ -155,7 +159,6 @@ The default ports are `8000`, but can be changed via the `WORKSPACE_MCP_PORT` en
 
 The server supports multiple connection methods:
 
-<details>
 <summary><b>Using mcpo (Recommended for OpenAPI Spec Access)</b></summary>
 
 1. Install `mcpo`: `uv pip install mcpo` or `pip install mcpo`
@@ -163,13 +166,13 @@ The server supports multiple connection methods:
 3. Run `mcpo` pointing to your config: `mcpo --config config.json --port 8000 [--api-key YOUR_SECRET_KEY]`
 4. The MCP server API will be available at: `http://localhost:8000/gworkspace` (or the name defined in `config.json`)
 5. OpenAPI documentation (Swagger UI) available at: `http://localhost:8000/gworkspace/docs`
-</details>
 
 <summary><b>HTTP Mode</b></summary>
 
 1. Start the server in HTTP mode (see [Start the Server](#start-the-server))
 2. Send MCP JSON requests directly to `http://localhost:8000`
-3. Useful for testing with tools like `curl` or custom HTTP clients, or derving to Claude via:
+3. Useful for testing with tools like `curl` or custom HTTP clients
+4. Can be used to serve  Claude Desktop & other MCP clients yet to integrate the new Streamable HTTP transport via mcp-remote:
 ```json
 {
   "mcpServers": {
@@ -183,7 +186,7 @@ The server supports multiple connection methods:
   }
 }
 ```
-</details>
+5. You can also serve in SSE fallback mode if preferred.
 
 ### Integration with Open WebUI
 
