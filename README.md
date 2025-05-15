@@ -157,7 +157,18 @@ The server supports multiple connection methods:
 1. Start the server in HTTP mode (see [Start the Server](#start-the-server))
 2. Send MCP JSON requests directly to `http://localhost:8000`
 3. Useful for testing with tools like `curl` or custom HTTP clients, or derving to Claude via:
-```
+```json
+{
+  "mcpServers": {
+    "Google workspace": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://yourendpoint.com:8000/mcp”
+      ]
+    }
+  }
+}
 ```
 </details>
 
