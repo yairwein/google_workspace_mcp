@@ -121,7 +121,6 @@ Without this, you might encounter an "OAuth 2 MUST utilize HTTPS" error during t
 
 Choose one of the following methods to run the server:
 
-<details>
 <summary><b>HTTP Server Mode</b></summary>
 
 ```bash
@@ -131,9 +130,7 @@ uv run main.py
 ```
 
 Runs the server with an HTTP transport layer on port 8000.
-</details>
 
-<details>
 <summary><b>Using mcpo (Recommended for Open WebUI and other OpenAPI spec compatible clients)</b></summary>
 
 Requires `mcpo` installed (`uv pip install mcpo` or `pip install mcpo`).
@@ -144,7 +141,6 @@ mcpo --config config.json --port 8000
 ```
 
 See the [Integration with Open WebUI](#integration-with-open-webui) section for a `config.json` example.
-</details>
 
 #### Important Ports
 
