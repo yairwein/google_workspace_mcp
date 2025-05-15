@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🔄 Google Workspace MCP Server
+# Google Workspace MCP Server
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.12+](https://img.shields.io/badge/Python-3.12%2B-blue.svg)](https://www.python.org/downloads/)
@@ -122,12 +122,12 @@ Without this, you might encounter an "OAuth 2 MUST utilize HTTPS" error during t
 Choose one of the following methods to run the server:
 
 <details>
-<summary><b>HTTP Mode</b></summary>
+<summary><b>HTTP Server Mode</b></summary>
 
 ```bash
-python main.py"
+python main.py
 # or using uv
-uv run main.py"
+uv run main.py
 ```
 
 Runs the server with an HTTP transport layer on port 8000.
@@ -154,7 +154,6 @@ The default ports are `8000`, but can be changed via the `WORKSPACE_MCP_PORT` en
 |---------|------|-------------|
 | OAuth Callback | `8000` | Handled internally by the server via the `/oauth2callback` route |
 | HTTP Mode Server | `8000` | Default when using HTTP transport |
-| `mcpo` API Proxy | `8000` | Default port for `mcpo` |
 
 ### Connecting to the Server
 
@@ -174,7 +173,20 @@ The server supports multiple connection methods:
 
 1. Start the server in HTTP mode (see [Start the Server](#start-the-server))
 2. Send MCP JSON requests directly to `http://localhost:8000`
-3. Useful for testing with tools like `curl` or custom HTTP clients
+3. Useful for testing with tools like `curl` or custom HTTP clients, or derving to Claude via:
+```json
+{
+  "mcpServers": {
+    "Google workspace": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://yourendpoint.com:8000/mcp”
+      ]
+    }
+  }
+}
+```
 </details>
 
 ### Integration with Open WebUI
