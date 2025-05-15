@@ -85,11 +85,26 @@ uv pip install -e .
 1. Create **OAuth 2.0 Credentials** (Desktop application type) in the [Google Cloud Console](https://console.cloud.google.com/).
 2. Enable the **Google Calendar API**, **Google Drive API**, **Gmail API**, and **Google Docs API** for your project.
 3. Download the OAuth client credentials as `client_secret.json` and place it in the project's root directory.
-4. Add the following redirect URI to your OAuth client configuration in the Google Cloud Console:
+4. Add the following redirect URI to your OAuth client configuration in the Google Cloud Console. Note that `http://localhost:8000` is the default base URI and port, which can be customized via environment variables (`WORKSPACE_MCP_BASE_URI` and `WORKSPACE_MCP_PORT`). If you change these, you must update the redirect URI in the Google Cloud Console accordingly.
    ```
    http://localhost:8000/oauth2callback
    ```
 5. **⚠️ Important**: Ensure `client_secret.json` is added to your `.gitignore` file and never committed to version control.
+
+### Server Configuration
+
+The server's base URL and port can be customized using environment variables:
+
+- `WORKSPACE_MCP_BASE_URI`: Sets the base URI for the server (default: `http://localhost`). This affects the `server_url` used for Gemini native function calling and the `OAUTH_REDIRECT_URI`.
+- `WORKSPACE_MCP_PORT`: Sets the port the server listens on (default: `8000`). This affects the `server_url`, `port`, and `OAUTH_REDIRECT_URI`.
+
+Example usage:
+
+```bash
+export WORKSPACE_MCP_BASE_URI="https://my-custom-domain.com"
+export WORKSPACE_MCP_PORT="9000"
+uv run main.py
+```
 
 ### Environment Setup
 
@@ -133,7 +148,9 @@ See the [Integration with Open WebUI](#integration-with-open-webui) section for 
 
 #### Important Ports
 
-| Service | Port | Description |
+The default ports are `8000`, but can be changed via the `WORKSPACE_MCP_PORT` environment variable.
+
+| Service | Default Port | Description |
 |---------|------|-------------|
 | OAuth Callback | `8000` | Handled internally by the server via the `/oauth2callback` route |
 | HTTP Mode Server | `8000` | Default when using HTTP transport |

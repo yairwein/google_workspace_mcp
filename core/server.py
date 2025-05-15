@@ -12,8 +12,7 @@ from mcp import types
 from mcp.server.fastmcp import FastMCP
 
 from google.auth.exceptions import RefreshError
-from auth.google_auth import handle_auth_callback, CONFIG_CLIENT_SECRETS_PATH # Import handle_auth_callback and CONFIG_CLIENT_SECRETS_PATH
-# auth_session_manager is no longer used here with the simplified flow
+from auth.google_auth import handle_auth_callback, CONFIG_CLIENT_SECRETS_PATH
 
 # Import shared configuration
 from config.google_config import (
@@ -37,21 +36,22 @@ from config.google_config import (
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
-# OAUTH_STATE_TO_SESSION_ID_MAP is now imported from config.google_config
 logger = logging.getLogger(__name__)
 
-DEFAULT_PORT = 8000
+WORKSPACE_MCP_PORT = int(os.getenv("WORKSPACE_MCP_PORT", 8000))
+WORKSPACE_MCP_BASE_URI = os.getenv("WORKSPACE_MCP_BASE_URI", "http://localhost")
+
 # Basic MCP server instance
 server = FastMCP(
     name="google_workspace",
-    server_url=f"http://localhost:{DEFAULT_PORT}/gworkspace",  # Add absolute URL for Gemini native function calling
+    server_url=f"{WORKSPACE_MCP_BASE_URI}:{WORKSPACE_MCP_PORT}/gworkspace",  # Add absolute URL for Gemini native function calling
     host="0.0.0.0",      # Listen on all interfaces
-    port=DEFAULT_PORT,   # Default port for HTTP server
+    port=WORKSPACE_MCP_PORT,   # Default port for HTTP server
     stateless_http=False # Enable stateful sessions (default)
 )
 
-# Configure OAuth redirect URI to use the MCP server's port
-OAUTH_REDIRECT_URI = f"http://localhost:{DEFAULT_PORT}/oauth2callback"
+# Configure OAuth redirect URI to use the MCP server's base uri and port
+OAUTH_REDIRECT_URI = f"{WORKSPACE_MCP_BASE_URI}:{WORKSPACE_MCP_PORT}/oauth2callback"
 
 # Register OAuth callback as a custom route
 @server.custom_route("/oauth2callback", methods=["GET"])
@@ -158,6 +158,3 @@ async def oauth2_callback(request: Request) -> HTMLResponse:
             </body>
             </html>
         """, status_code=500)
-
-# The @server.tool("oauth2callback") is removed as it's redundant with the custom HTTP route
-# and the simplified "authorize and retry" flow.

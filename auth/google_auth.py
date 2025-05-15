@@ -14,11 +14,8 @@ from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-# Import necessary components from core.server (OAUTH_REDIRECT_URI is no longer imported here)
-# from core.server import OAUTH_REDIRECT_URI
-# Import shared configuration from the new config file
 from config.google_config import OAUTH_STATE_TO_SESSION_ID_MAP, SCOPES
-from mcp import types # Ensure mcp.types is available
+from mcp import types
 
 
 # Configure logging
@@ -27,7 +24,6 @@ logger = logging.getLogger(__name__)
 
 # Constants
 DEFAULT_CREDENTIALS_DIR = ".credentials"
-# DEFAULT_REDIRECT_URI was previously imported, now passed as parameter
 
 # In-memory cache for session credentials
 # Maps session_id to Credentials object
