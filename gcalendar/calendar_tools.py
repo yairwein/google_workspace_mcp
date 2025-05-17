@@ -51,12 +51,6 @@ from core.server import (
     CALENDAR_READONLY_SCOPE, CALENDAR_EVENTS_SCOPE
 )
 
-# CONFIG_CLIENT_SECRETS_PATH is now imported from auth.google_auth
-# CONFIG_REDIRECT_URI is now imported from core.server
-
-# Remove the local _initiate_auth_and_get_message helper function
-# async def _initiate_auth_and_get_message(...): ...
-
 
 # --- Tool Implementations ---
 
