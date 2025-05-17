@@ -428,6 +428,11 @@ if not credentials or not credentials.valid:
 
 ---
 
+## Screenshots:
+<img width="1018" alt="image" src="https://github.com/user-attachments/assets/656cea40-1f66-40c1-b94c-5a2c900c969d" />
+![image](https://github.com/user-attachments/assets/d3c2a834-fcca-4dc5-8990-6d6dc1d96048)
+
+
 ## 📄 License
 
 This project is licensed under the MIT License - see the `LICENSE` file for details.
