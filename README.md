@@ -180,6 +180,28 @@ The default ports are `8000`, but can be changed via the `WORKSPACE_MCP_PORT` en
 
 The server supports multiple connection methods:
 
+**Claude Desktop:**
+> Can run anywhere and be used via `mcp-remote` or invoked locally either with `uv run main.py` as the arg or by using `mcp-remote` with localhost.
+
+<img width="810" alt="image" src="https://github.com/user-attachments/assets/7f91aa4e-6763-4dc8-8368-05049aa5c2c7" />
+
+
+**config.json:**
+```json
+{
+  "mcpServers": {
+    "Google workspace": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "http://localhost:8000/mcp”
+      ]
+    }
+  }
+}
+```
+
+
 <summary><b>Using mcpo (Recommended for OpenAPI Spec Access)</b></summary>
 
 1. Install `mcpo`: `uv pip install mcpo` or `pip install mcpo`
@@ -194,19 +216,6 @@ The server supports multiple connection methods:
 2. Send MCP JSON requests directly to `http://localhost:8000`
 3. Useful for testing with tools like `curl` or custom HTTP clients
 4. Can be used to serve  Claude Desktop & other MCP clients yet to integrate the new Streamable HTTP transport via mcp-remote:
-```json
-{
-  "mcpServers": {
-    "Google workspace": {
-      "command": "npx",
-      "args": [
-        "mcp-remote",
-        "http://localhost:8000/mcp”
-      ]
-    }
-  }
-}
-```
 5. You can also serve in SSE fallback mode if preferred.
 
 ### Integration with Open WebUI
