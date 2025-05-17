@@ -255,7 +255,9 @@ async def get_events(
             summary = item.get('summary', 'No Title')
             start = item['start'].get('dateTime', item['start'].get('date'))
             link = item.get('htmlLink', 'No Link')
-            event_details_list.append(f"- \"{summary}\" (Starts: {start}) Link: {link}")
+            event_id = item.get('id', 'No ID')
+            # Include the event ID in the output so users can copy it for modify/delete operations
+            event_details_list.append(f"- \"{summary}\" (Starts: {start}) ID: {event_id} | Link: {link}")
 
         text_output = f"Successfully retrieved {len(items)} events from calendar '{calendar_id}' for {log_user_email}:\n" + "\n".join(event_details_list)
         logger.info(f"Successfully retrieved {len(items)} events for {log_user_email}.")
@@ -418,6 +420,24 @@ async def modify_event(
              logger.warning(f"[modify_event] {message}")
              return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=message)])
 
+        # Log the event ID for debugging
+        logger.info(f"[modify_event] Attempting to update event with ID: '{event_id}' in calendar '{calendar_id}'")
+
+        # Try to get the event first to verify it exists
+        try:
+            await asyncio.to_thread(
+                service.events().get(calendarId=calendar_id, eventId=event_id).execute
+            )
+            logger.info(f"[modify_event] Successfully verified event exists before update")
+        except HttpError as get_error:
+            if get_error.resp.status == 404:
+                logger.error(f"[modify_event] Event not found during pre-update verification: {get_error}")
+                message = f"Event not found during verification. The event with ID '{event_id}' could not be found in calendar '{calendar_id}'. This may be due to incorrect ID format or the event no longer exists."
+                return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=message)])
+            else:
+                logger.warning(f"[modify_event] Error during pre-update verification, but proceeding with update: {get_error}")
+
+        # Proceed with the update
         updated_event = await asyncio.to_thread(
             service.events().update(calendarId=calendar_id, eventId=event_id, body=event_body).execute
         )
@@ -427,8 +447,13 @@ async def modify_event(
         logger.info(f"Event modified successfully for {log_user_email}. ID: {updated_event.get('id')}, Link: {link}")
         return types.CallToolResult(content=[types.TextContent(type="text", text=confirmation_message)])
     except HttpError as error:
-        message = f"API error modifying event (ID: {event_id}): {error}. You might need to re-authenticate. LLM: Try 'start_auth' with the user's email ({log_user_email if log_user_email != 'Unknown' else 'target Google account'})."
-        logger.error(message, exc_info=True)
+        # Check for 404 Not Found error specifically
+        if error.resp.status == 404:
+            message = f"Event not found. The event with ID '{event_id}' could not be found in calendar '{calendar_id}'. LLM: The event may have been deleted, or the event ID might be incorrect. Verify the event exists using 'get_events' before attempting to modify it."
+            logger.error(f"[modify_event] {message}")
+        else:
+            message = f"API error modifying event (ID: {event_id}): {error}. You might need to re-authenticate. LLM: Try 'start_auth' with the user's email ({log_user_email if log_user_email != 'Unknown' else 'target Google account'})."
+            logger.error(message, exc_info=True)
         return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=message)])
     except Exception as e:
         message = f"Unexpected error modifying event (ID: {event_id}): {e}."
@@ -468,6 +493,24 @@ async def delete_event(
 
     try:
 
+        # Log the event ID for debugging
+        logger.info(f"[delete_event] Attempting to delete event with ID: '{event_id}' in calendar '{calendar_id}'")
+
+        # Try to get the event first to verify it exists
+        try:
+            await asyncio.to_thread(
+                service.events().get(calendarId=calendar_id, eventId=event_id).execute
+            )
+            logger.info(f"[delete_event] Successfully verified event exists before deletion")
+        except HttpError as get_error:
+            if get_error.resp.status == 404:
+                logger.error(f"[delete_event] Event not found during pre-delete verification: {get_error}")
+                message = f"Event not found during verification. The event with ID '{event_id}' could not be found in calendar '{calendar_id}'. This may be due to incorrect ID format or the event no longer exists."
+                return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=message)])
+            else:
+                logger.warning(f"[delete_event] Error during pre-delete verification, but proceeding with deletion: {get_error}")
+
+        # Proceed with the deletion
         await asyncio.to_thread(
             service.events().delete(calendarId=calendar_id, eventId=event_id).execute
         )
@@ -476,8 +519,13 @@ async def delete_event(
         logger.info(f"Event deleted successfully for {log_user_email}. ID: {event_id}")
         return types.CallToolResult(content=[types.TextContent(type="text", text=confirmation_message)])
     except HttpError as error:
-        message = f"API error deleting event (ID: {event_id}): {error}. You might need to re-authenticate. LLM: Try 'start_auth' with the user's email ({log_user_email if log_user_email != 'Unknown' else 'target Google account'})."
-        logger.error(message, exc_info=True)
+        # Check for 404 Not Found error specifically
+        if error.resp.status == 404:
+            message = f"Event not found. The event with ID '{event_id}' could not be found in calendar '{calendar_id}'. LLM: The event may have been deleted already, or the event ID might be incorrect."
+            logger.error(f"[delete_event] {message}")
+        else:
+            message = f"API error deleting event (ID: {event_id}): {error}. You might need to re-authenticate. LLM: Try 'start_auth' with the user's email ({log_user_email if log_user_email != 'Unknown' else 'target Google account'})."
+            logger.error(message, exc_info=True)
         return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=message)])
     except Exception as e:
         message = f"Unexpected error deleting event (ID: {event_id}): {e}."
