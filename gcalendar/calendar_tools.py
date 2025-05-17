@@ -28,6 +28,23 @@ logger = logging.getLogger(__name__)
 def _correct_time_format_for_api(time_str: Optional[str], param_name: str) -> Optional[str]:
     if not time_str:
         return None
+
+    # Log the incoming time string for debugging
+    logger.info(f"_correct_time_format_for_api: Processing {param_name} with value '{time_str}'")
+
+    # Handle date-only format (YYYY-MM-DD)
+    if len(time_str) == 10 and time_str.count('-') == 2:
+        try:
+            # Validate it's a proper date
+            datetime.datetime.strptime(time_str, "%Y-%m-%d")
+            # For date-only, append T00:00:00Z to make it RFC3339 compliant
+            formatted = f"{time_str}T00:00:00Z"
+            logger.info(f"Formatting date-only {param_name} '{time_str}' to RFC3339: '{formatted}'")
+            return formatted
+        except ValueError:
+            logger.warning(f"{param_name} '{time_str}' looks like a date but is not valid YYYY-MM-DD. Using as is.")
+            return time_str
+
     # Specifically address YYYY-MM-DDTHH:MM:SS by appending 'Z'
     if len(time_str) == 19 and time_str[10] == 'T' and time_str.count(':') == 2 and \
        not (time_str.endswith('Z') or ('+' in time_str[10:]) or ('-' in time_str[10:])):
@@ -39,6 +56,9 @@ def _correct_time_format_for_api(time_str: Optional[str], param_name: str) -> Op
         except ValueError:
             logger.warning(f"{param_name} '{time_str}' looks like it needs 'Z' but is not valid YYYY-MM-DDTHH:MM:SS. Using as is.")
             return time_str
+
+    # If it already has timezone info or doesn't match our patterns, return as is
+    logger.info(f"{param_name} '{time_str}' doesn't need formatting, using as is.")
     return time_str
 
 # Import the server directly (will be initialized before this module is imported)
@@ -226,19 +246,22 @@ async def get_events(
     service, log_user_email = auth_result
 
     try:
+        logger.info(f"[get_events] Raw time parameters - time_min: '{time_min}', time_max: '{time_max}'")
 
         # Ensure time_min and time_max are correctly formatted for the API
         formatted_time_min = _correct_time_format_for_api(time_min, "time_min")
         effective_time_min = formatted_time_min or (datetime.datetime.utcnow().isoformat() + 'Z')
         if time_min is None:
             logger.info(f"time_min not provided, defaulting to current UTC time: {effective_time_min}")
-        elif formatted_time_min != time_min: # Log if original was modified by helper
-            logger.info(f"Original time_min '{time_min}' formatted to '{effective_time_min}' for API call.")
+        else:
+            logger.info(f"time_min processing: original='{time_min}', formatted='{formatted_time_min}', effective='{effective_time_min}'")
 
         effective_time_max = _correct_time_format_for_api(time_max, "time_max")
-        if time_max and effective_time_max != time_max: # Log if original was modified by helper
-            logger.info(f"Original time_max '{time_max}' formatted to '{effective_time_max}' for API call.")
+        if time_max:
+            logger.info(f"time_max processing: original='{time_max}', formatted='{effective_time_max}'")
 
+        # Log the final API call parameters
+        logger.info(f"[get_events] Final API parameters - calendarId: '{calendar_id}', timeMin: '{effective_time_min}', timeMax: '{effective_time_max}', maxResults: {max_results}")
 
         events_result = await asyncio.to_thread(
             service.events().list(
