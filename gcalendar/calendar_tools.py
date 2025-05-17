@@ -51,6 +51,53 @@ from core.server import (
     CALENDAR_READONLY_SCOPE, CALENDAR_EVENTS_SCOPE
 )
 
+# --- Helper for Authentication and Service Initialization ---
+
+async def _get_authenticated_calendar_service(
+    tool_name: str,
+    user_google_email: Optional[str],
+    mcp_session_id: Optional[str],
+    required_scopes: List[str]
+) -> tuple[Any, str] | types.CallToolResult:
+    """
+    Handles common authentication and Google Calendar service initialization logic.
+    Returns a tuple of (service, log_user_email) on success, or CallToolResult on auth failure.
+    """
+    logger.debug(f"[{tool_name}] Attempting to get authenticated calendar service. Email: '{user_google_email}', Session: '{mcp_session_id}'")
+    credentials = await asyncio.to_thread(
+        get_credentials,
+        user_google_email=user_google_email,
+        required_scopes=required_scopes,
+        client_secrets_path=CONFIG_CLIENT_SECRETS_PATH,
+        session_id=mcp_session_id
+    )
+
+    if not credentials or not credentials.valid:
+        logger.warning(f"[{tool_name}] No valid credentials. Session: '{mcp_session_id}', Email: '{user_google_email}'.")
+        if user_google_email and '@' in user_google_email:
+            logger.info(f"[{tool_name}] Valid email '{user_google_email}' provided, initiating auth flow.")
+            # This call will return a CallToolResult which should be propagated
+            return await start_auth_flow(
+                mcp_session_id=mcp_session_id,
+                user_google_email=user_google_email,
+                service_name="Google Calendar",
+                redirect_uri=OAUTH_REDIRECT_URI
+            )
+        else:
+            error_msg = f"Authentication required for {tool_name}. No active authenticated session, and no valid 'user_google_email' provided. LLM: Please ask the user for their Google email address and retry, or use the 'start_auth' tool with their email."
+            logger.info(f"[{tool_name}] {error_msg}")
+            return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=error_msg)])
+
+    try:
+        service = build('calendar', 'v3', credentials=credentials)
+        log_user_email = user_google_email or (credentials.id_token.get('email') if credentials and credentials.id_token else 'Unknown')
+        logger.info(f"[{tool_name}] Successfully built calendar service. User associated with creds: {log_user_email}")
+        return service, log_user_email
+    except Exception as e:
+        message = f"[{tool_name}] Unexpected error building calendar service: {e}."
+        logger.exception(message)
+        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=message)])
+
 
 # --- Tool Implementations ---
 
@@ -109,29 +156,17 @@ async def list_calendars(user_google_email: Optional[str] = None, mcp_session_id
                                or an authentication guidance message if credentials are required.
     """
     logger.info(f"[list_calendars] Invoked. Session: '{mcp_session_id}', Email: '{user_google_email}'")
-    credentials = await asyncio.to_thread(
-        get_credentials,
+    auth_result = await _get_authenticated_calendar_service(
+        tool_name="list_calendars",
         user_google_email=user_google_email,
-        required_scopes=[CALENDAR_READONLY_SCOPE], # Request only necessary scopes for get_credentials check
-        client_secrets_path=CONFIG_CLIENT_SECRETS_PATH, # Use imported constant
-        session_id=mcp_session_id
+        mcp_session_id=mcp_session_id,
+        required_scopes=[CALENDAR_READONLY_SCOPE]
     )
-
-    if not credentials or not credentials.valid:
-        logger.warning(f"[list_calendars] No valid credentials. Session: '{mcp_session_id}', Email: '{user_google_email}'.")
-        if user_google_email and '@' in user_google_email:
-            logger.info(f"[list_calendars] Valid email '{user_google_email}' provided, initiating auth flow for this email.")
-            # Use the centralized start_auth_flow
-            return await start_auth_flow(mcp_session_id=mcp_session_id, user_google_email=user_google_email, service_name="Google Calendar", redirect_uri=OAUTH_REDIRECT_URI)
-        else:
-            error_msg = "Authentication required. No active authenticated session, and no valid 'user_google_email' provided. LLM: Please ask the user for their Google email address and retry, or use the 'start_auth' tool with their email."
-            logger.info(f"[list_calendars] {error_msg}")
-            return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=error_msg)])
+    if isinstance(auth_result, types.CallToolResult):
+        return auth_result # Propagate auth error or auth initiation message
+    service, log_user_email = auth_result
 
     try:
-        service = build('calendar', 'v3', credentials=credentials)
-        log_user_email = user_google_email or (credentials.id_token.get('email') if credentials and credentials.id_token else 'Unknown')
-        logger.info(f"Successfully built calendar service. User associated with creds: {log_user_email}")
         calendar_list_response = await asyncio.to_thread(service.calendarList().list().execute)
         items = calendar_list_response.get('items', [])
         if not items:
@@ -180,29 +215,17 @@ async def get_events(
                                or an authentication guidance message if credentials are required.
     """
     logger.info(f"[get_events] Invoked. Session: '{mcp_session_id}', Email: '{user_google_email}', Calendar: {calendar_id}")
-    credentials = await asyncio.to_thread(
-        get_credentials,
+    auth_result = await _get_authenticated_calendar_service(
+        tool_name="get_events",
         user_google_email=user_google_email,
-        required_scopes=[CALENDAR_READONLY_SCOPE],
-        client_secrets_path=CONFIG_CLIENT_SECRETS_PATH, # Use imported constant
-        session_id=mcp_session_id
+        mcp_session_id=mcp_session_id,
+        required_scopes=[CALENDAR_READONLY_SCOPE]
     )
-
-    if not credentials or not credentials.valid:
-        logger.warning(f"[get_events] No valid credentials. Session: '{mcp_session_id}', Email: '{user_google_email}'.")
-        if user_google_email and '@' in user_google_email:
-            logger.info(f"[get_events] Valid email '{user_google_email}' provided, initiating auth flow for this email (requests all SCOPES).")
-            # Use the centralized start_auth_flow
-            return await start_auth_flow(mcp_session_id=mcp_session_id, user_google_email=user_google_email, service_name="Google Calendar", redirect_uri=OAUTH_REDIRECT_URI)
-        else:
-            error_msg = "Authentication required. No active authenticated session, and no valid 'user_google_email' provided. LLM: Please ask the user for their Google email address and retry, or use the 'start_auth' tool with their email."
-            logger.info(f"[get_events] {error_msg}")
-            return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=error_msg)])
+    if isinstance(auth_result, types.CallToolResult):
+        return auth_result
+    service, log_user_email = auth_result
 
     try:
-        service = build('calendar', 'v3', credentials=credentials)
-        log_user_email = user_google_email or (credentials.id_token.get('email') if credentials and credentials.id_token else 'Unknown')
-        logger.info(f"Successfully built calendar service. User associated with creds: {log_user_email}")
 
         # Ensure time_min and time_max are correctly formatted for the API
         formatted_time_min = _correct_time_format_for_api(time_min, "time_min")
@@ -279,29 +302,17 @@ async def create_event(
         A CallToolResult confirming creation or an error/auth guidance message.
     """
     logger.info(f"[create_event] Invoked. Session: '{mcp_session_id}', Email: '{user_google_email}', Summary: {summary}")
-    credentials = await asyncio.to_thread(
-        get_credentials,
+    auth_result = await _get_authenticated_calendar_service(
+        tool_name="create_event",
         user_google_email=user_google_email,
-        required_scopes=[CALENDAR_EVENTS_SCOPE],
-        client_secrets_path=CONFIG_CLIENT_SECRETS_PATH, # Use imported constant
-        session_id=mcp_session_id
+        mcp_session_id=mcp_session_id,
+        required_scopes=[CALENDAR_EVENTS_SCOPE]
     )
-
-    if not credentials or not credentials.valid:
-        logger.warning(f"[create_event] No valid credentials. Session: '{mcp_session_id}', Email: '{user_google_email}'.")
-        if user_google_email and '@' in user_google_email:
-            logger.info(f"[create_event] Valid email '{user_google_email}' provided, initiating auth flow for this email (requests all SCOPES).")
-            # Use the centralized start_auth_flow
-            return await start_auth_flow(mcp_session_id=mcp_session_id, user_google_email=user_google_email, service_name="Google Calendar", redirect_uri=OAUTH_REDIRECT_URI)
-        else:
-            error_msg = "Authentication required to create event. No active authenticated session, and no valid 'user_google_email' provided. LLM: Please ask the user for their Google email address and retry, or use the 'start_auth' tool with their email."
-            logger.info(f"[create_event] {error_msg}")
-            return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=error_msg)])
+    if isinstance(auth_result, types.CallToolResult):
+        return auth_result
+    service, log_user_email = auth_result
 
     try:
-        service = build('calendar', 'v3', credentials=credentials)
-        log_user_email = user_google_email or (credentials.id_token.get('email') if credentials and credentials.id_token else 'Unknown')
-        logger.info(f"Successfully built calendar service. User associated with creds: {log_user_email}")
 
         event_body: Dict[str, Any] = {
             'summary': summary,
@@ -327,13 +338,14 @@ async def create_event(
         return types.CallToolResult(content=[types.TextContent(type="text", text=confirmation_message)])
     except HttpError as error:
         # Corrected error message to use log_user_email and provide better guidance
-        log_user_email_for_error = user_google_email or (credentials.id_token.get('email') if credentials and credentials.id_token else 'Unknown')
-        message = f"API error creating event: {error}. You might need to re-authenticate. LLM: Try 'start_auth' with the user's email ({log_user_email_for_error if log_user_email_for_error != 'Unknown' else 'target Google account'})."
+        # log_user_email_for_error is now log_user_email from the helper or the original user_google_email
+        message = f"API error creating event: {error}. You might need to re-authenticate. LLM: Try 'start_auth' with the user's email ({log_user_email if log_user_email != 'Unknown' else 'target Google account'})."
         logger.error(message, exc_info=True)
         return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=message)])
     except Exception as e:
         message = f"Unexpected error creating event: {e}."
         logger.exception(message)
+        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=message)])
 @server.tool()
 async def modify_event(
     event_id: str,
@@ -369,28 +381,17 @@ async def modify_event(
         A CallToolResult confirming modification or an error/auth guidance message.
     """
     logger.info(f"[modify_event] Invoked. Session: '{mcp_session_id}', Email: '{user_google_email}', Event ID: {event_id}")
-    credentials = await asyncio.to_thread(
-        get_credentials,
+    auth_result = await _get_authenticated_calendar_service(
+        tool_name="modify_event",
         user_google_email=user_google_email,
-        required_scopes=[CALENDAR_EVENTS_SCOPE],
-        client_secrets_path=CONFIG_CLIENT_SECRETS_PATH,
-        session_id=mcp_session_id
+        mcp_session_id=mcp_session_id,
+        required_scopes=[CALENDAR_EVENTS_SCOPE]
     )
-
-    if not credentials or not credentials.valid:
-        logger.warning(f"[modify_event] No valid credentials. Session: '{mcp_session_id}', Email: '{user_google_email}'.")
-        if user_google_email and '@' in user_google_email:
-            logger.info(f"[modify_event] Valid email '{user_google_email}' provided, initiating auth flow for this email (requests all SCOPES).")
-            return await start_auth_flow(mcp_session_id=mcp_session_id, user_google_email=user_google_email, service_name="Google Calendar", redirect_uri=OAUTH_REDIRECT_URI)
-        else:
-            error_msg = "Authentication required to modify event. No active authenticated session, and no valid 'user_google_email' provided. LLM: Please ask the user for their Google email address and retry, or use the 'start_auth' tool with their email."
-            logger.info(f"[modify_event] {error_msg}")
-            return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=error_msg)])
+    if isinstance(auth_result, types.CallToolResult):
+        return auth_result
+    service, log_user_email = auth_result
 
     try:
-        service = build('calendar', 'v3', credentials=credentials)
-        log_user_email = user_google_email or (credentials.id_token.get('email') if credentials and credentials.id_token else 'Unknown')
-        logger.info(f"Successfully built calendar service. User associated with creds: {log_user_email}")
 
         # Build the event body with only the fields that are provided
         event_body: Dict[str, Any] = {}
@@ -426,8 +427,7 @@ async def modify_event(
         logger.info(f"Event modified successfully for {log_user_email}. ID: {updated_event.get('id')}, Link: {link}")
         return types.CallToolResult(content=[types.TextContent(type="text", text=confirmation_message)])
     except HttpError as error:
-        log_user_email_for_error = user_google_email or (credentials.id_token.get('email') if credentials and credentials.id_token else 'Unknown')
-        message = f"API error modifying event (ID: {event_id}): {error}. You might need to re-authenticate. LLM: Try 'start_auth' with the user's email ({log_user_email_for_error if log_user_email_for_error != 'Unknown' else 'target Google account'})."
+        message = f"API error modifying event (ID: {event_id}): {error}. You might need to re-authenticate. LLM: Try 'start_auth' with the user's email ({log_user_email if log_user_email != 'Unknown' else 'target Google account'})."
         logger.error(message, exc_info=True)
         return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=message)])
     except Exception as e:
@@ -456,28 +456,17 @@ async def delete_event(
         A CallToolResult confirming deletion or an error/auth guidance message.
     """
     logger.info(f"[delete_event] Invoked. Session: '{mcp_session_id}', Email: '{user_google_email}', Event ID: {event_id}")
-    credentials = await asyncio.to_thread(
-        get_credentials,
+    auth_result = await _get_authenticated_calendar_service(
+        tool_name="delete_event",
         user_google_email=user_google_email,
-        required_scopes=[CALENDAR_EVENTS_SCOPE],
-        client_secrets_path=CONFIG_CLIENT_SECRETS_PATH,
-        session_id=mcp_session_id
+        mcp_session_id=mcp_session_id,
+        required_scopes=[CALENDAR_EVENTS_SCOPE]
     )
-
-    if not credentials or not credentials.valid:
-        logger.warning(f"[delete_event] No valid credentials. Session: '{mcp_session_id}', Email: '{user_google_email}'.")
-        if user_google_email and '@' in user_google_email:
-            logger.info(f"[delete_event] Valid email '{user_google_email}' provided, initiating auth flow for this email (requests all SCOPES).")
-            return await start_auth_flow(mcp_session_id=mcp_session_id, user_google_email=user_google_email, service_name="Google Calendar", redirect_uri=OAUTH_REDIRECT_URI)
-        else:
-            error_msg = "Authentication required to delete event. No active authenticated session, and no valid 'user_google_email' provided. LLM: Please ask the user for their Google email address and retry, or use the 'start_auth' tool with their email."
-            logger.info(f"[delete_event] {error_msg}")
-            return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=error_msg)])
+    if isinstance(auth_result, types.CallToolResult):
+        return auth_result
+    service, log_user_email = auth_result
 
     try:
-        service = build('calendar', 'v3', credentials=credentials)
-        log_user_email = user_google_email or (credentials.id_token.get('email') if credentials and credentials.id_token else 'Unknown')
-        logger.info(f"Successfully built calendar service. User associated with creds: {log_user_email}")
 
         await asyncio.to_thread(
             service.events().delete(calendarId=calendar_id, eventId=event_id).execute
@@ -487,8 +476,7 @@ async def delete_event(
         logger.info(f"Event deleted successfully for {log_user_email}. ID: {event_id}")
         return types.CallToolResult(content=[types.TextContent(type="text", text=confirmation_message)])
     except HttpError as error:
-        log_user_email_for_error = user_google_email or (credentials.id_token.get('email') if credentials and credentials.id_token else 'Unknown')
-        message = f"API error deleting event (ID: {event_id}): {error}. You might need to re-authenticate. LLM: Try 'start_auth' with the user's email ({log_user_email_for_error if log_user_email_for_error != 'Unknown' else 'target Google account'})."
+        message = f"API error deleting event (ID: {event_id}): {error}. You might need to re-authenticate. LLM: Try 'start_auth' with the user's email ({log_user_email if log_user_email != 'Unknown' else 'target Google account'})."
         logger.error(message, exc_info=True)
         return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=message)])
     except Exception as e:
