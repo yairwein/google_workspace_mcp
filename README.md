@@ -6,7 +6,7 @@
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![UV](https://img.shields.io/badge/Package%20Installer-UV-blueviolet)](https://github.com/astral-sh/uv)
 
-<img src="https://github.com/user-attachments/assets/b89524e4-6e6e-49e6-ba77-00d6df0c6e5c" width="200">
+<img src="https://github.com/user-attachments/assets/b89524e4-6e6e-49e6-ba77-00d6df0c6e5c" width="200" />
 
 **Connect MCP Clients, AI Assistants and more to Google Workspace services through the Model Context Protocol**
 
@@ -201,7 +201,7 @@ The server supports multiple connection methods:
       "command": "npx",
       "args": [
         "mcp-remote",
-        "https://yourendpoint.com:8000/mcp”
+        "http://localhost:8000/mcp”
       ]
     }
   }
@@ -430,7 +430,7 @@ if not credentials or not credentials.valid:
 
 ## Screenshots:
 <img width="1018" alt="image" src="https://github.com/user-attachments/assets/656cea40-1f66-40c1-b94c-5a2c900c969d" />
-![image](https://github.com/user-attachments/assets/d3c2a834-fcca-4dc5-8990-6d6dc1d96048)
+<img src="https://github.com/user-attachments/assets/d3c2a834-fcca-4dc5-8990-6d6dc1d96048" />
 
 
 ## 📄 License
