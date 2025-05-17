@@ -2,17 +2,11 @@
 startCommand:
     type: http
     configSchema:
-      # JSON Schema defining the configuration options for the MCP.
-      {}
-    commandFunction:
-      # A function that produces the CLI command to start the MCP on stdio.
-      |-
-      (config) => ({
-        "command": "python",
-        "args": [
-          "main.py"
-        ],
-        "env": {
-          ...
-        }
-      })
+        type: object
+        required:
+            - clientSecretsPath
+        properties:
+            clientSecretsPath:
+                type: string
+                title: "Client Secrets JSON"
+                description: "Path to your client_secrets.json file"
