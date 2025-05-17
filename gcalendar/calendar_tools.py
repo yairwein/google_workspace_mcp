@@ -334,4 +334,164 @@ async def create_event(
     except Exception as e:
         message = f"Unexpected error creating event: {e}."
         logger.exception(message)
+@server.tool()
+async def modify_event(
+    event_id: str,
+    user_google_email: Optional[str] = None,
+    calendar_id: str = 'primary',
+    summary: Optional[str] = None,
+    start_time: Optional[str] = None,
+    end_time: Optional[str] = None,
+    description: Optional[str] = None,
+    location: Optional[str] = None,
+    attendees: Optional[List[str]] = None,
+    timezone: Optional[str] = None,
+    mcp_session_id: Optional[str] = Header(None, alias="Mcp-Session-Id")
+) -> types.CallToolResult:
+    """
+    Modifies an existing event. Prioritizes authenticated MCP session, then `user_google_email`.
+    If no valid authentication is found, guides the LLM to obtain user's email or use `start_auth`.
+
+    Args:
+        event_id (str): The ID of the event to modify.
+        user_google_email (Optional[str]): User's Google email. Used if session isn't authenticated.
+        calendar_id (str): Calendar ID (default: 'primary').
+        summary (Optional[str]): New event title.
+        start_time (Optional[str]): New start time (RFC3339, e.g., "2023-10-27T10:00:00-07:00" or "2023-10-27" for all-day).
+        end_time (Optional[str]): New end time (RFC3339, e.g., "2023-10-27T11:00:00-07:00" or "2023-10-28" for all-day).
+        description (Optional[str]): New event description.
+        location (Optional[str]): New event location.
+        attendees (Optional[List[str]]): New attendee email addresses.
+        timezone (Optional[str]): New timezone (e.g., "America/New_York").
+        mcp_session_id (Optional[str]): Active MCP session ID (injected by FastMCP from Mcp-Session-Id header).
+
+    Returns:
+        A CallToolResult confirming modification or an error/auth guidance message.
+    """
+    logger.info(f"[modify_event] Invoked. Session: '{mcp_session_id}', Email: '{user_google_email}', Event ID: {event_id}")
+    credentials = await asyncio.to_thread(
+        get_credentials,
+        user_google_email=user_google_email,
+        required_scopes=[CALENDAR_EVENTS_SCOPE],
+        client_secrets_path=CONFIG_CLIENT_SECRETS_PATH,
+        session_id=mcp_session_id
+    )
+
+    if not credentials or not credentials.valid:
+        logger.warning(f"[modify_event] No valid credentials. Session: '{mcp_session_id}', Email: '{user_google_email}'.")
+        if user_google_email and '@' in user_google_email:
+            logger.info(f"[modify_event] Valid email '{user_google_email}' provided, initiating auth flow for this email (requests all SCOPES).")
+            return await start_auth_flow(mcp_session_id=mcp_session_id, user_google_email=user_google_email, service_name="Google Calendar", redirect_uri=OAUTH_REDIRECT_URI)
+        else:
+            error_msg = "Authentication required to modify event. No active authenticated session, and no valid 'user_google_email' provided. LLM: Please ask the user for their Google email address and retry, or use the 'start_auth' tool with their email."
+            logger.info(f"[modify_event] {error_msg}")
+            return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=error_msg)])
+
+    try:
+        service = build('calendar', 'v3', credentials=credentials)
+        log_user_email = user_google_email or (credentials.id_token.get('email') if credentials and credentials.id_token else 'Unknown')
+        logger.info(f"Successfully built calendar service. User associated with creds: {log_user_email}")
+
+        # Build the event body with only the fields that are provided
+        event_body: Dict[str, Any] = {}
+        if summary is not None: event_body['summary'] = summary
+        if start_time is not None:
+             event_body['start'] = {'date': start_time} if 'T' not in start_time else {'dateTime': start_time}
+             if timezone is not None and 'dateTime' in event_body['start']: event_body['start']['timeZone'] = timezone
+        if end_time is not None:
+             event_body['end'] = {'date': end_time} if 'T' not in end_time else {'dateTime': end_time}
+             if timezone is not None and 'dateTime' in event_body['end']: event_body['end']['timeZone'] = timezone
+        if description is not None: event_body['description'] = description
+        if location is not None: event_body['location'] = location
+        if attendees is not None: event_body['attendees'] = [{'email': email} for email in attendees]
+        if timezone is not None and 'start' not in event_body and 'end' not in event_body:
+             # If timezone is provided but start/end times are not, we need to fetch the existing event
+             # to apply the timezone correctly. This is a simplification; a full implementation
+             # might handle this more robustly or require start/end with timezone.
+             # For now, we'll log a warning and skip applying timezone if start/end are missing.
+             logger.warning(f"[modify_event] Timezone provided but start_time and end_time are missing. Timezone will not be applied unless start/end times are also provided.")
+
+
+        if not event_body:
+             message = "No fields provided to modify the event."
+             logger.warning(f"[modify_event] {message}")
+             return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=message)])
+
+        updated_event = await asyncio.to_thread(
+            service.events().update(calendarId=calendar_id, eventId=event_id, body=event_body).execute
+        )
+
+        link = updated_event.get('htmlLink', 'No link available')
+        confirmation_message = f"Successfully modified event '{updated_event.get('summary', summary)}' (ID: {event_id}) for {log_user_email}. Link: {link}"
+        logger.info(f"Event modified successfully for {log_user_email}. ID: {updated_event.get('id')}, Link: {link}")
+        return types.CallToolResult(content=[types.TextContent(type="text", text=confirmation_message)])
+    except HttpError as error:
+        log_user_email_for_error = user_google_email or (credentials.id_token.get('email') if credentials and credentials.id_token else 'Unknown')
+        message = f"API error modifying event (ID: {event_id}): {error}. You might need to re-authenticate. LLM: Try 'start_auth' with the user's email ({log_user_email_for_error if log_user_email_for_error != 'Unknown' else 'target Google account'})."
+        logger.error(message, exc_info=True)
+        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=message)])
+    except Exception as e:
+        message = f"Unexpected error modifying event (ID: {event_id}): {e}."
+        logger.exception(message)
+        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=message)])
+
+@server.tool()
+async def delete_event(
+    event_id: str,
+    user_google_email: Optional[str] = None,
+    calendar_id: str = 'primary',
+    mcp_session_id: Optional[str] = Header(None, alias="Mcp-Session-Id")
+) -> types.CallToolResult:
+    """
+    Deletes an existing event. Prioritizes authenticated MCP session, then `user_google_email`.
+    If no valid authentication is found, guides the LLM to obtain user's email or use `start_auth`.
+
+    Args:
+        event_id (str): The ID of the event to delete.
+        user_google_email (Optional[str]): User's Google email. Used if session isn't authenticated.
+        calendar_id (str): Calendar ID (default: 'primary').
+        mcp_session_id (Optional[str]): Active MCP session ID (injected by FastMCP from Mcp-Session-Id header).
+
+    Returns:
+        A CallToolResult confirming deletion or an error/auth guidance message.
+    """
+    logger.info(f"[delete_event] Invoked. Session: '{mcp_session_id}', Email: '{user_google_email}', Event ID: {event_id}")
+    credentials = await asyncio.to_thread(
+        get_credentials,
+        user_google_email=user_google_email,
+        required_scopes=[CALENDAR_EVENTS_SCOPE],
+        client_secrets_path=CONFIG_CLIENT_SECRETS_PATH,
+        session_id=mcp_session_id
+    )
+
+    if not credentials or not credentials.valid:
+        logger.warning(f"[delete_event] No valid credentials. Session: '{mcp_session_id}', Email: '{user_google_email}'.")
+        if user_google_email and '@' in user_google_email:
+            logger.info(f"[delete_event] Valid email '{user_google_email}' provided, initiating auth flow for this email (requests all SCOPES).")
+            return await start_auth_flow(mcp_session_id=mcp_session_id, user_google_email=user_google_email, service_name="Google Calendar", redirect_uri=OAUTH_REDIRECT_URI)
+        else:
+            error_msg = "Authentication required to delete event. No active authenticated session, and no valid 'user_google_email' provided. LLM: Please ask the user for their Google email address and retry, or use the 'start_auth' tool with their email."
+            logger.info(f"[delete_event] {error_msg}")
+            return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=error_msg)])
+
+    try:
+        service = build('calendar', 'v3', credentials=credentials)
+        log_user_email = user_google_email or (credentials.id_token.get('email') if credentials and credentials.id_token else 'Unknown')
+        logger.info(f"Successfully built calendar service. User associated with creds: {log_user_email}")
+
+        await asyncio.to_thread(
+            service.events().delete(calendarId=calendar_id, eventId=event_id).execute
+        )
+
+        confirmation_message = f"Successfully deleted event (ID: {event_id}) from calendar '{calendar_id}' for {log_user_email}."
+        logger.info(f"Event deleted successfully for {log_user_email}. ID: {event_id}")
+        return types.CallToolResult(content=[types.TextContent(type="text", text=confirmation_message)])
+    except HttpError as error:
+        log_user_email_for_error = user_google_email or (credentials.id_token.get('email') if credentials and credentials.id_token else 'Unknown')
+        message = f"API error deleting event (ID: {event_id}): {error}. You might need to re-authenticate. LLM: Try 'start_auth' with the user's email ({log_user_email_for_error if log_user_email_for_error != 'Unknown' else 'target Google account'})."
+        logger.error(message, exc_info=True)
+        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=message)])
+    except Exception as e:
+        message = f"Unexpected error deleting event (ID: {event_id}): {e}."
+        logger.exception(message)
         return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=message)])
