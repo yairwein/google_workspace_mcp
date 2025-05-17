@@ -146,6 +146,25 @@ mcpo --config config.json --port 8000
 See the [Integration with Open WebUI](#integration-with-open-webui) section for a `config.json` example.
 </details>
 
+<details>
+<summary><b>Using Docker</b></summary>
+
+You can build and run the server using the provided [`Dockerfile`](Dockerfile).
+
+```bash
+# Build the Docker image
+docker build -t google-workspace-mcp .
+
+# Run the Docker container
+# The -p flag maps the container port 8000 to the host port 8000
+# The -v flag mounts the current directory to /app inside the container
+# This is useful for development to pick up code changes without rebuilding
+docker run -p 8000:8000 -v $(pwd):/app google-workspace-mcp
+```
+
+The `smithery.yaml` file is configured to start the server correctly within the Docker container.
+</details>
+
 #### Important Ports
 
 The default ports are `8000`, but can be changed via the `WORKSPACE_MCP_PORT` environment variable.
