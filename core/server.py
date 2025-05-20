@@ -1,18 +1,16 @@
 import logging
 import os
-import sys
 from typing import Dict, Any, Optional
 
-from fastapi import Request
+from fastapi import Request, Header
 from fastapi.responses import HTMLResponse
 
-# Import MCP types for proper response formatting
 from mcp import types
 
 from mcp.server.fastmcp import FastMCP
 
 from google.auth.exceptions import RefreshError
-from auth.google_auth import handle_auth_callback, CONFIG_CLIENT_SECRETS_PATH, start_auth_flow # Added start_auth_flow
+from auth.google_auth import handle_auth_callback, start_auth_flow, CONFIG_CLIENT_SECRETS_PATH
 
 # Import shared configuration
 from config.google_config import (
