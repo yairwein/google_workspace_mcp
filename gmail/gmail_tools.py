@@ -10,8 +10,11 @@ import base64
 import email
 from typing import List, Optional, Any # Keep Any
 
+from email.mime.text import MIMEText
+
+
 from mcp import types
-from fastapi import Header
+from fastapi import Header, Body 
 from googleapiclient.discovery import build # Import build
 from googleapiclient.errors import HttpError
 
@@ -226,4 +229,78 @@ async def get_gmail_message_content( # Signature cleaned - no google_service par
         logger.exception(f"[{tool_name}] Unexpected error getting Gmail message content: {e}")
         return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=f"Unexpected error: {e}")])
 
-# Note: send_gmail_message tool would need GMAIL_SEND_SCOPE and similar refactoring if added.
+@server.tool()
+async def send_gmail_message(
+    to: str = Body(..., description="Recipient email address."),
+    subject: str = Body(..., description="Email subject."),
+    body: str = Body(..., description="Email body (plain text)."),
+    user_google_email: Optional[str] = None,
+    mcp_session_id: Optional[str] = Header(None, alias="Mcp-Session-Id")
+) -> types.CallToolResult:
+    """
+    Sends an email using the user's Gmail account.
+    Authentication is handled by get_credentials and start_auth_flow.
+
+    Args:
+        to (str): Recipient email address.
+        subject (str): Email subject.
+        body (str): Email body (plain text).
+        user_google_email (Optional[str]): The user's Google email address. Required if the MCP session is not already authenticated for Gmail access.
+        mcp_session_id (Optional[str]): The active MCP session ID (automatically injected by FastMCP from the Mcp-Session-Id header). Used for session-based authentication.
+
+    Returns:
+        types.CallToolResult: Contains the message ID of the sent email, or an error/auth guidance message.
+    """
+    tool_name = "send_gmail_message"
+    try:
+        # Get credentials (with send scope)
+        # credentials = await get_credentials(
+        #     user_google_email=user_google_email,
+        #     mcp_session_id=mcp_session_id,
+        #     scopes=[GMAIL_SEND_SCOPE],
+        #     tool_name=tool_name
+        # )
+        # Use get_credentials to fetch credentials
+        credentials = await asyncio.to_thread(
+            get_credentials,
+            user_google_email=user_google_email,
+            required_scopes=[GMAIL_SEND_SCOPE], # Specify required scopes for this tool
+            client_secrets_path=CONFIG_CLIENT_SECRETS_PATH, # Use imported constant
+            session_id=mcp_session_id
+        )
+         # Check if credentials are valid, initiate auth flow if not
+        if not credentials or not credentials.valid:
+            logger.warning(f"[{tool_name}] No valid credentials. Session: '{mcp_session_id}', Email: '{user_google_email}'.")
+            if user_google_email and '@' in user_google_email:
+                logger.info(f"[{tool_name}] Valid email '{user_google_email}' provided, initiating auth flow for this email (requests all SCOPES).")
+                # Use the centralized start_auth_flow
+                return await start_auth_flow(mcp_session_id=mcp_session_id, user_google_email=user_google_email, service_name="Gmail", redirect_uri=OAUTH_REDIRECT_URI)
+            else:
+                error_msg = "Gmail Authentication required. No active authenticated session, and no valid 'user_google_email' provided. LLM: Please ask the user for their Google email address and retry, or use the 'start_auth' tool with their email."
+                logger.info(f"[{tool_name}] {error_msg}")
+                return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=error_msg)])
+
+        service = await asyncio.to_thread(
+            build, "gmail", "v1", credentials=credentials
+        )
+
+        # Prepare the email
+        message = MIMEText(body)
+        message["to"] = to
+        message["subject"] = subject
+        raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+        send_body = {"raw": raw_message}
+
+        # Send the message
+        sent_message = await asyncio.to_thread(
+            service.users().messages().send(userId="me", body=send_body).execute
+        )
+        message_id = sent_message.get("id")
+        return types.CallToolResult(content=[types.TextContent(type="text", text=f"Email sent! Message ID: {message_id}")])
+
+    except HttpError as e:
+        logger.error(f"[{tool_name}] Gmail API error sending message: {e}", exc_info=True)
+        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=f"Gmail API error: {e}")])
+    except Exception as e:
+        logger.exception(f"[{tool_name}] Unexpected error sending Gmail message: {e}")
+        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=f"Unexpected error: {e}")])
