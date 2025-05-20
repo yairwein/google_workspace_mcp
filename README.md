@@ -52,7 +52,7 @@ The Google Workspace MCP Server integrates Google Workspace services (Calendar, 
 - **🔐 OAuth 2.0 Authentication**: Securely connects to Google APIs using user-authorized credentials with automatic token refresh
 - **📅 Google Calendar Integration**: List calendars and fetch events
 - **📁 Google Drive Integration**: Search files, list folder contents, read file content, and create new files
-- **📧 Gmail Integration**: Search for messages and retrieve message content (including body)
+- **📧 Gmail Integration**: Search for messages, retrieve message content (including body) and send emails!
 - **📄 Google Docs Integration**: Search for documents, read document content, list documents in folders, and create new documents
 - **🔄 Multiple Transport Options**: Streamable HTTP + SSE fallback
 - **🔌 `mcpo` Compatibility**: Easily expose the server as an OpenAPI endpoint for integration with tools like Open WebUI
@@ -280,50 +280,59 @@ To use this server as a tool provider within Open WebUI:
 
 > **Note**: The first use of any tool for a specific Google service may trigger the OAuth authentication flow if valid credentials are not already stored.
 
-### Calendar
+### 📅 Google Calendar  
 
 Source: [`gcalendar/calendar_tools.py`](gcalendar/calendar_tools.py)
 
 | Tool | Description | Parameters |
 |------|-------------|------------|
-| `start_auth` | Initiates the OAuth flow for Google Calendar access | • `user_google_email` (required): The user's Google email address |
-| `list_calendars` | Lists the user's available calendars | (None) |
-| `get_events` | Retrieves events from a specified calendar | • `calendar_id` (required): The ID of the calendar (use `primary` for the main calendar)<br>• `time_min` (optional): Start time for events (RFC3339 timestamp, e.g., `2025-05-12T00:00:00Z`)<br>• `time_max` (optional): End time for events (RFC3339 timestamp)<br>• `max_results` (optional): Maximum number of events to return |
+| `start_auth` | Initiates the OAuth 2.0 authentication flow for a specific Google account. Use this when no valid credentials are available. | • `user_google_email` (required): The user's Google email address |
+| `list_calendars` | Lists all calendars accessible to the authenticated user. | • `user_google_email` (optional): Used if session is not authenticated<br>• `mcp_session_id` (injected automatically) |
+| `get_events` | Retrieves upcoming events from a specified calendar within a time range. | • `calendar_id` (optional): Calendar ID (default: `primary`)<br>• `time_min` (optional): Start time (RFC3339 or `YYYY-MM-DD`)<br>• `time_max` (optional): End time (RFC3339 or `YYYY-MM-DD`)<br>• `max_results` (optional): Max number of events (default: 25)<br>• `user_google_email` (optional)<br>• `mcp_session_id` (injected automatically) |
+| `create_event` | Creates a new calendar event. Supports all-day and timed events. | • `summary` (required): Event title<br>• `start_time` (required): Start time (RFC3339 or `YYYY-MM-DD`)<br>• `end_time` (required): End time (RFC3339 or `YYYY-MM-DD`)<br>• `calendar_id` (optional): Calendar ID (default: `primary`)<br>• `description`, `location`, `attendees`, `timezone` (optional)<br>• `user_google_email` (optional)<br>• `mcp_session_id` (injected automatically) |
+| `modify_event` | Updates an existing event by ID. Only provided fields will be modified. | • `event_id` (required): ID of the event to modify<br>• `calendar_id` (optional): Calendar ID (default: `primary`)<br>• `summary`, `start_time`, `end_time`, `description`, `location`, `attendees`, `timezone` (optional)<br>• `user_google_email` (optional)<br>• `mcp_session_id` (injected automatically) |
+| `delete_event` | Deletes an event by ID. | • `event_id` (required): ID of the event to delete<br>• `calendar_id` (optional): Calendar ID (default: `primary`)<br>• `user_google_email` (optional)<br>• `mcp_session_id` (injected automatically) |
 
-### Google Drive
+> ℹ️ All tools support authentication via the current MCP session (`mcp_session_id`) or fallback to `user_google_email`. If neither is available, use `start_auth` to initiate the OAuth flow.
+
+> 🕒 Date/Time Parameters: Tools accept both full RFC3339 timestamps (e.g., 2024-05-12T10:00:00Z) and simple dates (e.g., 2024-05-12). The server automatically formats them as needed.
+
+### 📁 Google Drive
 
 Source: [`gdrive/drive_tools.py`](gdrive/drive_tools.py)
 
 | Tool | Description | Parameters |
 |------|-------------|------------|
-| [`search_drive_files`](gdrive/drive_tools.py:98) | Searches for files and folders across the user's Drive | • `query` (required): Search query string (e.g., `name contains 'report'`)<br>• `max_results` (optional): Maximum number of files to return |
-| [`get_drive_file_content`](gdrive/drive_tools.py:184) | Retrieves the content of a specific file | • `file_id` (required): The ID of the file<br>• `mime_type` (optional): Specify the desired export format |
-| [`list_drive_items`](gdrive/drive_tools.py:265) | Lists files and folders within a specific folder or the root | • `folder_id` (optional): The ID of the folder to list (defaults to root)<br>• `max_results` (optional): Maximum number of items to return |
-| [`create_drive_file`](gdrive/drive_tools.py:348) | Creates a new file in Google Drive | • `name` (required): The desired name for the new file<br>• `content` (required): The text content to write into the file<br>• `folder_id` (optional): The ID of the parent folder<br>• `mime_type` (optional): The MIME type of the file (defaults to `text/plain`) |
+| `search_drive_files` | Searches for files and folders across the user's Drive | • `query` (required): Search query string (e.g., `name contains 'report'`)<br>• `max_results` (optional): Maximum number of files to return |
+| `get_drive_file_content` | Retrieves the content of a specific file | • `file_id` (required): The ID of the file<br>• `mime_type` (optional): Specify the desired export format |
+| `list_drive_items` | Lists files and folders within a specific folder or the root | • `folder_id` (optional): The ID of the folder to list (defaults to root)<br>• `max_results` (optional): Maximum number of items to return |
+| `create_drive_file` | Creates a new file in Google Drive | • `name` (required): The desired name for the new file<br>• `content` (required): The text content to write into the file<br>• `folder_id` (optional): The ID of the parent folder<br>• `mime_type` (optional): The MIME type of the file (defaults to `text/plain`) |
 
 > **Query Syntax**: For Google Drive search queries, see [Drive Search Query Syntax](https://developers.google.com/drive/api/guides/search-files)
 
-### Gmail
+### 📧 Gmail  
 
 Source: [`gmail/gmail_tools.py`](gmail/gmail_tools.py)
 
-| Tool | Description | Parameters |
-|------|-------------|------------|
-| [`search_gmail_messages`](gmail/gmail_tools.py:29) | Searches for email messages matching a query | • `query` (required): Search query string (e.g., `from:example@domain.com subject:Report is:unread`)<br>• `max_results` (optional): Maximum number of message threads to return |
-| [`get_gmail_message_content`](gmail/gmail_tools.py:106) | Retrieves the details and body of a specific email message | • `message_id` (required): The ID of the message to retrieve |
+| Tool                      | Description                                                                      | Parameters |
+|---------------------------|----------------------------------------------------------------------------------|------------|
+| `search_gmail_messages`   | Search email messages using standard Gmail search operators (from, subject, etc). | • `query` (required): Search string (e.g., `"from:foo subject:bar is:unread"`)<br>• `user_google_email` (optional)<br>• `page_size` (optional, default: 10)<br>• `mcp_session_id` (injected automatically) |
+| `get_gmail_message_content`| Get subject, sender, and *plain text* body of an email by message ID.            | • `message_id` (required)<br>• `user_google_email` (optional)<br>• `mcp_session_id` (injected automatically) |
+| `send_gmail_message`      | Send a plain text email using the user's Gmail account.                           | • `to` (required): Recipient email address<br>• `subject` (required)<br>• `body` (required)<br>• `user_google_email` (optional)<br>• `mcp_session_id` (injected automatically) |
+
 
 > **Query Syntax**: For Gmail search queries, see [Gmail Search Query Syntax](https://support.google.com/mail/answer/7190)
 
-### Google Docs
+### 📝 Google Docs 
 
 Source: [`gdocs/docs_tools.py`](gdocs/docs_tools.py)
 
-| Tool | Description | Parameters |
-|------|-------------|------------|
-| `search_docs` | Searches for Google Docs by name across user's Drive | • `query` (required): Search query string (e.g., `report`)<br>• `user_google_email` (optional): The user's Google email address<br>• `page_size` (optional): Maximum number of documents to return |
-| `get_doc_content` | Retrieves the content of a specific Google Doc as plain text | • `document_id` (required): The ID of the document<br>• `user_google_email` (optional): The user's Google email address |
-| `list_docs_in_folder` | Lists Google Docs within a specific folder | • `folder_id` (optional): The ID of the folder to list (defaults to root)<br>• `user_google_email` (optional): The user's Google email address<br>• `page_size` (optional): Maximum number of documents to return |
-| `create_doc` | Creates a new Google Doc with a title and optional content | • `title` (required): The title for the new document<br>• `content` (optional): Initial text content for the document<br>• `user_google_email` (optional): The user's Google email address |
+| Tool                 | Description                                                                         | Parameters |
+|----------------------|-------------------------------------------------------------------------------------|------------|
+| `search_docs`        | Search for Google Docs by name (using Drive API).                                   | • `query` (required): Text to search for in Doc names<br>• `user_google_email` (optional)<br>• `page_size` (optional, default: 10)<br>• `mcp_session_id` (injected automatically) |
+| `get_doc_content`    | Retrieve the plain text content of a Google Doc by its document ID.                 | • `document_id` (required)<br>• `user_google_email` (optional)<br>• `mcp_session_id` (injected automatically) |
+| `list_docs_in_folder`| List all Google Docs inside a given Drive folder (by folder ID, default = `root`).  | • `folder_id` (optional, default: `'root'`)<br>• `user_google_email` (optional)<br>• `page_size` (optional, default: 100)<br>• `mcp_session_id` (injected automatically) |
+| `create_doc`         | Create a new Google Doc, optionally with initial content.                           | • `title` (required): Name for the doc<br>• `content` (optional, default: empty)<br>• `user_google_email` (optional)<br>• `mcp_session_id` (injected automatically) |
 
 ---
 
