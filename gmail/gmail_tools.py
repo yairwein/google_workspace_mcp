@@ -68,7 +68,7 @@ async def search_gmail_messages(
             # Use the centralized start_auth_flow
             return await start_auth_flow(mcp_session_id=mcp_session_id, user_google_email=user_google_email, service_name="Gmail", redirect_uri=OAUTH_REDIRECT_URI)
         else:
-            error_msg = "Gmail Authentication required. No active authenticated session, and no valid 'user_google_email' provided. LLM: Please ask the user for their Google email address and retry, or use the 'start_auth' tool with their email."
+            error_msg = "Gmail Authentication required. No active authenticated session, and no valid 'user_google_email' provided. LLM: Please ask the user for their Google email address and retry, or use the 'start_google_auth' tool with their email and service_name='Gmail'."
             logger.info(f"[{tool_name}] {error_msg}")
             return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=error_msg)])
 
@@ -141,7 +141,7 @@ async def get_gmail_message_content(
             # Use the centralized start_auth_flow
             return await start_auth_flow(mcp_session_id=mcp_session_id, user_google_email=user_google_email, service_name="Gmail", redirect_uri=OAUTH_REDIRECT_URI)
         else:
-            error_msg = "Gmail Authentication required. No active authenticated session, and no valid 'user_google_email' provided. LLM: Please ask the user for their Google email address and retry, or use the 'start_auth' tool with their email."
+            error_msg = "Gmail Authentication required. No active authenticated session, and no valid 'user_google_email' provided. LLM: Please ask the user for their Google email address and retry, or use the 'start_google_auth' tool with their email and service_name='Gmail'."
             logger.info(f"[{tool_name}] {error_msg}")
             return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=error_msg)])
 
@@ -249,7 +249,7 @@ async def send_gmail_message(
                 # Use the centralized start_auth_flow
                 return await start_auth_flow(mcp_session_id=mcp_session_id, user_google_email=user_google_email, service_name="Gmail", redirect_uri=OAUTH_REDIRECT_URI)
             else:
-                error_msg = "Gmail Authentication required. No active authenticated session, and no valid 'user_google_email' provided. LLM: Please ask the user for their Google email address and retry, or use the 'start_auth' tool with their email."
+                error_msg = "Gmail Authentication required. No active authenticated session, and no valid 'user_google_email' provided. LLM: Please ask the user for their Google email address and retry, or use the 'start_google_auth' tool with their email and service_name='Gmail'."
                 logger.info(f"[{tool_name}] {error_msg}")
                 return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=error_msg)])
 

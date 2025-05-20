@@ -104,7 +104,7 @@ async def _get_authenticated_calendar_service(
                 redirect_uri=OAUTH_REDIRECT_URI
             )
         else:
-            error_msg = f"Authentication required for {tool_name}. No active authenticated session, and no valid 'user_google_email' provided. LLM: Please ask the user for their Google email address and retry, or use the 'start_auth' tool with their email."
+            error_msg = f"Authentication required for {tool_name}. No active authenticated session, and no valid 'user_google_email' provided. LLM: Please ask the user for their Google email address and retry, or use the 'start_google_auth' tool with their email and service_name='Google Calendar'."
             logger.info(f"[{tool_name}] {error_msg}")
             return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=error_msg)])
 
@@ -122,49 +122,13 @@ async def _get_authenticated_calendar_service(
 # --- Tool Implementations ---
 
 @server.tool()
-async def start_auth(user_google_email: str, mcp_session_id: Optional[str] = Header(None, alias="Mcp-Session-Id")) -> types.CallToolResult:
-    """
-    Initiates the Google OAuth 2.0 authentication flow for the specified user email.
-    This is the primary method to establish credentials when no valid session exists or when targeting a specific account.
-    It generates an authorization URL that the LLM must present to the user.
-    The authentication attempt is linked to the current MCP session via `mcp_session_id`.
-
-    LLM Guidance:
-    - Use this tool when you need to authenticate a user for Google services and don't have existing valid credentials for the session or specified email.
-    - You MUST provide the `user_google_email`. If you don't know it, ask the user first.
-    - After calling this tool, present the returned authorization URL clearly to the user and instruct them to:
-        1. Click the link and complete the sign-in/consent process in their browser.
-        2. Note the authenticated email displayed on the success page.
-        3. Provide that email back to you (the LLM).
-        4. Retry their original request, including the confirmed `user_google_email`.
-
-    Args:
-        user_google_email (str): The user's full Google email address (e.g., 'example@gmail.com'). This is REQUIRED.
-        mcp_session_id (Optional[str]): The active MCP session ID (automatically injected by FastMCP from the Mcp-Session-Id header). Links the OAuth flow state to the session.
-
-    Returns:
-        types.CallToolResult: An error result (`isError=True`) containing:
-                               - A detailed message for the LLM with the authorization URL and instructions to guide the user through the authentication process.
-                               - An error message if `user_google_email` is invalid or missing.
-                               - An error message if the OAuth flow initiation fails.
-    """
-    if not user_google_email or not isinstance(user_google_email, str) or '@' not in user_google_email:
-        error_msg = "Invalid or missing 'user_google_email'. This parameter is required and must be a valid email address. LLM, please ask the user for their Google email address."
-        logger.error(f"[start_auth] {error_msg}")
-        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=error_msg)])
-
-    logger.info(f"Tool 'start_auth' invoked for user_google_email: '{user_google_email}', session: '{mcp_session_id}'.")
-    # Use the centralized start_auth_flow from auth.google_auth
-    return await start_auth_flow(mcp_session_id=mcp_session_id, user_google_email=user_google_email, service_name="Google Calendar", redirect_uri=OAUTH_REDIRECT_URI)
-
-@server.tool()
 async def list_calendars(user_google_email: Optional[str] = None, mcp_session_id: Optional[str] = Header(None, alias="Mcp-Session-Id")) -> types.CallToolResult:
     """
     Retrieves a list of calendars accessible to the authenticated user.
     Prioritizes authentication via the active MCP session (`mcp_session_id`).
     If the session isn't authenticated for Calendar, it falls back to using `user_google_email`.
     If neither provides valid credentials, it returns a message guiding the LLM to request the user's email
-    or initiate the authentication flow via the `start_auth` tool.
+    or initiate the authentication flow via the `start_google_auth` tool (provide service_name='Google Calendar').
 
     Args:
         user_google_email (Optional[str]): The user's Google email address. Required if the MCP session is not already authenticated for Calendar access.
@@ -197,7 +161,7 @@ async def list_calendars(user_google_email: Optional[str] = None, mcp_session_id
         logger.info(f"Successfully listed {len(items)} calendars for {log_user_email}.")
         return types.CallToolResult(content=[types.TextContent(type="text", text=text_output)])
     except HttpError as error:
-        message = f"API error listing calendars: {error}. You might need to re-authenticate. LLM: Try 'start_auth' with user's email."
+        message = f"API error listing calendars: {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with user's email and service_name='Google Calendar'."
         logger.error(message, exc_info=True)
         return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=message)])
     except Exception as e:
@@ -219,7 +183,7 @@ async def get_events(
     Prioritizes authentication via the active MCP session (`mcp_session_id`).
     If the session isn't authenticated for Calendar, it falls back to using `user_google_email`.
     If neither provides valid credentials, it returns a message guiding the LLM to request the user's email
-    or initiate the authentication flow via the `start_auth` tool.
+    or initiate the authentication flow via the `start_google_auth` tool (provide service_name='Google Calendar').
 
     Args:
         user_google_email (Optional[str]): The user's Google email address. Required if the MCP session is not already authenticated for Calendar access.
@@ -286,7 +250,7 @@ async def get_events(
         logger.info(f"Successfully retrieved {len(items)} events for {log_user_email}.")
         return types.CallToolResult(content=[types.TextContent(type="text", text=text_output)])
     except HttpError as error:
-        message = f"API error getting events: {error}. You might need to re-authenticate. LLM: Try 'start_auth' with user's email."
+        message = f"API error getting events: {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with user's email and service_name='Google Calendar'."
         logger.error(message, exc_info=True)
         return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=message)])
     except Exception as e:
@@ -309,7 +273,7 @@ async def create_event(
 ) -> types.CallToolResult:
     """
     Creates a new event. Prioritizes authenticated MCP session, then `user_google_email`.
-    If no valid authentication is found, guides the LLM to obtain user's email or use `start_auth`.
+    If no valid authentication is found, guides the LLM to obtain user's email or use `start_google_auth` (provide service_name='Google Calendar').
 
     Args:
         summary (str): Event title.
@@ -364,7 +328,7 @@ async def create_event(
     except HttpError as error:
         # Corrected error message to use log_user_email and provide better guidance
         # log_user_email_for_error is now log_user_email from the helper or the original user_google_email
-        message = f"API error creating event: {error}. You might need to re-authenticate. LLM: Try 'start_auth' with the user's email ({log_user_email if log_user_email != 'Unknown' else 'target Google account'})."
+        message = f"API error creating event: {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with the user's email ({log_user_email if log_user_email != 'Unknown' else 'target Google account'}) and service_name='Google Calendar'."
         logger.error(message, exc_info=True)
         return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=message)])
     except Exception as e:
@@ -387,7 +351,7 @@ async def modify_event(
 ) -> types.CallToolResult:
     """
     Modifies an existing event. Prioritizes authenticated MCP session, then `user_google_email`.
-    If no valid authentication is found, guides the LLM to obtain user's email or use `start_auth`.
+    If no valid authentication is found, guides the LLM to obtain user's email or use `start_google_auth` (provide service_name='Google Calendar').
 
     Args:
         event_id (str): The ID of the event to modify.
@@ -475,7 +439,7 @@ async def modify_event(
             message = f"Event not found. The event with ID '{event_id}' could not be found in calendar '{calendar_id}'. LLM: The event may have been deleted, or the event ID might be incorrect. Verify the event exists using 'get_events' before attempting to modify it."
             logger.error(f"[modify_event] {message}")
         else:
-            message = f"API error modifying event (ID: {event_id}): {error}. You might need to re-authenticate. LLM: Try 'start_auth' with the user's email ({log_user_email if log_user_email != 'Unknown' else 'target Google account'})."
+            message = f"API error modifying event (ID: {event_id}): {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with the user's email ({log_user_email if log_user_email != 'Unknown' else 'target Google account'}) and service_name='Google Calendar'."
             logger.error(message, exc_info=True)
         return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=message)])
     except Exception as e:
@@ -492,7 +456,7 @@ async def delete_event(
 ) -> types.CallToolResult:
     """
     Deletes an existing event. Prioritizes authenticated MCP session, then `user_google_email`.
-    If no valid authentication is found, guides the LLM to obtain user's email or use `start_auth`.
+    If no valid authentication is found, guides the LLM to obtain user's email or use `start_google_auth` (provide service_name='Google Calendar').
 
     Args:
         event_id (str): The ID of the event to delete.
@@ -547,7 +511,7 @@ async def delete_event(
             message = f"Event not found. The event with ID '{event_id}' could not be found in calendar '{calendar_id}'. LLM: The event may have been deleted already, or the event ID might be incorrect."
             logger.error(f"[delete_event] {message}")
         else:
-            message = f"API error deleting event (ID: {event_id}): {error}. You might need to re-authenticate. LLM: Try 'start_auth' with the user's email ({log_user_email if log_user_email != 'Unknown' else 'target Google account'})."
+            message = f"API error deleting event (ID: {event_id}): {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with the user's email ({log_user_email if log_user_email != 'Unknown' else 'target Google account'}) and service_name='Google Calendar'."
             logger.error(message, exc_info=True)
         return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=message)])
     except Exception as e:
