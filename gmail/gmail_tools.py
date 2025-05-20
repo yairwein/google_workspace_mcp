@@ -5,10 +5,8 @@ This module provides MCP tools for interacting with the Gmail API.
 """
 import logging
 import asyncio
-import os
 import base64
-import email
-from typing import List, Optional, Any # Keep Any
+from typing import Optional
 
 from email.mime.text import MIMEText
 
@@ -261,7 +259,6 @@ async def send_gmail_message(
 
         # Prepare the email
         message = MIMEText(body)
-        message["from"] = user_google_email
         message["to"] = to
         message["subject"] = subject
         raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
