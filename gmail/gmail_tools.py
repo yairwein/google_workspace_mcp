@@ -15,34 +15,23 @@ from email.mime.text import MIMEText
 
 from mcp import types
 from fastapi import Header, Body 
-from googleapiclient.discovery import build # Import build
+from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-# Use functions directly from google_auth
-from auth.google_auth import get_credentials, start_auth_flow, CONFIG_CLIENT_SECRETS_PATH # Import get_credentials, start_auth_flow, CONFIG_CLIENT_SECRETS_PATH
-# Remove imports from auth.auth_flow
-# from auth.auth_flow import require_google_auth, CONFIG_CLIENT_SECRETS_PATH, current_google_service
+from auth.google_auth import get_credentials, start_auth_flow, CONFIG_CLIENT_SECRETS_PATH
 
-from core.server import server, OAUTH_REDIRECT_URI # Import OAUTH_REDIRECT_URI
 from core.server import (
     GMAIL_READONLY_SCOPE,
     GMAIL_SEND_SCOPE,
-    SCOPES # Import SCOPES for auth flow initiation
+    OAUTH_REDIRECT_URI,
+    SCOPES,
+    server
 )
 
 logger = logging.getLogger(__name__)
 
-# CONFIG_CLIENT_SECRETS_PATH is now imported from auth.google_auth
-
 @server.tool()
-# Remove the decorator
-# @require_google_auth(
-#     required_scopes=[GMAIL_READONLY_SCOPE],
-#     service_name="Gmail",
-#     api_name="gmail",
-#     api_version="v1"
-# )
-async def search_gmail_messages( # Signature cleaned - no google_service param
+async def search_gmail_messages(
     query: str,
     user_google_email: Optional[str] = None,
     page_size: int = 10,
@@ -68,8 +57,8 @@ async def search_gmail_messages( # Signature cleaned - no google_service param
     credentials = await asyncio.to_thread(
         get_credentials,
         user_google_email=user_google_email,
-        required_scopes=[GMAIL_READONLY_SCOPE], # Specify required scopes for this tool
-        client_secrets_path=CONFIG_CLIENT_SECRETS_PATH, # Use imported constant
+        required_scopes=[GMAIL_READONLY_SCOPE],
+        client_secrets_path=CONFIG_CLIENT_SECRETS_PATH,
         session_id=mcp_session_id
     )
 
@@ -117,14 +106,7 @@ async def search_gmail_messages( # Signature cleaned - no google_service param
 
 
 @server.tool()
-# Remove the decorator
-# @require_google_auth(
-#     required_scopes=[GMAIL_READONLY_SCOPE],
-#     service_name="Gmail",
-#     api_name="gmail",
-#     api_version="v1"
-# )
-async def get_gmail_message_content( # Signature cleaned - no google_service param
+async def get_gmail_message_content(
     message_id: str,
     user_google_email: Optional[str] = None,
     mcp_session_id: Optional[str] = Header(None, alias="Mcp-Session-Id")
@@ -148,8 +130,8 @@ async def get_gmail_message_content( # Signature cleaned - no google_service par
     credentials = await asyncio.to_thread(
         get_credentials,
         user_google_email=user_google_email,
-        required_scopes=[GMAIL_READONLY_SCOPE], # Specify required scopes for this tool
-        client_secrets_path=CONFIG_CLIENT_SECRETS_PATH, # Use imported constant
+        required_scopes=[GMAIL_READONLY_SCOPE],
+        client_secrets_path=CONFIG_CLIENT_SECRETS_PATH,
         session_id=mcp_session_id
     )
 
@@ -253,19 +235,12 @@ async def send_gmail_message(
     """
     tool_name = "send_gmail_message"
     try:
-        # Get credentials (with send scope)
-        # credentials = await get_credentials(
-        #     user_google_email=user_google_email,
-        #     mcp_session_id=mcp_session_id,
-        #     scopes=[GMAIL_SEND_SCOPE],
-        #     tool_name=tool_name
-        # )
         # Use get_credentials to fetch credentials
         credentials = await asyncio.to_thread(
             get_credentials,
             user_google_email=user_google_email,
-            required_scopes=[GMAIL_SEND_SCOPE], # Specify required scopes for this tool
-            client_secrets_path=CONFIG_CLIENT_SECRETS_PATH, # Use imported constant
+            required_scopes=[GMAIL_SEND_SCOPE],
+            client_secrets_path=CONFIG_CLIENT_SECRETS_PATH,
             session_id=mcp_session_id
         )
          # Check if credentials are valid, initiate auth flow if not
@@ -286,6 +261,7 @@ async def send_gmail_message(
 
         # Prepare the email
         message = MIMEText(body)
+        message["from"] = user_google_email
         message["to"] = to
         message["subject"] = subject
         raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
