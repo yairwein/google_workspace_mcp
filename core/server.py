@@ -25,6 +25,7 @@ from config.google_config import (
     DRIVE_FILE_SCOPE,
     GMAIL_READONLY_SCOPE,
     GMAIL_SEND_SCOPE,
+    GMAIL_COMPOSE_SCOPE,
     BASE_SCOPES,
     CALENDAR_SCOPES,
     DRIVE_SCOPES,

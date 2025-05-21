@@ -21,6 +21,7 @@ from auth.google_auth import get_credentials, start_auth_flow, CONFIG_CLIENT_SEC
 from core.server import (
     GMAIL_READONLY_SCOPE,
     GMAIL_SEND_SCOPE,
+    GMAIL_COMPOSE_SCOPE,
     OAUTH_REDIRECT_URI,
     SCOPES,
     server
@@ -276,4 +277,87 @@ async def send_gmail_message(
         return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=f"Gmail API error: {e}")])
     except Exception as e:
         logger.exception(f"[{tool_name}] Unexpected error sending Gmail message: {e}")
+        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=f"Unexpected error: {e}")])
+
+@server.tool()
+async def draft_gmail_message(
+    subject: str = Body(..., description="Email subject."),
+    body: str = Body(..., description="Email body (plain text)."),
+    to: Optional[str] = Body(None, description="Optional recipient email address."),
+    user_google_email: Optional[str] = None,
+    mcp_session_id: Optional[str] = Header(None, alias="Mcp-Session-Id")
+) -> types.CallToolResult:
+    """
+    Creates a draft email in the user's Gmail account.
+    Authentication is handled by get_credentials and start_auth_flow.
+
+    Args:
+        subject (str): Email subject.
+        body (str): Email body (plain text).
+        to (Optional[str]): Optional recipient email address. Can be left empty for drafts.
+        user_google_email (Optional[str]): The user's Google email address. Required if the MCP session is not already authenticated for Gmail access.
+        mcp_session_id (Optional[str]): The active MCP session ID (automatically injected by FastMCP from the Mcp-Session-Id header). Used for session-based authentication.
+
+    Returns:
+        types.CallToolResult: Contains the draft ID of the created email, or an error/auth guidance message.
+    """
+    tool_name = "draft_gmail_message"
+    logger.info(f"[{tool_name}] Invoked. Session: '{mcp_session_id}', Email: '{user_google_email}'")
+    
+    try:
+        # Use get_credentials to fetch credentials
+        credentials = await asyncio.to_thread(
+            get_credentials,
+            user_google_email=user_google_email,
+            required_scopes=[GMAIL_COMPOSE_SCOPE],
+            client_secrets_path=CONFIG_CLIENT_SECRETS_PATH,
+            session_id=mcp_session_id
+        )
+         # Check if credentials are valid, initiate auth flow if not
+        if not credentials or not credentials.valid:
+            logger.warning(f"[{tool_name}] No valid credentials. Session: '{mcp_session_id}', Email: '{user_google_email}'.")
+            if user_google_email and '@' in user_google_email:
+                logger.info(f"[{tool_name}] Valid email '{user_google_email}' provided, initiating auth flow for this email (requests all SCOPES).")
+                # Use the centralized start_auth_flow
+                return await start_auth_flow(mcp_session_id=mcp_session_id, user_google_email=user_google_email, service_name="Gmail", redirect_uri=OAUTH_REDIRECT_URI)
+            else:
+                error_msg = "Gmail Authentication required. No active authenticated session, and no valid 'user_google_email' provided. LLM: Please ask the user for their Google email address and retry, or use the 'start_auth' tool with their email."
+                logger.info(f"[{tool_name}] {error_msg}")
+                return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=error_msg)])
+
+        service = await asyncio.to_thread(
+            build, "gmail", "v1", credentials=credentials
+        )
+        user_email_from_creds = credentials.id_token.get('email') if credentials.id_token else 'Unknown (Gmail)'
+        logger.info(f"[{tool_name}] Using service for: {user_email_from_creds}")
+
+        # Prepare the email
+        message = MIMEText(body)
+        message["subject"] = subject
+        
+        # Add recipient if provided
+        if to:
+            message["to"] = to
+            
+        raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+        
+        # Create a draft instead of sending
+        draft_body = {
+            "message": {
+                "raw": raw_message
+            }
+        }
+
+        # Create the draft
+        created_draft = await asyncio.to_thread(
+            service.users().drafts().create(userId="me", body=draft_body).execute
+        )
+        draft_id = created_draft.get("id")
+        return types.CallToolResult(content=[types.TextContent(type="text", text=f"Draft created! Draft ID: {draft_id}")])
+
+    except HttpError as e:
+        logger.error(f"[{tool_name}] Gmail API error creating draft: {e}", exc_info=True)
+        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=f"Gmail API error: {e}")])
+    except Exception as e:
+        logger.exception(f"[{tool_name}] Unexpected error creating Gmail draft: {e}")
         return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=f"Unexpected error: {e}")])
