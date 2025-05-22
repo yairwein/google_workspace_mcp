@@ -1,5 +1,6 @@
 import logging
 import os
+import threading
 from typing import Dict, Any, Optional
 
 from fastapi import Request, Header
@@ -55,8 +56,30 @@ server = FastMCP(
     stateless_http=False # Enable stateful sessions (default)
 )
 
-# Store for session manager
-session_manager = None
+# Container for session manager
+class SessionManagerContainer:
+    """
+    Thread-safe container for the session manager instance.
+
+    This encapsulates the session manager to improve testability and thread safety
+    by avoiding direct global variable access.
+    """
+
+    def __init__(self):
+        self._session_manager = None
+        self._lock = threading.Lock()
+
+    def set_session_manager(self, manager) -> None:
+        """Set the session manager instance in a thread-safe manner."""
+        with self._lock:
+            self._session_manager = manager
+
+    def get_session_manager(self):
+        """Get the current session manager instance in a thread-safe manner."""
+        with self._lock:
+            return self._session_manager
+
+session_manager_container = SessionManagerContainer()
 
 def get_session_manager():
     """
@@ -65,12 +88,13 @@ def get_session_manager():
     Returns:
         The session manager instance if initialized, None otherwise
     """
-    return session_manager
+    return session_manager_container.get_session_manager()
 
 def log_all_active_sessions():
     """
     Log information about all active sessions for debugging purposes.
     """
+    session_manager = session_manager_container.get_session_manager()
     if session_manager is None:
         logger.debug("Cannot log sessions: session_manager is not initialized")
         return
@@ -92,10 +116,9 @@ def create_application(base_path="/gworkspace") -> Starlette:
     Returns:
         A Starlette application
     """
-    global session_manager
     logger.info(f"Creating Starlette application with MCP server mounted at {base_path}")
     app, manager = create_starlette_app(server._mcp_server, base_path)
-    session_manager = manager
+    session_manager_container.set_session_manager(manager)
 
     # Add the OAuth callback route to the Starlette application
     from starlette.routing import Route
@@ -281,7 +304,7 @@ async def get_active_sessions() -> Dict[str, Any]:
     Returns:
         A dictionary mapping session IDs to session information
     """
-    global session_manager
+    session_manager = session_manager_container.get_session_manager()
     if session_manager is None:
         logger.error("get_active_sessions called but session_manager is not initialized")
         return {"error": "Session manager not initialized"}
@@ -305,7 +328,7 @@ async def get_session_info(session_id: str) -> Optional[Dict[str, Any]]:
     Returns:
         Session information if found, None otherwise
     """
-    global session_manager
+    session_manager = session_manager_container.get_session_manager()
     if session_manager is None:
         logger.error(f"get_session_info({session_id}) called but session_manager is not initialized")
         return {"error": "Session manager not initialized"}
@@ -334,7 +357,7 @@ async def debug_current_session(
     Returns:
         Information about the current session and all active sessions
     """
-    global session_manager
+    session_manager = session_manager_container.get_session_manager()
 
     # Get the HTTP request to access headers
     req: Request = get_http_request()
