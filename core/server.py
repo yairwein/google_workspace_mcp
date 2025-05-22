@@ -97,6 +97,14 @@ def create_application(base_path="/gworkspace") -> Starlette:
     app, manager = create_starlette_app(server._mcp_server, base_path)
     session_manager = manager
     
+    # Add the OAuth callback route to the Starlette application
+    from starlette.routing import Route
+    
+    # Add the OAuth callback route
+    app.routes.append(
+        Route("/oauth2callback", endpoint=oauth2_callback, methods=["GET"])
+    )
+    
     return app
 
 # Configure OAuth redirect URI to use the MCP server's base uri and port
