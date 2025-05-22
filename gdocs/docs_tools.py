@@ -56,7 +56,7 @@ async def search_docs(
                 redirect_uri=OAUTH_REDIRECT_URI
             )
         return types.CallToolResult(isError=True, content=[types.TextContent(type="text",
-            text="Docs Authentication required. LLM: Please ask for Google email.")])
+            text="Google Drive Authentication required. LLM: Please ask for Google email and retry, or use the 'start_google_auth' tool with the email and service_name='Google Drive'.")])
 
     try:
         drive = build('drive', 'v3', credentials=credentials)
@@ -113,7 +113,7 @@ async def get_doc_content(
                 redirect_uri=OAUTH_REDIRECT_URI
             )
         return types.CallToolResult(isError=True, content=[types.TextContent(type="text",
-            text="Docs Authentication required. LLM: Please ask for Google email.")])
+            text="Google Docs Authentication required. LLM: Please ask for Google email and retry, or use the 'start_google_auth' tool with the email and service_name='Google Docs'.")])
 
     try:
         docs = build('docs', 'v1', credentials=credentials)
@@ -166,7 +166,7 @@ async def list_docs_in_folder(
                 redirect_uri=OAUTH_REDIRECT_URI
             )
         return types.CallToolResult(isError=True, content=[types.TextContent(type="text",
-            text="Docs Authentication required. LLM: Please ask for Google email.")])
+            text="Google Drive Authentication required. LLM: Please ask for Google email and retry, or use the 'start_google_auth' tool with the email and service_name='Google Drive'.")])
 
     try:
         drive = build('drive', 'v3', credentials=credentials)
@@ -219,7 +219,7 @@ async def create_doc(
                 redirect_uri=OAUTH_REDIRECT_URI
             )
         return types.CallToolResult(isError=True, content=[types.TextContent(type="text",
-            text="Docs Authentication required. LLM: Please ask for Google email.")])
+            text="Google Docs Authentication required. LLM: Please ask for Google email and retry, or use the 'start_google_auth' tool with the email and service_name='Google Docs'.")])
 
     try:
         docs = build('docs', 'v1', credentials=credentials)

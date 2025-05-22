@@ -86,7 +86,7 @@ async def search_gmail_messages(
                 redirect_uri=OAUTH_REDIRECT_URI,
             )
         else:
-            error_msg = "Gmail Authentication required. No active authenticated session, and no valid 'user_google_email' provided. LLM: Please ask the user for their Google email address and retry, or use the 'start_auth' tool with their email."
+            error_msg = "Gmail Authentication required. No active authenticated session, and no valid 'user_google_email' provided. LLM: Please ask the user for their Google email address and retry, or use the 'start_google_auth' tool with their email and service_name='Gmail'."
             logger.info(f"[{tool_name}] {error_msg}")
             return types.CallToolResult(
                 isError=True, content=[types.TextContent(type="text", text=error_msg)]
@@ -193,7 +193,7 @@ async def get_gmail_message_content(
                 redirect_uri=OAUTH_REDIRECT_URI,
             )
         else:
-            error_msg = "Gmail Authentication required. No active authenticated session, and no valid 'user_google_email' provided. LLM: Please ask the user for their Google email address and retry, or use the 'start_auth' tool with their email."
+            error_msg = "Gmail Authentication required. No active authenticated session, and no valid 'user_google_email' provided. LLM: Please ask the user for their Google email address and retry, or use the 'start_google_auth' tool with their email and service_name='Gmail'."
             logger.info(f"[{tool_name}] {error_msg}")
             return types.CallToolResult(
                 isError=True, content=[types.TextContent(type="text", text=error_msg)]
@@ -345,7 +345,7 @@ async def send_gmail_message(
                     redirect_uri=OAUTH_REDIRECT_URI,
                 )
             else:
-                error_msg = "Gmail Authentication required. No active authenticated session, and no valid 'user_google_email' provided. LLM: Please ask the user for their Google email address and retry, or use the 'start_auth' tool with their email."
+                error_msg = "Gmail Authentication required. No active authenticated session, and no valid 'user_google_email' provided. LLM: Please ask the user for their Google email address and retry, or use the 'start_google_auth' tool with their email and service_name='Gmail'."
                 logger.info(f"[{tool_name}] {error_msg}")
                 return types.CallToolResult(
                     isError=True,

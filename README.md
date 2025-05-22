@@ -266,34 +266,39 @@ To use this server as a tool provider within Open WebUI:
 
 ### First-time Authentication
 
-1. Start the server using one of the methods above
-2. The first time you call a tool that requires Google API access (e.g., `list_calendars`, `search_drive_files`), the server will detect missing credentials and initiate the OAuth 2.0 flow
-3. A URL will be printed to the console (or returned in the MCP response). Open this URL in your browser
-4. Log in to your Google account and grant the requested permissions (Calendar, Drive, Gmail access)
-5. After authorization, Google will redirect your browser to `http://localhost:8000/oauth2callback`
-6. The running MCP server will handle this callback, exchange the authorization code for tokens, and securely store the credentials for future use
-7. Subsequent calls for the same user should work without requiring re-authentication until the refresh token expires or is revoked
+When a tool requiring Google API access is called:
+
+- **If `user_google_email` is provided to the tool and credentials are missing/invalid**: The server automatically initiates the OAuth 2.0 flow. An authorization URL will be returned in the MCP response (or printed to the console).
+- **If `user_google_email` is NOT provided and credentials are missing/invalid**: The tool will return an error message guiding the LLM to use the centralized `start_google_auth` tool. The LLM should then call `start_google_auth` with the user's email and the appropriate `service_name` (e.g., "Google Calendar", "Google Docs", "Gmail", "Google Drive"). This will also return an authorization URL.
+
+**Steps for the User (once an authorization URL is obtained):**
+
+1. Open the provided authorization URL in a web browser.
+2. Log in to the Google account and grant the requested permissions for the specified service.
+3. After authorization, Google will redirect the browser to `http://localhost:8000/oauth2callback` (or your configured redirect URI).
+4. The MCP server handles this callback, exchanges the authorization code for tokens, and securely stores the credentials.
+5. The LLM can then retry the original request. Subsequent calls for the same user and service should work without re-authentication until the refresh token expires or is revoked.
 
 ---
 
 ## 🧰 Available Tools
 
-> **Note**: The first use of any tool for a specific Google service may trigger the OAuth authentication flow if valid credentials are not already stored.
+> **Note**: The first use of any tool for a specific Google service may trigger the OAuth authentication flow if valid credentials are not already stored and `user_google_email` is provided to the tool. If authentication is required and `user_google_email` is not provided to the tool, the LLM should use the centralized `start_google_auth` tool (defined in `core/server.py`) with the user's email and the appropriate `service_name`.
 
-### 📅 Google Calendar  
+### 📅 Google Calendar
 
 Source: [`gcalendar/calendar_tools.py`](gcalendar/calendar_tools.py)
 
 | Tool | Description | Parameters |
 |------|-------------|------------|
-| `start_auth` | Initiates the OAuth 2.0 authentication flow for a specific Google account. Use this when no valid credentials are available. | • `user_google_email` (required): The user's Google email address |
+| `start_google_auth` | (Centralized in `core/server.py`) Initiates the OAuth 2.0 authentication flow for a specific Google account and service. Use this when no valid credentials are available or if a tool fails due to missing authentication and an email was not provided to it. | • `user_google_email` (required): The user's Google email address<br>• `service_name` (required): The Google service name (e.g., "Google Calendar", "Google Docs", "Gmail", "Google Drive") |
 | `list_calendars` | Lists all calendars accessible to the authenticated user. | • `user_google_email` (optional): Used if session is not authenticated<br>• `mcp_session_id` (injected automatically) |
 | `get_events` | Retrieves upcoming events from a specified calendar within a time range. | • `calendar_id` (optional): Calendar ID (default: `primary`)<br>• `time_min` (optional): Start time (RFC3339 or `YYYY-MM-DD`)<br>• `time_max` (optional): End time (RFC3339 or `YYYY-MM-DD`)<br>• `max_results` (optional): Max number of events (default: 25)<br>• `user_google_email` (optional)<br>• `mcp_session_id` (injected automatically) |
 | `create_event` | Creates a new calendar event. Supports all-day and timed events. | • `summary` (required): Event title<br>• `start_time` (required): Start time (RFC3339 or `YYYY-MM-DD`)<br>• `end_time` (required): End time (RFC3339 or `YYYY-MM-DD`)<br>• `calendar_id` (optional): Calendar ID (default: `primary`)<br>• `description`, `location`, `attendees`, `timezone` (optional)<br>• `user_google_email` (optional)<br>• `mcp_session_id` (injected automatically) |
 | `modify_event` | Updates an existing event by ID. Only provided fields will be modified. | • `event_id` (required): ID of the event to modify<br>• `calendar_id` (optional): Calendar ID (default: `primary`)<br>• `summary`, `start_time`, `end_time`, `description`, `location`, `attendees`, `timezone` (optional)<br>• `user_google_email` (optional)<br>• `mcp_session_id` (injected automatically) |
 | `delete_event` | Deletes an event by ID. | • `event_id` (required): ID of the event to delete<br>• `calendar_id` (optional): Calendar ID (default: `primary`)<br>• `user_google_email` (optional)<br>• `mcp_session_id` (injected automatically) |
 
-> ℹ️ All tools support authentication via the current MCP session (`mcp_session_id`) or fallback to `user_google_email`. If neither is available, use `start_auth` to initiate the OAuth flow.
+> ℹ️ All Calendar tools support authentication via the current MCP session (`mcp_session_id`) or fallback to `user_google_email`. If neither is available and authentication is required, the tool will return an error prompting the LLM to use the centralized `start_google_auth` tool with the user's email and `service_name="Google Calendar"`.
 
 > 🕒 Date/Time Parameters: Tools accept both full RFC3339 timestamps (e.g., 2024-05-12T10:00:00Z) and simple dates (e.g., 2024-05-12). The server automatically formats them as needed.
 

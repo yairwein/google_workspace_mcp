@@ -1,18 +1,16 @@
 import logging
 import os
-import sys
 from typing import Dict, Any, Optional
 
-from fastapi import Request
+from fastapi import Request, Header
 from fastapi.responses import HTMLResponse
 
-# Import MCP types for proper response formatting
 from mcp import types
 
 from mcp.server.fastmcp import FastMCP
 
 from google.auth.exceptions import RefreshError
-from auth.google_auth import handle_auth_callback, CONFIG_CLIENT_SECRETS_PATH
+from auth.google_auth import handle_auth_callback, start_auth_flow, CONFIG_CLIENT_SECRETS_PATH
 
 # Import shared configuration
 from config.google_config import (
@@ -159,3 +157,57 @@ async def oauth2_callback(request: Request) -> HTMLResponse:
             </body>
             </html>
         """, status_code=500)
+
+@server.tool()
+async def start_google_auth(
+    user_google_email: str,
+    service_name: str,
+    mcp_session_id: Optional[str] = Header(None, alias="Mcp-Session-Id")
+) -> types.CallToolResult:
+    """
+    Initiates the Google OAuth 2.0 authentication flow for the specified user email and service.
+    This is the primary method to establish credentials when no valid session exists or when targeting a specific account for a particular service.
+    It generates an authorization URL that the LLM must present to the user.
+    The authentication attempt is linked to the current MCP session via `mcp_session_id`.
+
+    LLM Guidance:
+    - Use this tool when you need to authenticate a user for a specific Google service (e.g., "Google Calendar", "Google Docs", "Gmail", "Google Drive")
+      and don't have existing valid credentials for the session or specified email.
+    - You MUST provide the `user_google_email` and the `service_name`. If you don't know the email, ask the user first.
+    - Valid `service_name` values typically include "Google Calendar", "Google Docs", "Gmail", "Google Drive".
+    - After calling this tool, present the returned authorization URL clearly to the user and instruct them to:
+        1. Click the link and complete the sign-in/consent process in their browser.
+        2. Note the authenticated email displayed on the success page.
+        3. Provide that email back to you (the LLM).
+        4. Retry their original request, including the confirmed `user_google_email`.
+
+    Args:
+        user_google_email (str): The user's full Google email address (e.g., 'example@gmail.com'). This is REQUIRED.
+        service_name (str): The name of the Google service for which authentication is being requested (e.g., "Google Calendar", "Google Docs"). This is REQUIRED.
+        mcp_session_id (Optional[str]): The active MCP session ID (automatically injected by FastMCP from the Mcp-Session-Id header). Links the OAuth flow state to the session.
+
+    Returns:
+        types.CallToolResult: An error result (`isError=True`) containing:
+                               - A detailed message for the LLM with the authorization URL and instructions to guide the user through the authentication process.
+                               - An error message if `user_google_email` or `service_name` is invalid or missing.
+                               - An error message if the OAuth flow initiation fails.
+    """
+    if not user_google_email or not isinstance(user_google_email, str) or '@' not in user_google_email:
+        error_msg = "Invalid or missing 'user_google_email'. This parameter is required and must be a valid email address. LLM, please ask the user for their Google email address."
+        logger.error(f"[start_google_auth] {error_msg}")
+        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=error_msg)])
+
+    if not service_name or not isinstance(service_name, str):
+        error_msg = "Invalid or missing 'service_name'. This parameter is required (e.g., 'Google Calendar', 'Google Docs'). LLM, please specify the service name."
+        logger.error(f"[start_google_auth] {error_msg}")
+        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=error_msg)])
+
+    logger.info(f"Tool 'start_google_auth' invoked for user_google_email: '{user_google_email}', service: '{service_name}', session: '{mcp_session_id}'.")
+    # Use the centralized start_auth_flow from auth.google_auth
+    # OAUTH_REDIRECT_URI is already defined in this file
+    return await start_auth_flow(
+        mcp_session_id=mcp_session_id,
+        user_google_email=user_google_email,
+        service_name=service_name,
+        redirect_uri=OAUTH_REDIRECT_URI
+    )
