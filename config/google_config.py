@@ -32,6 +32,7 @@ DOCS_WRITE_SCOPE = 'https://www.googleapis.com/auth/documents'
 # Gmail API scopes
 GMAIL_READONLY_SCOPE   = 'https://www.googleapis.com/auth/gmail.readonly'
 GMAIL_SEND_SCOPE       = 'https://www.googleapis.com/auth/gmail.send'
+GMAIL_COMPOSE_SCOPE    = 'https://www.googleapis.com/auth/gmail.compose'
 # Optional, if you later need label management:
 # GMAIL_LABELS_SCOPE     = 'https://www.googleapis.com/auth/gmail.labels'
 
@@ -63,6 +64,7 @@ DRIVE_SCOPES = [
 GMAIL_SCOPES = [
     GMAIL_READONLY_SCOPE,
     GMAIL_SEND_SCOPE,
+    GMAIL_COMPOSE_SCOPE
 ]
 
 # Combined scopes for all supported Google Workspace operations
