@@ -2,9 +2,10 @@ import asyncio
 import logging
 import os
 import sys
+import uvicorn
 
 # Local imports
-from core.server import server
+from core.server import server, create_application
 
 # Configure basic console logging
 logging.basicConfig(
@@ -18,17 +19,17 @@ try:
     root_logger = logging.getLogger()
     log_file_dir = os.path.dirname(os.path.abspath(__file__))
     log_file_path = os.path.join(log_file_dir, 'mcp_server_debug.log')
-    
+
     file_handler = logging.FileHandler(log_file_path, mode='a')
     file_handler.setLevel(logging.DEBUG)
-    
+
     file_formatter = logging.Formatter(
         '%(asctime)s - %(name)s - %(levelname)s - %(process)d - %(threadName)s '
         '[%(module)s.%(funcName)s:%(lineno)d] - %(message)s'
     )
     file_handler.setFormatter(file_formatter)
     root_logger.addHandler(file_handler)
-    
+
     logger.info(f"Detailed file logging configured to: {log_file_path}")
 except Exception as e:
     sys.stderr.write(f"CRITICAL: Failed to set up file logging to '{log_file_path}': {e}\n")
@@ -44,12 +45,20 @@ import gdocs.docs_tools
 def main():
     """
     Main entry point for the Google Workspace MCP server.
-    Uses streamable-http transport for HTTP-based communication.
+    Uses streamable-http transport via a Starlette application with SessionAwareStreamableHTTPManager.
     """
     try:
-        logger.info("Google Workspace MCP server starting with Streamable HTTP transport")
-        server.run(
-            transport="streamable-http"
+        logger.info("Google Workspace MCP server starting...")
+
+        # Create the Starlette application with our custom session manager
+        app = create_application(base_path="/mcp")
+
+        # Run the application with uvicorn
+        uvicorn.run(
+            app,
+            host="0.0.0.0",
+            port=int(os.getenv("WORKSPACE_MCP_PORT", 8000)),
+            log_level="info"
         )
     except KeyboardInterrupt:
         logger.info("Server shutdown requested via keyboard interrupt")

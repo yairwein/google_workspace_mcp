@@ -13,9 +13,12 @@ from google_auth_oauthlib.flow import Flow, InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-
 from config.google_config import OAUTH_STATE_TO_SESSION_ID_MAP, SCOPES
 from mcp import types
+
+# Import our session ID getter
+from core.streamable_http import get_current_session_id
+
 
 
 # Configure logging
@@ -72,7 +75,7 @@ def save_credentials_to_file(user_google_email: str, credentials: Credentials, b
 def save_credentials_to_session(session_id: str, credentials: Credentials):
     """Saves user credentials to the in-memory session cache."""
     _SESSION_CREDENTIALS_CACHE[session_id] = credentials
-    logger.info(f"Credentials saved to session cache for session_id: {session_id}")
+    logger.debug(f"Credentials saved to session cache for session_id: {session_id}")
 
 def load_credentials_from_file(user_google_email: str, base_dir: str = DEFAULT_CREDENTIALS_DIR) -> Optional[Credentials]:
     """Loads user credentials from a file."""
@@ -92,7 +95,7 @@ def load_credentials_from_file(user_google_email: str, base_dir: str = DEFAULT_C
             client_secret=creds_data.get('client_secret'),
             scopes=creds_data.get('scopes')
         )
-        logger.info(f"Credentials loaded for user {user_google_email} from {creds_path}")
+        logger.debug(f"Credentials loaded for user {user_google_email} from {creds_path}")
         return credentials
     except (IOError, json.JSONDecodeError, KeyError) as e:
         logger.error(f"Error loading or parsing credentials for user {user_google_email} from {creds_path}: {e}")
@@ -102,9 +105,9 @@ def load_credentials_from_session(session_id: str) -> Optional[Credentials]:
     """Loads user credentials from the in-memory session cache."""
     credentials = _SESSION_CREDENTIALS_CACHE.get(session_id)
     if credentials:
-        logger.info(f"Credentials loaded from session cache for session_id: {session_id}")
+        logger.debug(f"Credentials loaded from session cache for session_id: {session_id}")
     else:
-        logger.info(f"No credentials found in session cache for session_id: {session_id}")
+        logger.debug(f"No credentials found in session cache for session_id: {session_id}")
     return credentials
 
 def load_client_secrets(client_secrets_path: str) -> Dict[str, Any]:
@@ -297,36 +300,43 @@ def get_credentials(
     """
     credentials: Optional[Credentials] = None
     loaded_from_session = False
+    
+    # Try to get the current session ID if not explicitly provided
+    if not session_id:
+        current_session_id = get_current_session_id()
+        if current_session_id:
+            session_id = current_session_id
+            logger.info(f"[get_credentials] No session_id provided, using current session ID: '{session_id}'")
 
-    logger.info(f"[get_credentials] Called for user_google_email: '{user_google_email}', session_id: '{session_id}', required_scopes: {required_scopes}")
+    logger.debug(f"[get_credentials] Called for user_google_email: '{user_google_email}', session_id: '{session_id}', required_scopes: {required_scopes}")
 
     if session_id:
         credentials = load_credentials_from_session(session_id)
         if credentials:
-            logger.info(f"[get_credentials] Loaded credentials from session for session_id '{session_id}'.")
+            logger.debug(f"[get_credentials] Loaded credentials from session for session_id '{session_id}'.")
             loaded_from_session = True
 
     if not credentials and user_google_email:
-        logger.info(f"[get_credentials] No session credentials, trying file for user_google_email '{user_google_email}'.")
+        logger.debug(f"[get_credentials] No session credentials, trying file for user_google_email '{user_google_email}'.")
         credentials = load_credentials_from_file(user_google_email, credentials_base_dir)
         if credentials and session_id:
-            logger.info(f"[get_credentials] Loaded from file for user '{user_google_email}', caching to session '{session_id}'.")
+            logger.debug(f"[get_credentials] Loaded from file for user '{user_google_email}', caching to session '{session_id}'.")
             save_credentials_to_session(session_id, credentials) # Cache for current session
 
     if not credentials:
         logger.info(f"[get_credentials] No credentials found for user '{user_google_email}' or session '{session_id}'.")
         return None
 
-    logger.info(f"[get_credentials] Credentials found. Scopes: {credentials.scopes}, Valid: {credentials.valid}, Expired: {credentials.expired}")
+    logger.debug(f"[get_credentials] Credentials found. Scopes: {credentials.scopes}, Valid: {credentials.valid}, Expired: {credentials.expired}")
 
     if not all(scope in credentials.scopes for scope in required_scopes):
         logger.warning(f"[get_credentials] Credentials lack required scopes. Need: {required_scopes}, Have: {credentials.scopes}. User: '{user_google_email}', Session: '{session_id}'")
         return None # Re-authentication needed for scopes
 
-    logger.info(f"[get_credentials] Credentials have sufficient scopes. User: '{user_google_email}', Session: '{session_id}'")
+    logger.debug(f"[get_credentials] Credentials have sufficient scopes. User: '{user_google_email}', Session: '{session_id}'")
 
     if credentials.valid:
-        logger.info(f"[get_credentials] Credentials are valid. User: '{user_google_email}', Session: '{session_id}'")
+        logger.debug(f"[get_credentials] Credentials are valid. User: '{user_google_email}', Session: '{session_id}'")
         return credentials
     elif credentials.expired and credentials.refresh_token:
         logger.info(f"[get_credentials] Credentials expired. Attempting refresh. User: '{user_google_email}', Session: '{session_id}'")
@@ -334,7 +344,7 @@ def get_credentials(
              logger.error("[get_credentials] Client secrets path required for refresh but not provided.")
              return None
         try:
-            logger.info(f"[get_credentials] Refreshing token using client_secrets_path: {client_secrets_path}")
+            logger.debug(f"[get_credentials] Refreshing token using client_secrets_path: {client_secrets_path}")
             # client_config = load_client_secrets(client_secrets_path) # Not strictly needed if creds have client_id/secret
             credentials.refresh(Request())
             logger.info(f"[get_credentials] Credentials refreshed successfully. User: '{user_google_email}', Session: '{session_id}'")
