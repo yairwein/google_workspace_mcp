@@ -49,15 +49,16 @@ The Google Workspace MCP Server integrates Google Workspace services (Calendar, 
 
 ## ✨ Features
 
-- **🔐 OAuth 2.0 Authentication**: Securely connects to Google APIs using user-authorized credentials with automatic token refresh
-- **📅 Google Calendar Integration**: List calendars and fetch events
+- **🔐 OAuth 2.0 Authentication**: Securely connects to Google APIs using user-authorized credentials with automatic token refresh and centralized authentication flow
+- **📅 Google Calendar Integration**: Full calendar management - list calendars, fetch events, create/modify/delete events with support for all-day and timed events
 - **📁 Google Drive Integration**: Search files, list folder contents, read file content, and create new files
-- **📧 Gmail Integration**: Search for messages, retrieve message content (including body) and send emails!
+- **📧 Gmail Integration**: Complete email management - search messages, retrieve content, send emails, and create drafts
 - **📄 Google Docs Integration**: Search for documents, read document content, list documents in folders, and create new documents
 - **🔄 Multiple Transport Options**: Streamable HTTP + SSE fallback
 - **🔌 `mcpo` Compatibility**: Easily expose the server as an OpenAPI endpoint for integration with tools like Open WebUI
 - **🧩 Extensible Design**: Simple structure for adding support for more Google Workspace APIs and tools
 - **🔄 Integrated OAuth Callback**: Handles the OAuth redirect directly within the server on port 8000
+- **⚡ Thread-Safe Session Management**: Robust session handling with thread-safe architecture for improved reliability
 
 ---
 
@@ -315,7 +316,7 @@ Source: [`gdrive/drive_tools.py`](gdrive/drive_tools.py)
 
 > **Query Syntax**: For Google Drive search queries, see [Drive Search Query Syntax](https://developers.google.com/drive/api/guides/search-files)
 
-### 📧 Gmail  
+### 📧 Gmail
 
 Source: [`gmail/gmail_tools.py`](gmail/gmail_tools.py)
 
@@ -324,6 +325,7 @@ Source: [`gmail/gmail_tools.py`](gmail/gmail_tools.py)
 | `search_gmail_messages`   | Search email messages using standard Gmail search operators (from, subject, etc). | • `query` (required): Search string (e.g., `"from:foo subject:bar is:unread"`)<br>• `user_google_email` (optional)<br>• `page_size` (optional, default: 10)<br>• `mcp_session_id` (injected automatically) |
 | `get_gmail_message_content`| Get subject, sender, and *plain text* body of an email by message ID.            | • `message_id` (required)<br>• `user_google_email` (optional)<br>• `mcp_session_id` (injected automatically) |
 | `send_gmail_message`      | Send a plain text email using the user's Gmail account.                           | • `to` (required): Recipient email address<br>• `subject` (required)<br>• `body` (required)<br>• `user_google_email` (optional)<br>• `mcp_session_id` (injected automatically) |
+| `draft_gmail_message`     | Create a draft email in the user's Gmail account.                                 | • `subject` (required): Email subject<br>• `body` (required): Email body (plain text)<br>• `to` (optional): Recipient email address<br>• `user_google_email` (optional)<br>• `mcp_session_id` (injected automatically) |
 
 
 > **Query Syntax**: For Gmail search queries, see [Gmail Search Query Syntax](https://support.google.com/mail/answer/7190)
