@@ -1,4 +1,5 @@
 import asyncio
+import argparse
 import logging
 import os
 import sys
@@ -35,7 +36,6 @@ except Exception as e:
     sys.stderr.write(f"CRITICAL: Failed to set up file logging to '{log_file_path}': {e}\n")
 
 # Import calendar tools to register them with the MCP server via decorators
-# Tools are registered when this module is imported
 import gcalendar.calendar_tools
 import gdrive.drive_tools
 import gmail.gmail_tools
@@ -47,6 +47,17 @@ def main():
     Main entry point for the Google Workspace MCP server.
     Uses streamable-http transport via a Starlette application with SessionAwareStreamableHTTPManager.
     """
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Google Workspace MCP Server')
+    parser.add_argument('--single-user', action='store_true',
+                        help='Run in single-user mode - bypass session mapping and use any credentials from ./credentials directory')
+    args = parser.parse_args()
+
+    # Set global single-user mode flag
+    if args.single_user:
+        os.environ['MCP_SINGLE_USER_MODE'] = '1'
+        logger.info("Starting in single-user mode - bypassing session-to-OAuth mapping")
+
     try:
         logger.info("Google Workspace MCP server starting...")
 

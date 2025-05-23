@@ -137,6 +137,26 @@ Runs the server with an HTTP transport layer on port 8000.
 </details>
 
 <details>
+<summary><b>Single-User Mode</b></summary>
+
+For simplified single-user environments, you can run the server in single-user mode, which bypasses session-to-OAuth mapping and uses any available credentials from the `.credentials` directory:
+
+```bash
+python main.py --single-user
+# or using uv
+uv run main.py --single-user
+```
+
+In single-user mode:
+- The server automatically finds and uses any valid credentials in the `.credentials` directory
+- No session mapping is required - the server uses the first valid credential file found
+- Useful for development, testing, or single-user deployments
+- Still requires initial OAuth authentication to create credential files
+
+This mode is particularly helpful when you don't need multi-user session management and want simplified credential handling.
+</details>
+
+<details>
 <summary><b>Using mcpo (Recommended for Open WebUI and other OpenAPI spec compatible clients)</b></summary>
 
 Requires `mcpo` installed (`uv pip install mcpo` or `pip install mcpo`).
@@ -330,7 +350,7 @@ Source: [`gmail/gmail_tools.py`](gmail/gmail_tools.py)
 
 > **Query Syntax**: For Gmail search queries, see [Gmail Search Query Syntax](https://support.google.com/mail/answer/7190)
 
-### 📝 Google Docs 
+### 📝 Google Docs
 
 Source: [`gdocs/docs_tools.py`](gdocs/docs_tools.py)
 
