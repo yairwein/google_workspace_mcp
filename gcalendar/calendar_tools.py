@@ -184,6 +184,7 @@ async def list_calendars(
                                an error message if the API call fails,
                                or an authentication guidance message if credentials are required.
     """
+
     logger.info(
         f"[list_calendars] Invoked. Session: '{mcp_session_id}', Email: '{user_google_email}'"
     )
