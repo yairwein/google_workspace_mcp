@@ -15,55 +15,44 @@ from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaIoBaseDownload
 
 # Auth & server utilities
-from auth.google_auth import get_credentials, start_auth_flow, CONFIG_CLIENT_SECRETS_PATH
+from auth.google_auth import get_authenticated_google_service
 from core.server import (
     server,
-    OAUTH_REDIRECT_URI,
     DRIVE_READONLY_SCOPE,
     DOCS_READONLY_SCOPE,
     DOCS_WRITE_SCOPE,
-    SCOPES
 )
 
 logger = logging.getLogger(__name__)
 
 @server.tool()
 async def search_docs(
+    user_google_email: str,
     query: str,
-    user_google_email: Optional[str] = None,
     page_size: int = 10,
-    mcp_session_id: Optional[str] = Header(None, alias="Mcp-Session-Id")
 ) -> types.CallToolResult:
     """
     Searches for Google Docs by name using Drive API (mimeType filter).
     """
-    logger.info(f"[search_docs] Session={mcp_session_id}, Email={user_google_email}, Query='{query}'")
-    tool_scopes = [DRIVE_READONLY_SCOPE]
-    credentials = await asyncio.to_thread(
-        get_credentials,
+    tool_name = "search_docs"
+    logger.info(f"[{tool_name}] Email={user_google_email}, Query='{query}'")
+
+    auth_result = await get_authenticated_google_service(
+        service_name="drive",
+        version="v3",
+        tool_name=tool_name,
         user_google_email=user_google_email,
-        required_scopes=tool_scopes,
-        client_secrets_path=CONFIG_CLIENT_SECRETS_PATH,
-        session_id=mcp_session_id
+        required_scopes=[DRIVE_READONLY_SCOPE],
     )
-    if not credentials or not credentials.valid:
-        logger.warning(f"[search_docs] Missing credentials.")
-        if user_google_email and '@' in user_google_email:
-            return await start_auth_flow(
-                mcp_session_id=mcp_session_id,
-                user_google_email=user_google_email,
-                service_name="Google Drive",
-                redirect_uri=OAUTH_REDIRECT_URI
-            )
-        return types.CallToolResult(isError=True, content=[types.TextContent(type="text",
-            text="Google Drive Authentication required. LLM: Please ask for Google email and retry, or use the 'start_google_auth' tool with the email and service_name='Google Drive'.")])
+    if isinstance(auth_result, types.CallToolResult):
+        return auth_result  # Auth error
+    service, user_email = auth_result
 
     try:
-        drive = build('drive', 'v3', credentials=credentials)
         escaped_query = query.replace("'", "\\'")
 
         response = await asyncio.to_thread(
-            drive.files().list(
+            service.files().list(
                 q=f"name contains '{escaped_query}' and mimeType='application/vnd.google-apps.document' and trashed=false",
                 pageSize=page_size,
                 fields="files(id, name, createdTime, modifiedTime, webViewLink)"
@@ -87,36 +76,27 @@ async def search_docs(
 
 @server.tool()
 async def get_doc_content(
+    user_google_email: str,
     document_id: str,
-    user_google_email: Optional[str] = None,
-    mcp_session_id: Optional[str] = Header(None, alias="Mcp-Session-Id")
 ) -> types.CallToolResult:
     """
     Retrieves Google Doc content as plain text using Docs API.
     """
-    logger.info(f"[get_doc_content] Document ID={document_id}")
-    tool_scopes = [DOCS_READONLY_SCOPE]
-    credentials = await asyncio.to_thread(
-        get_credentials,
+    tool_name = "get_doc_content"
+    logger.info(f"[{tool_name}] Document ID={document_id}")
+
+    auth_result = await get_authenticated_google_service(
+        service_name="docs",
+        version="v1",
+        tool_name=tool_name,
         user_google_email=user_google_email,
-        required_scopes=tool_scopes,
-        client_secrets_path=CONFIG_CLIENT_SECRETS_PATH,
-        session_id=mcp_session_id
+        required_scopes=[DOCS_READONLY_SCOPE],
     )
-    if not credentials or not credentials.valid:
-        logger.warning(f"[get_doc_content] Missing credentials.")
-        if user_google_email and '@' in user_google_email:
-            return await start_auth_flow(
-                mcp_session_id=mcp_session_id,
-                user_google_email=user_google_email,
-                service_name="Google Docs",
-                redirect_uri=OAUTH_REDIRECT_URI
-            )
-        return types.CallToolResult(isError=True, content=[types.TextContent(type="text",
-            text="Google Docs Authentication required. LLM: Please ask for Google email and retry, or use the 'start_google_auth' tool with the email and service_name='Google Docs'.")])
+    if isinstance(auth_result, types.CallToolResult):
+        return auth_result  # Auth error
+    docs, user_email = auth_result
 
     try:
-        docs = build('docs', 'v1', credentials=credentials)
         doc = await asyncio.to_thread(docs.documents().get(documentId=document_id).execute)
         title = doc.get('title', '')
         body = doc.get('body', {}).get('content', [])
@@ -139,10 +119,9 @@ async def get_doc_content(
 
 @server.tool()
 async def list_docs_in_folder(
+    user_google_email: str,
     folder_id: str = 'root',
-    user_google_email: Optional[str] = None,
-    page_size: int = 100,
-    mcp_session_id: Optional[str] = Header(None, alias="Mcp-Session-Id")
+    page_size: int = 100
 ) -> types.CallToolResult:
     """
     Lists Google Docs within a specific Drive folder.
@@ -230,7 +209,7 @@ async def create_doc(
             requests = [{'insertText': {'location': {'index': 1}, 'text': content}}]
             await asyncio.to_thread(docs.documents().batchUpdate(documentId=doc_id, body={'requests': requests}).execute)
         link = f"https://docs.google.com/document/d/{doc_id}/edit"
-        msg = f"Created Google Doc '{title}' (ID: {doc_id}). Link: {link}"  
+        msg = f"Created Google Doc '{title}' (ID: {doc_id}). Link: {link}"
         return types.CallToolResult(content=[types.TextContent(type="text", text=msg)])
 
     except HttpError as e:

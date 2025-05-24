@@ -13,22 +13,15 @@ from email.mime.text import MIMEText
 
 
 from mcp import types
-from fastapi import Header, Body
-from googleapiclient.discovery import build
+from fastapi import Body
 from googleapiclient.errors import HttpError
 
-from auth.google_auth import (
-    get_credentials,
-    start_auth_flow,
-    CONFIG_CLIENT_SECRETS_PATH,
-)
+from auth.google_auth import get_authenticated_google_service
 
 from core.server import (
     GMAIL_READONLY_SCOPE,
     GMAIL_SEND_SCOPE,
     GMAIL_COMPOSE_SCOPE,
-    OAUTH_REDIRECT_URI,
-    SCOPES,
     server,
 )
 
@@ -73,68 +66,38 @@ def _extract_message_body(payload):
 @server.tool()
 async def search_gmail_messages(
     query: str,
-    user_google_email: Optional[str] = None,
+    user_google_email: str,
     page_size: int = 10,
-    mcp_session_id: Optional[str] = Header(None, alias="Mcp-Session-Id"),
 ) -> types.CallToolResult:
     """
     Searches messages in a user's Gmail account based on a query.
     Returns both Message IDs and Thread IDs for each found message.
-    Authentication is handled by get_credentials and start_auth_flow.
 
     Args:
         query (str): The search query. Supports standard Gmail search operators.
-        user_google_email (Optional[str]): The user's Google email address. Required if the MCP session is not already authenticated for Gmail access.
+        user_google_email (str): The user's Google email address. Required.
         page_size (int): The maximum number of messages to return. Defaults to 10.
-        mcp_session_id (Optional[str]): The active MCP session ID (automatically injected by FastMCP from the Mcp-Session-Id header). Used for session-based authentication.
 
     Returns:
         types.CallToolResult: Contains a list of found messages with both Message IDs (for get_gmail_message_content) and Thread IDs (for get_gmail_thread_content), or an error/auth guidance message.
     """
     tool_name = "search_gmail_messages"
     logger.info(
-        f"[{tool_name}] Invoked. Session: '{mcp_session_id}', Email: '{user_google_email}', Query: '{query}'"
+        f"[{tool_name}] Invoked. Email: '{user_google_email}', Query: '{query}'"
     )
 
-    # Use get_credentials to fetch credentials
-    credentials = await asyncio.to_thread(
-        get_credentials,
+    auth_result = await get_authenticated_google_service(
+        service_name="gmail",
+        version="v1",
+        tool_name=tool_name,
         user_google_email=user_google_email,
         required_scopes=[GMAIL_READONLY_SCOPE],
-        client_secrets_path=CONFIG_CLIENT_SECRETS_PATH,
-        session_id=mcp_session_id,
     )
-
-    # Check if credentials are valid, initiate auth flow if not
-    if not credentials or not credentials.valid:
-        logger.warning(
-            f"[{tool_name}] No valid credentials. Session: '{mcp_session_id}', Email: '{user_google_email}'."
-        )
-        if user_google_email and "@" in user_google_email:
-            logger.info(
-                f"[{tool_name}] Valid email '{user_google_email}' provided, initiating auth flow for this email (requests all SCOPES)."
-            )
-            # Use the centralized start_auth_flow
-            return await start_auth_flow(
-                mcp_session_id=mcp_session_id,
-                user_google_email=user_google_email,
-                service_name="Gmail",
-                redirect_uri=OAUTH_REDIRECT_URI,
-            )
-        else:
-            error_msg = "Gmail Authentication required. No active authenticated session, and no valid 'user_google_email' provided. LLM: Please ask the user for their Google email address and retry, or use the 'start_google_auth' tool with their email and service_name='Gmail'."
-            logger.info(f"[{tool_name}] {error_msg}")
-            return types.CallToolResult(
-                isError=True, content=[types.TextContent(type="text", text=error_msg)]
-            )
+    if isinstance(auth_result, types.CallToolResult):
+        return auth_result  # Auth error
+    service, user_email = auth_result
 
     try:
-        # Build the service object directly
-        service = build("gmail", "v1", credentials=credentials)
-        user_email_from_creds = "Unknown (Gmail)"
-        if credentials.id_token and isinstance(credentials.id_token, dict):
-            user_email_from_creds = credentials.id_token.get("email", "Unknown (Gmail)")
-        logger.info(f"[{tool_name}] Using service for: {user_email_from_creds}")
 
         response = await asyncio.to_thread(
             service.users()
@@ -194,65 +157,36 @@ async def search_gmail_messages(
 @server.tool()
 async def get_gmail_message_content(
     message_id: str,
-    user_google_email: Optional[str] = None,
-    mcp_session_id: Optional[str] = Header(None, alias="Mcp-Session-Id"),
+    user_google_email: str,
 ) -> types.CallToolResult:
     """
     Retrieves the full content (subject, sender, plain text body) of a specific Gmail message.
-    Authentication is handled by get_credentials and start_auth_flow.
 
     Args:
         message_id (str): The unique ID of the Gmail message to retrieve.
-        user_google_email (Optional[str]): The user's Google email address. Required if the MCP session is not already authenticated for Gmail access.
-        mcp_session_id (Optional[str]): The active MCP session ID (automatically injected by FastMCP from the Mcp-Session-Id header). Used for session-based authentication.
+        user_google_email (str): The user's Google email address. Required.
 
     Returns:
         types.CallToolResult: Contains the message details or an error/auth guidance message.
     """
     tool_name = "get_gmail_message_content"
     logger.info(
-        f"[{tool_name}] Invoked. Message ID: '{message_id}', Session: '{mcp_session_id}', Email: '{user_google_email}'"
+        f"[{tool_name}] Invoked. Message ID: '{message_id}', Email: '{user_google_email}'"
     )
 
-    # Use get_credentials to fetch credentials
-    credentials = await asyncio.to_thread(
-        get_credentials,
+    auth_result = await get_authenticated_google_service(
+        service_name="gmail",
+        version="v1",
+        tool_name=tool_name,
         user_google_email=user_google_email,
         required_scopes=[GMAIL_READONLY_SCOPE],
-        client_secrets_path=CONFIG_CLIENT_SECRETS_PATH,
-        session_id=mcp_session_id,
     )
-
-    # Check if credentials are valid, initiate auth flow if not
-    if not credentials or not credentials.valid:
-        logger.warning(
-            f"[{tool_name}] No valid credentials. Session: '{mcp_session_id}', Email: '{user_google_email}'."
-        )
-        if user_google_email and "@" in user_google_email:
-            logger.info(
-                f"[{tool_name}] Valid email '{user_google_email}' provided, initiating auth flow for this email (requests all SCOPES)."
-            )
-            # Use the centralized start_auth_flow
-            return await start_auth_flow(
-                mcp_session_id=mcp_session_id,
-                user_google_email=user_google_email,
-                service_name="Gmail",
-                redirect_uri=OAUTH_REDIRECT_URI,
-            )
-        else:
-            error_msg = "Gmail Authentication required. No active authenticated session, and no valid 'user_google_email' provided. LLM: Please ask the user for their Google email address and retry, or use the 'start_google_auth' tool with their email and service_name='Gmail'."
-            logger.info(f"[{tool_name}] {error_msg}")
-            return types.CallToolResult(
-                isError=True, content=[types.TextContent(type="text", text=error_msg)]
-            )
+    if isinstance(auth_result, types.CallToolResult):
+        return auth_result  # Auth error
+    service, user_email = auth_result
 
     try:
-        # Build the service object directly
-        service = build("gmail", "v1", credentials=credentials)
-        user_email_from_creds = "Unknown (Gmail)"
-        if credentials.id_token and isinstance(credentials.id_token, dict):
-            user_email_from_creds = credentials.id_token.get("email", "Unknown (Gmail)")
-        logger.info(f"[{tool_name}] Using service for: {user_email_from_creds}")
+        logger.info(f"[{tool_name}] Using service for: {user_google_email}")
 
         # Fetch message metadata first to get headers
         message_metadata = await asyncio.to_thread(
@@ -321,61 +255,37 @@ async def get_gmail_message_content(
 
 @server.tool()
 async def send_gmail_message(
+    user_google_email: str,
     to: str = Body(..., description="Recipient email address."),
     subject: str = Body(..., description="Email subject."),
     body: str = Body(..., description="Email body (plain text)."),
-    user_google_email: Optional[str] = None,
-    mcp_session_id: Optional[str] = Header(None, alias="Mcp-Session-Id"),
 ) -> types.CallToolResult:
     """
     Sends an email using the user's Gmail account.
-    Authentication is handled by get_credentials and start_auth_flow.
 
     Args:
         to (str): Recipient email address.
         subject (str): Email subject.
         body (str): Email body (plain text).
-        user_google_email (Optional[str]): The user's Google email address. Required if the MCP session is not already authenticated for Gmail access.
-        mcp_session_id (Optional[str]): The active MCP session ID (automatically injected by FastMCP from the Mcp-Session-Id header). Used for session-based authentication.
+        user_google_email (str): The user's Google email address. Required.
 
     Returns:
         types.CallToolResult: Contains the message ID of the sent email, or an error/auth guidance message.
     """
     tool_name = "send_gmail_message"
-    try:
-        # Use get_credentials to fetch credentials
-        credentials = await asyncio.to_thread(
-            get_credentials,
-            user_google_email=user_google_email,
-            required_scopes=[GMAIL_SEND_SCOPE],
-            client_secrets_path=CONFIG_CLIENT_SECRETS_PATH,
-            session_id=mcp_session_id,
-        )
-        # Check if credentials are valid, initiate auth flow if not
-        if not credentials or not credentials.valid:
-            logger.warning(
-                f"[{tool_name}] No valid credentials. Session: '{mcp_session_id}', Email: '{user_google_email}'."
-            )
-            if user_google_email and "@" in user_google_email:
-                logger.info(
-                    f"[{tool_name}] Valid email '{user_google_email}' provided, initiating auth flow for this email (requests all SCOPES)."
-                )
-                # Use the centralized start_auth_flow
-                return await start_auth_flow(
-                    mcp_session_id=mcp_session_id,
-                    user_google_email=user_google_email,
-                    service_name="Gmail",
-                    redirect_uri=OAUTH_REDIRECT_URI,
-                )
-            else:
-                error_msg = "Gmail Authentication required. No active authenticated session, and no valid 'user_google_email' provided. LLM: Please ask the user for their Google email address and retry, or use the 'start_google_auth' tool with their email and service_name='Gmail'."
-                logger.info(f"[{tool_name}] {error_msg}")
-                return types.CallToolResult(
-                    isError=True,
-                    content=[types.TextContent(type="text", text=error_msg)],
-                )
 
-        service = await asyncio.to_thread(build, "gmail", "v1", credentials=credentials)
+    auth_result = await get_authenticated_google_service(
+        service_name="gmail",
+        version="v1",
+        tool_name=tool_name,
+        user_google_email=user_google_email,
+        required_scopes=[GMAIL_SEND_SCOPE],
+    )
+    if isinstance(auth_result, types.CallToolResult):
+        return auth_result  # Auth error
+    service, user_email = auth_result
+
+    try:
 
         # Prepare the email
         message = MIMEText(body)
@@ -415,70 +325,40 @@ async def send_gmail_message(
 
 @server.tool()
 async def draft_gmail_message(
+    user_google_email: str,
     subject: str = Body(..., description="Email subject."),
     body: str = Body(..., description="Email body (plain text)."),
     to: Optional[str] = Body(None, description="Optional recipient email address."),
-    user_google_email: Optional[str] = None,
-    mcp_session_id: Optional[str] = Header(None, alias="Mcp-Session-Id"),
 ) -> types.CallToolResult:
     """
     Creates a draft email in the user's Gmail account.
-    Authentication is handled by get_credentials and start_auth_flow.
 
     Args:
+        user_google_email (str): The user's Google email address. Required.
         subject (str): Email subject.
         body (str): Email body (plain text).
         to (Optional[str]): Optional recipient email address. Can be left empty for drafts.
-        user_google_email (Optional[str]): The user's Google email address. Required if the MCP session is not already authenticated for Gmail access.
-        mcp_session_id (Optional[str]): The active MCP session ID (automatically injected by FastMCP from the Mcp-Session-Id header). Used for session-based authentication.
 
     Returns:
         types.CallToolResult: Contains the draft ID of the created email, or an error/auth guidance message.
     """
     tool_name = "draft_gmail_message"
     logger.info(
-        f"[{tool_name}] Invoked. Session: '{mcp_session_id}', Email: '{user_google_email}', Subject: '{subject}'"
+        f"[{tool_name}] Invoked. Email: '{user_google_email}', Subject: '{subject}'"
     )
 
-    # Use get_credentials to fetch credentials
-    credentials = await asyncio.to_thread(
-        get_credentials,
+    auth_result = await get_authenticated_google_service(
+        service_name="gmail",
+        version="v1",
+        tool_name=tool_name,
         user_google_email=user_google_email,
         required_scopes=[GMAIL_COMPOSE_SCOPE],
-        client_secrets_path=CONFIG_CLIENT_SECRETS_PATH,
-        session_id=mcp_session_id,
     )
-
-    # Check if credentials are valid, initiate auth flow if not
-    if not credentials or not credentials.valid:
-        logger.warning(
-            f"[{tool_name}] No valid credentials. Session: '{mcp_session_id}', Email: '{user_google_email}'."
-        )
-        if user_google_email and "@" in user_google_email:
-            logger.info(
-                f"[{tool_name}] Valid email '{user_google_email}' provided, initiating auth flow for this email (requests all SCOPES)."
-            )
-            # Use the centralized start_auth_flow
-            return await start_auth_flow(
-                mcp_session_id=mcp_session_id,
-                user_google_email=user_google_email,
-                service_name="Gmail",
-                redirect_uri=OAUTH_REDIRECT_URI,
-            )
-        else:
-            error_msg = "Gmail Authentication required. No active authenticated session, and no valid 'user_google_email' provided. LLM: Please ask the user for their Google email address and retry, or use the 'start_auth' tool with their email."
-            logger.info(f"[{tool_name}] {error_msg}")
-            return types.CallToolResult(
-                isError=True, content=[types.TextContent(type="text", text=error_msg)]
-            )
+    if isinstance(auth_result, types.CallToolResult):
+        return auth_result  # Auth error
+    service, user_email = auth_result
 
     try:
-        # Build the service object directly
-        service = build("gmail", "v1", credentials=credentials)
-        user_email_from_creds = "Unknown (Gmail)"
-        if credentials.id_token and isinstance(credentials.id_token, dict):
-            user_email_from_creds = credentials.id_token.get("email", "Unknown (Gmail)")
-        logger.info(f"[{tool_name}] Using service for: {user_email_from_creds}")
 
         # Prepare the email
         message = MIMEText(body)
@@ -525,67 +405,35 @@ async def draft_gmail_message(
 @server.tool()
 async def get_gmail_thread_content(
     thread_id: str,
-    user_google_email: Optional[str] = None,
-    mcp_session_id: Optional[str] = Header(None, alias="Mcp-Session-Id"),
+    user_google_email: str,
 ) -> types.CallToolResult:
     """
     Retrieves the complete content of a Gmail conversation thread, including all messages.
-    Authentication is handled by get_credentials and start_auth_flow.
 
     Args:
         thread_id (str): The unique ID of the Gmail thread to retrieve.
-        user_google_email (Optional[str]): The user's Google email address. Required if the MCP session is not already authenticated for Gmail access.
-        mcp_session_id (Optional[str]): The active MCP session ID (automatically injected by FastMCP from the Mcp-Session-Id header). Used for session-based authentication.
+        user_google_email (str): The user's Google email address. Required.
 
     Returns:
         types.CallToolResult: Contains the complete thread content with all messages or an error/auth guidance message.
     """
     tool_name = "get_gmail_thread_content"
     logger.info(
-        f"[{tool_name}] Invoked. Thread ID: '{thread_id}', Session: '{mcp_session_id}', Email: '{user_google_email}'"
+        f"[{tool_name}] Invoked. Thread ID: '{thread_id}', Email: '{user_google_email}'"
     )
 
-    # Use get_credentials to fetch credentials
-    credentials = await asyncio.to_thread(
-        get_credentials,
+    auth_result = await get_authenticated_google_service(
+        service_name="gmail",
+        version="v1",
+        tool_name=tool_name,
         user_google_email=user_google_email,
         required_scopes=[GMAIL_READONLY_SCOPE],
-        client_secrets_path=CONFIG_CLIENT_SECRETS_PATH,
-        session_id=mcp_session_id,
     )
-
-    # Check if credentials are valid, initiate auth flow if not
-    if not credentials or not credentials.valid:
-        logger.warning(
-            f"[{tool_name}] No valid credentials. Session: '{mcp_session_id}', Email: '{user_google_email}'."
-        )
-        if user_google_email and "@" in user_google_email:
-            logger.info(
-                f"[{tool_name}] Valid email '{user_google_email}' provided, initiating auth flow for this email (requests all SCOPES)."
-            )
-            # Use the centralized start_auth_flow
-            return await start_auth_flow(
-                mcp_session_id=mcp_session_id,
-                user_google_email=user_google_email,
-                service_name="Gmail",
-                redirect_uri=OAUTH_REDIRECT_URI,
-            )
-        else:
-            error_msg = "Gmail Authentication required. No active authenticated session, and no valid 'user_google_email' provided. LLM: Please ask the user for their Google email address and retry, or use the 'start_google_auth' tool with their email and service_name='Gmail'."
-            logger.info(f"[{tool_name}] {error_msg}")
-            return types.CallToolResult(
-                isError=True, content=[types.TextContent(type="text", text=error_msg)]
-            )
+    if isinstance(auth_result, types.CallToolResult):
+        return auth_result  # Auth error
+    service, user_email = auth_result
 
     try:
-        # Build the service object directly
-        service = build("gmail", "v1", credentials=credentials)
-        user_email_from_creds = "Unknown (Gmail)"
-        if credentials.id_token and isinstance(credentials.id_token, dict):
-            user_email_from_creds = credentials.id_token.get("email", "Unknown (Gmail)")
-
-        logger.info(f"[{tool_name}] Using service for: {user_email_from_creds}")
-
         # Fetch the complete thread with all messages
         thread_response = await asyncio.to_thread(
             service.users()
