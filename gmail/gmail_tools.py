@@ -35,6 +35,41 @@ from core.server import (
 logger = logging.getLogger(__name__)
 
 
+def _extract_message_body(payload):
+    """
+    Helper function to extract plain text body from a Gmail message payload.
+
+    Args:
+        payload (dict): The message payload from Gmail API
+
+    Returns:
+        str: The plain text body content, or empty string if not found
+    """
+    body_data = ""
+    parts = [payload] if "parts" not in payload else payload.get("parts", [])
+
+    part_queue = list(parts)  # Use a queue for BFS traversal of parts
+    while part_queue:
+        part = part_queue.pop(0)
+        if part.get("mimeType") == "text/plain" and part.get("body", {}).get("data"):
+            data = base64.urlsafe_b64decode(part["body"]["data"])
+            body_data = data.decode("utf-8", errors="ignore")
+            break  # Found plain text body
+        elif part.get("mimeType", "").startswith("multipart/") and "parts" in part:
+            part_queue.extend(part.get("parts", []))  # Add sub-parts to the queue
+
+    # If no plain text found, check the main payload body if it exists
+    if (
+        not body_data
+        and payload.get("mimeType") == "text/plain"
+        and payload.get("body", {}).get("data")
+    ):
+        data = base64.urlsafe_b64decode(payload["body"]["data"])
+        body_data = data.decode("utf-8", errors="ignore")
+
+    return body_data
+
+
 @server.tool()
 async def search_gmail_messages(
     query: str,
@@ -44,6 +79,7 @@ async def search_gmail_messages(
 ) -> types.CallToolResult:
     """
     Searches messages in a user's Gmail account based on a query.
+    Returns both Message IDs and Thread IDs for each found message.
     Authentication is handled by get_credentials and start_auth_flow.
 
     Args:
@@ -53,7 +89,7 @@ async def search_gmail_messages(
         mcp_session_id (Optional[str]): The active MCP session ID (automatically injected by FastMCP from the Mcp-Session-Id header). Used for session-based authentication.
 
     Returns:
-        types.CallToolResult: Contains a list of found message IDs or an error/auth guidance message.
+        types.CallToolResult: Contains a list of found messages with both Message IDs (for get_gmail_message_content) and Thread IDs (for get_gmail_thread_content), or an error/auth guidance message.
     """
     tool_name = "search_gmail_messages"
     logger.info(
@@ -95,11 +131,9 @@ async def search_gmail_messages(
     try:
         # Build the service object directly
         service = build("gmail", "v1", credentials=credentials)
-        user_email_from_creds = (
-            credentials.id_token.get("email")
-            if credentials.id_token
-            else "Unknown (Gmail)"
-        )
+        user_email_from_creds = "Unknown (Gmail)"
+        if credentials.id_token and isinstance(credentials.id_token, dict):
+            user_email_from_creds = credentials.id_token.get("email", "Unknown (Gmail)")
         logger.info(f"[{tool_name}] Using service for: {user_email_from_creds}")
 
         response = await asyncio.to_thread(
@@ -118,9 +152,22 @@ async def search_gmail_messages(
                 ]
             )
 
-        lines = [f"Found {len(messages)} messages:"]
-        for msg in messages:
-            lines.append(f"- ID: {msg['id']}")  # list doesn't return snippet by default
+        # Build enhanced output showing both message ID and thread ID
+        lines = [
+            f"Found {len(messages)} messages:",
+            "",
+            "Note: Use Message ID with get_gmail_message_content, Thread ID with get_gmail_thread_content",
+            "",
+        ]
+
+        for i, msg in enumerate(messages, 1):
+            lines.extend(
+                [
+                    f"{i}. Message ID: {msg['id']}",
+                    f"   Thread ID:  {msg['threadId']}",
+                    "",
+                ]
+            )
 
         return types.CallToolResult(
             content=[types.TextContent(type="text", text="\n".join(lines))]
@@ -239,31 +286,9 @@ async def get_gmail_message_content(
             .execute
         )
 
-        # Find the plain text part (more robustly)
-        body_data = ""
+        # Extract the plain text body using helper function
         payload = message_full.get("payload", {})
-        parts = [payload] if "parts" not in payload else payload.get("parts", [])
-
-        part_queue = list(parts)  # Use a queue for BFS traversal of parts
-        while part_queue:
-            part = part_queue.pop(0)
-            if part.get("mimeType") == "text/plain" and part.get("body", {}).get(
-                "data"
-            ):
-                data = base64.urlsafe_b64decode(part["body"]["data"])
-                body_data = data.decode("utf-8", errors="ignore")
-                break  # Found plain text body
-            elif part.get("mimeType", "").startswith("multipart/") and "parts" in part:
-                part_queue.extend(part.get("parts", []))  # Add sub-parts to the queue
-
-        # If no plain text found, check the main payload body if it exists
-        if (
-            not body_data
-            and payload.get("mimeType") == "text/plain"
-            and payload.get("body", {}).get("data")
-        ):
-            data = base64.urlsafe_b64decode(payload["body"]["data"])
-            body_data = data.decode("utf-8", errors="ignore")
+        body_data = _extract_message_body(payload)
 
         content_text = "\n".join(
             [
@@ -490,8 +515,164 @@ async def draft_gmail_message(
             content=[types.TextContent(type="text", text=f"Gmail API error: {e}")],
         )
     except Exception as e:
+        logger.exception(f"[{tool_name}] Unexpected error creating Gmail draft: {e}")
+        return types.CallToolResult(
+            isError=True,
+            content=[types.TextContent(type="text", text=f"Unexpected error: {e}")],
+        )
+
+
+@server.tool()
+async def get_gmail_thread_content(
+    thread_id: str,
+    user_google_email: Optional[str] = None,
+    mcp_session_id: Optional[str] = Header(None, alias="Mcp-Session-Id"),
+) -> types.CallToolResult:
+    """
+    Retrieves the complete content of a Gmail conversation thread, including all messages.
+    Authentication is handled by get_credentials and start_auth_flow.
+
+    Args:
+        thread_id (str): The unique ID of the Gmail thread to retrieve.
+        user_google_email (Optional[str]): The user's Google email address. Required if the MCP session is not already authenticated for Gmail access.
+        mcp_session_id (Optional[str]): The active MCP session ID (automatically injected by FastMCP from the Mcp-Session-Id header). Used for session-based authentication.
+
+    Returns:
+        types.CallToolResult: Contains the complete thread content with all messages or an error/auth guidance message.
+    """
+    tool_name = "get_gmail_thread_content"
+    logger.info(
+        f"[{tool_name}] Invoked. Thread ID: '{thread_id}', Session: '{mcp_session_id}', Email: '{user_google_email}'"
+    )
+
+    # Use get_credentials to fetch credentials
+    credentials = await asyncio.to_thread(
+        get_credentials,
+        user_google_email=user_google_email,
+        required_scopes=[GMAIL_READONLY_SCOPE],
+        client_secrets_path=CONFIG_CLIENT_SECRETS_PATH,
+        session_id=mcp_session_id,
+    )
+
+    # Check if credentials are valid, initiate auth flow if not
+    if not credentials or not credentials.valid:
+        logger.warning(
+            f"[{tool_name}] No valid credentials. Session: '{mcp_session_id}', Email: '{user_google_email}'."
+        )
+        if user_google_email and "@" in user_google_email:
+            logger.info(
+                f"[{tool_name}] Valid email '{user_google_email}' provided, initiating auth flow for this email (requests all SCOPES)."
+            )
+            # Use the centralized start_auth_flow
+            return await start_auth_flow(
+                mcp_session_id=mcp_session_id,
+                user_google_email=user_google_email,
+                service_name="Gmail",
+                redirect_uri=OAUTH_REDIRECT_URI,
+            )
+        else:
+            error_msg = "Gmail Authentication required. No active authenticated session, and no valid 'user_google_email' provided. LLM: Please ask the user for their Google email address and retry, or use the 'start_google_auth' tool with their email and service_name='Gmail'."
+            logger.info(f"[{tool_name}] {error_msg}")
+            return types.CallToolResult(
+                isError=True, content=[types.TextContent(type="text", text=error_msg)]
+            )
+
+    try:
+        # Build the service object directly
+        service = build("gmail", "v1", credentials=credentials)
+        user_email_from_creds = "Unknown (Gmail)"
+        if credentials.id_token and isinstance(credentials.id_token, dict):
+            user_email_from_creds = credentials.id_token.get("email", "Unknown (Gmail)")
+
+        logger.info(f"[{tool_name}] Using service for: {user_email_from_creds}")
+
+        # Fetch the complete thread with all messages
+        thread_response = await asyncio.to_thread(
+            service.users()
+            .threads()
+            .get(userId="me", id=thread_id, format="full")
+            .execute
+        )
+
+        messages = thread_response.get("messages", [])
+        if not messages:
+            return types.CallToolResult(
+                content=[
+                    types.TextContent(
+                        type="text", text=f"No messages found in thread '{thread_id}'."
+                    )
+                ]
+            )
+
+        # Extract thread subject from the first message
+        first_message = messages[0]
+        first_headers = {
+            h["name"]: h["value"]
+            for h in first_message.get("payload", {}).get("headers", [])
+        }
+        thread_subject = first_headers.get("Subject", "(no subject)")
+
+        # Build the thread content
+        content_lines = [
+            f"Thread ID: {thread_id}",
+            f"Subject: {thread_subject}",
+            f"Messages: {len(messages)}",
+            "",
+        ]
+
+        # Process each message in the thread
+        for i, message in enumerate(messages, 1):
+            # Extract headers
+            headers = {
+                h["name"]: h["value"]
+                for h in message.get("payload", {}).get("headers", [])
+            }
+
+            sender = headers.get("From", "(unknown sender)")
+            date = headers.get("Date", "(unknown date)")
+            subject = headers.get("Subject", "(no subject)")
+
+            # Extract message body
+            payload = message.get("payload", {})
+            body_data = _extract_message_body(payload)
+
+            # Add message to content
+            content_lines.extend(
+                [
+                    f"=== Message {i} ===",
+                    f"From: {sender}",
+                    f"Date: {date}",
+                ]
+            )
+
+            # Only show subject if it's different from thread subject
+            if subject != thread_subject:
+                content_lines.append(f"Subject: {subject}")
+
+            content_lines.extend(
+                [
+                    "",
+                    body_data or "[No text/plain body found]",
+                    "",
+                ]
+            )
+
+        content_text = "\n".join(content_lines)
+        return types.CallToolResult(
+            content=[types.TextContent(type="text", text=content_text)]
+        )
+
+    except HttpError as e:
+        logger.error(
+            f"[{tool_name}] Gmail API error getting thread content: {e}", exc_info=True
+        )
+        return types.CallToolResult(
+            isError=True,
+            content=[types.TextContent(type="text", text=f"Gmail API error: {e}")],
+        )
+    except Exception as e:
         logger.exception(
-            f"[{tool_name}] Unexpected error creating Gmail draft: {e}"
+            f"[{tool_name}] Unexpected error getting Gmail thread content: {e}"
         )
         return types.CallToolResult(
             isError=True,
