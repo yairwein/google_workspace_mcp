@@ -16,6 +16,7 @@ from googleapiclient.http import MediaIoBaseDownload
 
 # Auth & server utilities
 from auth.google_auth import get_authenticated_google_service
+from core.utils import extract_office_xml_text
 from core.server import (
     server,
     DRIVE_READONLY_SCOPE,
@@ -80,42 +81,132 @@ async def get_doc_content(
     document_id: str,
 ) -> types.CallToolResult:
     """
-    Retrieves Google Doc content as plain text using Docs API.
+    Retrieves content of a Google Doc or a Drive file (like .docx) identified by document_id.
+    - Native Google Docs: Fetches content via Docs API.
+    - Office files (.docx, etc.) stored in Drive: Downloads via Drive API and extracts text.
     """
     tool_name = "get_doc_content"
-    logger.info(f"[{tool_name}] Document ID={document_id}")
+    logger.info(f"[{tool_name}] Invoked. Document/File ID: '{document_id}' for user '{user_google_email}'")
 
-    auth_result = await get_authenticated_google_service(
-        service_name="docs",
-        version="v1",
+    # Step 1: Authenticate with Drive API to get metadata
+    drive_auth_result = await get_authenticated_google_service(
+        service_name="drive",
+        version="v3",
         tool_name=tool_name,
         user_google_email=user_google_email,
-        required_scopes=[DOCS_READONLY_SCOPE],
+        required_scopes=[DRIVE_READONLY_SCOPE],
     )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result  # Auth error
-    docs, user_email = auth_result
+    if isinstance(drive_auth_result, types.CallToolResult):
+        return drive_auth_result
+    drive_service, user_email = drive_auth_result # user_email will be consistent
 
     try:
-        doc = await asyncio.to_thread(docs.documents().get(documentId=document_id).execute)
-        title = doc.get('title', '')
-        body = doc.get('body', {}).get('content', [])
+        # Step 2: Get file metadata from Drive
+        file_metadata = await asyncio.to_thread(
+            drive_service.files().get(
+                fileId=document_id, fields="id, name, mimeType, webViewLink"
+            ).execute
+        )
+        mime_type = file_metadata.get("mimeType", "")
+        file_name = file_metadata.get("name", "Unknown File")
+        web_view_link = file_metadata.get("webViewLink", "#")
 
-        text_lines: List[str] = [f"Document: '{title}' (ID: {document_id})\n"]
-        def extract_text(el):
-            segs = el.get('paragraph', {}).get('elements', [])
-            return ''.join([s.get('textRun', {}).get('content', '') for s in segs])
-        for el in body:
-            if 'paragraph' in el:
-                t = extract_text(el)
-                if t.strip():
-                    text_lines.append(t)
-        content = ''.join(text_lines)
-        return types.CallToolResult(content=[types.TextContent(type="text", text=content)])
+        logger.info(f"[{tool_name}] File '{file_name}' (ID: {document_id}) has mimeType: '{mime_type}'")
 
-    except HttpError as e:
-        logger.error(f"API error in get_doc_content: {e}", exc_info=True)
-        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=f"API error: {e}")])
+        body_text = "" # Initialize body_text
+
+        # Step 3: Process based on mimeType
+        if mime_type == "application/vnd.google-apps.document":
+            logger.info(f"[{tool_name}] Processing as native Google Doc.")
+            docs_auth_result = await get_authenticated_google_service(
+                service_name="docs",
+                version="v1",
+                tool_name=tool_name,
+                user_google_email=user_google_email,
+                required_scopes=[DOCS_READONLY_SCOPE],
+            )
+            if isinstance(docs_auth_result, types.CallToolResult):
+                return docs_auth_result
+            docs_service, _ = docs_auth_result # user_email already obtained from drive_auth
+
+            doc_data = await asyncio.to_thread(
+                docs_service.documents().get(documentId=document_id).execute
+            )
+            body_elements = doc_data.get('body', {}).get('content', [])
+
+            processed_text_lines: List[str] = []
+            for element in body_elements:
+                if 'paragraph' in element:
+                    paragraph = element.get('paragraph', {})
+                    para_elements = paragraph.get('elements', [])
+                    current_line_text = ""
+                    for pe in para_elements:
+                        text_run = pe.get('textRun', {})
+                        if text_run and 'content' in text_run:
+                            current_line_text += text_run['content']
+                    if current_line_text.strip():
+                         processed_text_lines.append(current_line_text)
+            body_text = "".join(processed_text_lines)
+        else:
+            logger.info(f"[{tool_name}] Processing as Drive file (e.g., .docx, other). MimeType: {mime_type}")
+
+            export_mime_type_map = {
+                 # Example: "application/vnd.google-apps.spreadsheet": "text/csv",
+                 # Native GSuite types that are not Docs would go here if this function
+                 # was intended to export them. For .docx, direct download is used.
+            }
+            effective_export_mime = export_mime_type_map.get(mime_type)
+
+            request_obj = (
+                drive_service.files().export_media(fileId=document_id, mimeType=effective_export_mime)
+                if effective_export_mime
+                else drive_service.files().get_media(fileId=document_id)
+            )
+
+            fh = io.BytesIO()
+            downloader = MediaIoBaseDownload(fh, request_obj)
+            loop = asyncio.get_event_loop()
+            done = False
+            while not done:
+                status, done = await loop.run_in_executor(None, downloader.next_chunk)
+
+            file_content_bytes = fh.getvalue()
+
+            office_text = extract_office_xml_text(file_content_bytes, mime_type)
+            if office_text:
+                body_text = office_text
+            else:
+                try:
+                    body_text = file_content_bytes.decode("utf-8")
+                except UnicodeDecodeError:
+                    body_text = (
+                        f"[Binary or unsupported text encoding for mimeType '{mime_type}' - "
+                        f"{len(file_content_bytes)} bytes]"
+                    )
+
+        header = (
+            f'File: "{file_name}" (ID: {document_id}, Type: {mime_type})\n'
+            f'Link: {web_view_link}\n\n--- CONTENT ---\n'
+        )
+        return types.CallToolResult(
+            content=[types.TextContent(type="text", text=header + body_text)]
+        )
+
+    except HttpError as error:
+        logger.error(
+            f"[{tool_name}] API error for ID {document_id}: {error}",
+            exc_info=True,
+        )
+        return types.CallToolResult(
+            isError=True,
+            content=[types.TextContent(type="text", text=f"API error processing document/file ID {document_id}: {error}")],
+        )
+    except Exception as e:
+        logger.exception(f"[{tool_name}] Unexpected error for ID {document_id}: {e}")
+        return types.CallToolResult(
+            isError=True,
+            content=[types.TextContent(type="text", text=f"Unexpected error processing document/file ID {document_id}: {e}")],
+        )
 
 @server.tool()
 async def list_docs_in_folder(
