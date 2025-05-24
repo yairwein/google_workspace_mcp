@@ -1,10 +1,11 @@
+import io
+import logging
 import zipfile, xml.etree.ElementTree as ET
 
 from typing import List, Optional
 
-# -------------------------------------------------------------------------
-# Helper: pull raw text from OOXML containers (docx / xlsx / pptx)
-# -------------------------------------------------------------------------
+logger = logging.getLogger(__name__)
+
 def extract_office_xml_text(file_bytes: bytes, mime_type: str) -> Optional[str]:
     """
     Very light-weight XML scraper for Word, Excel, PowerPoint files.
