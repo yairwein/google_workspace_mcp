@@ -12,23 +12,12 @@ import sys
 from typing import List, Optional, Dict, Any
 
 from mcp import types
-from fastapi import Header
-
-from google.oauth2.credentials import Credentials
-from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-from auth.google_auth import (
-    get_credentials,
-    start_auth_flow,
-    CONFIG_CLIENT_SECRETS_PATH,
-)
+from auth.google_auth import get_authenticated_google_service
 
-# Import the server directly (will be initialized before this module is imported)
-# Also import the OAUTH_STATE_TO_SESSION_ID_MAP for linking OAuth state to MCP session
 from core.server import (
     server,
-    OAUTH_REDIRECT_URI,
     CALENDAR_READONLY_SCOPE,
     CALENDAR_EVENTS_SCOPE,
 )
@@ -97,111 +86,38 @@ def _correct_time_format_for_api(
 # --- Helper for Authentication and Service Initialization ---
 
 
-async def _get_authenticated_calendar_service(
-    tool_name: str,
-    user_google_email: Optional[str],
-    mcp_session_id: Optional[str],
-    required_scopes: List[str],
-) -> tuple[Any, str] | types.CallToolResult:
-    """
-    Handles common authentication and Google Calendar service initialization logic.
-    Returns a tuple of (service, log_user_email) on success, or CallToolResult on auth failure.
-    """
-    logger.info(
-        f"[{tool_name}] Attempting to get authenticated calendar service. Email: '{user_google_email}', Session: '{mcp_session_id}', Session Type: {type(mcp_session_id)}"
-    )
-
-    credentials = await asyncio.to_thread(
-        get_credentials,
-        user_google_email=user_google_email,
-        required_scopes=required_scopes,
-        client_secrets_path=CONFIG_CLIENT_SECRETS_PATH,
-        session_id=mcp_session_id,
-    )
-
-    if not credentials or not credentials.valid:
-        logger.warning(
-            f"[{tool_name}] No valid credentials. Session: '{mcp_session_id}', Email: '{user_google_email}'."
-        )
-        if user_google_email and "@" in user_google_email:
-            logger.info(
-                f"[{tool_name}] Valid email '{user_google_email}' provided, initiating auth flow."
-            )
-            # This call will return a CallToolResult which should be propagated
-            return await start_auth_flow(
-                mcp_session_id=mcp_session_id,
-                user_google_email=user_google_email,
-                service_name="Google Calendar",
-                redirect_uri=OAUTH_REDIRECT_URI,
-            )
-        else:
-            error_msg = f"Authentication required for {tool_name}. No active authenticated session, and no valid 'user_google_email' provided. LLM: Please ask the user for their Google email address and retry, or use the 'start_google_auth' tool with their email and service_name='Google Calendar'."
-            logger.info(f"[{tool_name}] {error_msg}")
-            return types.CallToolResult(
-                isError=True, content=[types.TextContent(type="text", text=error_msg)]
-            )
-
-    try:
-        service = build("calendar", "v3", credentials=credentials)
-        log_user_email = user_google_email or "Unknown"
-
-        # Try to get email from id_token if it's a dict, otherwise use user_google_email or "Unknown"
-        if not user_google_email and credentials and credentials.id_token:
-            try:
-                if isinstance(credentials.id_token, dict):
-                    log_user_email = credentials.id_token.get("email", "Unknown")
-                # If id_token is a string (JWT), we'd need to decode it, but for logging purposes "Unknown" is fine
-            except Exception:
-                pass  # Keep log_user_email as "Unknown"
-
-        logger.info(
-            f"[{tool_name}] Successfully built calendar service. User associated with creds: {log_user_email}"
-        )
-        return service, log_user_email
-    except Exception as e:
-        message = f"[{tool_name}] Unexpected error building calendar service: {e}."
-        logger.exception(message)
-        return types.CallToolResult(
-            isError=True, content=[types.TextContent(type="text", text=message)]
-        )
-
-
 # --- Tool Implementations ---
 
 @server.tool()
 async def list_calendars(
-    user_google_email: Optional[str] = None,
-    mcp_session_id: Optional[str] = Header(None, alias="Mcp-Session-Id"),
+    user_google_email: str,
 ) -> types.CallToolResult:
     """
     Retrieves a list of calendars accessible to the authenticated user.
-    Prioritizes authentication via the active MCP session (`mcp_session_id`).
-    If the session isn't authenticated for Calendar, it falls back to using `user_google_email`.
-    If neither provides valid credentials, it returns a message guiding the LLM to request the user's email
-    or initiate the authentication flow via the `start_google_auth` tool (provide service_name='Google Calendar').
 
     Args:
-        user_google_email (Optional[str]): The user's Google email address. Required if the MCP session is not already authenticated for Calendar access.
-        mcp_session_id (Optional[str]): The active MCP session ID (automatically injected by FastMCP from the Mcp-Session-Id header). Used for session-based authentication.
+        user_google_email (str): The user's Google email address. Required.
 
     Returns:
         types.CallToolResult: Contains a list of the user's calendars (summary, ID, primary status),
                                an error message if the API call fails,
                                or an authentication guidance message if credentials are required.
     """
-
+    tool_name = "list_calendars"
     logger.info(
-        f"[list_calendars] Invoked. Session: '{mcp_session_id}', Email: '{user_google_email}'"
+        f"[{tool_name}] Invoked. Email: '{user_google_email}'"
     )
-    auth_result = await _get_authenticated_calendar_service(
-        tool_name="list_calendars",
+
+    auth_result = await get_authenticated_google_service(
+        service_name="calendar",
+        version="v3",
+        tool_name=tool_name,
         user_google_email=user_google_email,
-        mcp_session_id=mcp_session_id,
         required_scopes=[CALENDAR_READONLY_SCOPE],
     )
     if isinstance(auth_result, types.CallToolResult):
-        return auth_result  # Propagate auth error or auth initiation message
-    service, log_user_email = auth_result
+        return auth_result  # Auth error
+    service, user_email = auth_result
 
     try:
         calendar_list_response = await asyncio.to_thread(
@@ -212,7 +128,7 @@ async def list_calendars(
             return types.CallToolResult(
                 content=[
                     types.TextContent(
-                        type="text", text=f"No calendars found for {log_user_email}."
+                        type="text", text=f"No calendars found for {user_email}."
                     )
                 ]
             )
@@ -222,10 +138,10 @@ async def list_calendars(
             for cal in items
         ]
         text_output = (
-            f"Successfully listed {len(items)} calendars for {log_user_email}:\n"
+            f"Successfully listed {len(items)} calendars for {user_email}:\n"
             + "\n".join(calendars_summary_list)
         )
-        logger.info(f"Successfully listed {len(items)} calendars for {log_user_email}.")
+        logger.info(f"Successfully listed {len(items)} calendars for {user_email}.")
         return types.CallToolResult(
             content=[types.TextContent(type="text", text=text_output)]
         )
@@ -245,42 +161,40 @@ async def list_calendars(
 
 @server.tool()
 async def get_events(
-    user_google_email: Optional[str] = None,
+    user_google_email: str,
     calendar_id: str = "primary",
     time_min: Optional[str] = None,
     time_max: Optional[str] = None,
     max_results: int = 25,
-    mcp_session_id: Optional[str] = Header(None, alias="Mcp-Session-Id"),
 ) -> types.CallToolResult:
     """
     Retrieves a list of events from a specified Google Calendar within a given time range.
-    Prioritizes authentication via the active MCP session (`mcp_session_id`).
-    If the session isn't authenticated for Calendar, it falls back to using `user_google_email`.
-    If neither provides valid credentials, it returns a message guiding the LLM to request the user's email
-    or initiate the authentication flow via the `start_google_auth` tool (provide service_name='Google Calendar').
 
     Args:
-        user_google_email (Optional[str]): The user's Google email address. Required if the MCP session is not already authenticated for Calendar access.
+        user_google_email (str): The user's Google email address. Required.
         calendar_id (str): The ID of the calendar to query. Use 'primary' for the user's primary calendar. Defaults to 'primary'. Calendar IDs can be obtained using `list_calendars`.
         time_min (Optional[str]): The start of the time range (inclusive) in RFC3339 format (e.g., '2024-05-12T10:00:00Z' or '2024-05-12'). If omitted, defaults to the current time.
         time_max (Optional[str]): The end of the time range (exclusive) in RFC3339 format. If omitted, events starting from `time_min` onwards are considered (up to `max_results`).
         max_results (int): The maximum number of events to return. Defaults to 25.
-        mcp_session_id (Optional[str]): The active MCP session ID (automatically injected by FastMCP from the Mcp-Session-Id header). Used for session-based authentication.
 
     Returns:
         types.CallToolResult: Contains a list of events (summary, start time, link) within the specified range,
                                an error message if the API call fails,
                                or an authentication guidance message if credentials are required.
     """
-    auth_result = await _get_authenticated_calendar_service(
-        tool_name="get_events",
+    tool_name = "get_events"
+
+    auth_result = await get_authenticated_google_service(
+        service_name="calendar",
+        version="v3",
+        tool_name=tool_name,
         user_google_email=user_google_email,
-        mcp_session_id=mcp_session_id,
         required_scopes=[CALENDAR_READONLY_SCOPE],
     )
+
     if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, log_user_email = auth_result
+        return auth_result  # Auth error
+    service, user_email = auth_result
 
     try:
         logger.info(
@@ -330,7 +244,7 @@ async def get_events(
                 content=[
                     types.TextContent(
                         type="text",
-                        text=f"No events found in calendar '{calendar_id}' for {log_user_email} for the specified time range.",
+                        text=f"No events found in calendar '{calendar_id}' for {user_email} for the specified time range.",
                     )
                 ]
             )
@@ -347,10 +261,10 @@ async def get_events(
             )
 
         text_output = (
-            f"Successfully retrieved {len(items)} events from calendar '{calendar_id}' for {log_user_email}:\n"
+            f"Successfully retrieved {len(items)} events from calendar '{calendar_id}' for {user_email}:\n"
             + "\n".join(event_details_list)
         )
-        logger.info(f"Successfully retrieved {len(items)} events for {log_user_email}.")
+        logger.info(f"Successfully retrieved {len(items)} events for {user_email}.")
         return types.CallToolResult(
             content=[types.TextContent(type="text", text=text_output)]
         )
@@ -370,48 +284,48 @@ async def get_events(
 
 @server.tool()
 async def create_event(
+    user_google_email: str,
     summary: str,
     start_time: str,
     end_time: str,
-    user_google_email: Optional[str] = None,
     calendar_id: str = "primary",
     description: Optional[str] = None,
     location: Optional[str] = None,
     attendees: Optional[List[str]] = None,
     timezone: Optional[str] = None,
-    mcp_session_id: Optional[str] = Header(None, alias="Mcp-Session-Id"),
 ) -> types.CallToolResult:
     """
-    Creates a new event. Prioritizes authenticated MCP session, then `user_google_email`.
-    If no valid authentication is found, guides the LLM to obtain user's email or use `start_google_auth` (provide service_name='Google Calendar').
+    Creates a new event.
 
     Args:
+        user_google_email (str): The user's Google email address. Required.
         summary (str): Event title.
         start_time (str): Start time (RFC3339, e.g., "2023-10-27T10:00:00-07:00" or "2023-10-27" for all-day).
         end_time (str): End time (RFC3339, e.g., "2023-10-27T11:00:00-07:00" or "2023-10-28" for all-day).
-        user_google_email (Optional[str]): User's Google email. Used if session isn't authenticated.
         calendar_id (str): Calendar ID (default: 'primary').
         description (Optional[str]): Event description.
         location (Optional[str]): Event location.
         attendees (Optional[List[str]]): Attendee email addresses.
         timezone (Optional[str]): Timezone (e.g., "America/New_York").
-        mcp_session_id (Optional[str]): Active MCP session ID (injected by FastMCP from Mcp-Session-Id header).
 
     Returns:
         A CallToolResult confirming creation or an error/auth guidance message.
     """
+    tool_name = "create_event"
     logger.info(
-        f"[create_event] Invoked. Session: '{mcp_session_id}', Email: '{user_google_email}', Summary: {summary}"
+        f"[{tool_name}] Invoked. Email: '{user_google_email}', Summary: {summary}"
     )
-    auth_result = await _get_authenticated_calendar_service(
-        tool_name="create_event",
+
+    auth_result = await get_authenticated_google_service(
+        service_name="calendar",
+        version="v3",
+        tool_name=tool_name,
         user_google_email=user_google_email,
-        mcp_session_id=mcp_session_id,
         required_scopes=[CALENDAR_EVENTS_SCOPE],
     )
     if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, log_user_email = auth_result
+        return auth_result  # Auth error
+    service, user_email = auth_result
 
     try:
 
@@ -443,19 +357,19 @@ async def create_event(
         )
 
         link = created_event.get("htmlLink", "No link available")
-        # Corrected confirmation_message to use log_user_email
-        confirmation_message = f"Successfully created event '{created_event.get('summary', summary)}' for {log_user_email}. Link: {link}"
-        # Corrected logger to use log_user_email and include event ID
+        # Corrected confirmation_message to use user_email
+        confirmation_message = f"Successfully created event '{created_event.get('summary', summary)}' for {user_email}. Link: {link}"
+        # Corrected logger to use user_email and include event ID
         logger.info(
-            f"Event created successfully for {log_user_email}. ID: {created_event.get('id')}, Link: {link}"
+            f"Event created successfully for {user_email}. ID: {created_event.get('id')}, Link: {link}"
         )
         return types.CallToolResult(
             content=[types.TextContent(type="text", text=confirmation_message)]
         )
     except HttpError as error:
-        # Corrected error message to use log_user_email and provide better guidance
-        # log_user_email_for_error is now log_user_email from the helper or the original user_google_email
-        message = f"API error creating event: {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with the user's email ({log_user_email if log_user_email != 'Unknown' else 'target Google account'}) and service_name='Google Calendar'."
+        # Corrected error message to use user_email and provide better guidance
+        # user_email_for_error is now user_email from the helper or the original user_google_email
+        message = f"API error creating event: {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with the user's email ({user_email if user_email != 'Unknown' else 'target Google account'}) and service_name='Google Calendar'."
         logger.error(message, exc_info=True)
         return types.CallToolResult(
             isError=True, content=[types.TextContent(type="text", text=message)]
@@ -470,8 +384,8 @@ async def create_event(
 
 @server.tool()
 async def modify_event(
+    user_google_email: str,
     event_id: str,
-    user_google_email: Optional[str] = None,
     calendar_id: str = "primary",
     summary: Optional[str] = None,
     start_time: Optional[str] = None,
@@ -480,15 +394,13 @@ async def modify_event(
     location: Optional[str] = None,
     attendees: Optional[List[str]] = None,
     timezone: Optional[str] = None,
-    mcp_session_id: Optional[str] = Header(None, alias="Mcp-Session-Id"),
 ) -> types.CallToolResult:
     """
-    Modifies an existing event. Prioritizes authenticated MCP session, then `user_google_email`.
-    If no valid authentication is found, guides the LLM to obtain user's email or use `start_google_auth` (provide service_name='Google Calendar').
+    Modifies an existing event.
 
     Args:
+        user_google_email (str): The user's Google email address. Required.
         event_id (str): The ID of the event to modify.
-        user_google_email (Optional[str]): User's Google email. Used if session isn't authenticated.
         calendar_id (str): Calendar ID (default: 'primary').
         summary (Optional[str]): New event title.
         start_time (Optional[str]): New start time (RFC3339, e.g., "2023-10-27T10:00:00-07:00" or "2023-10-27" for all-day).
@@ -497,23 +409,25 @@ async def modify_event(
         location (Optional[str]): New event location.
         attendees (Optional[List[str]]): New attendee email addresses.
         timezone (Optional[str]): New timezone (e.g., "America/New_York").
-        mcp_session_id (Optional[str]): Active MCP session ID (injected by FastMCP from Mcp-Session-Id header).
 
     Returns:
         A CallToolResult confirming modification or an error/auth guidance message.
     """
+    tool_name = "modify_event"
     logger.info(
-        f"[modify_event] Invoked. Session: '{mcp_session_id}', Email: '{user_google_email}', Event ID: {event_id}"
+        f"[{tool_name}] Invoked. Email: '{user_google_email}', Event ID: {event_id}"
     )
-    auth_result = await _get_authenticated_calendar_service(
-        tool_name="modify_event",
+
+    auth_result = await get_authenticated_google_service(
+        service_name="calendar",
+        version="v3",
+        tool_name=tool_name,
         user_google_email=user_google_email,
-        mcp_session_id=mcp_session_id,
         required_scopes=[CALENDAR_EVENTS_SCOPE],
     )
     if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, log_user_email = auth_result
+        return auth_result  # Auth error
+    service, user_email = auth_result
 
     try:
 
@@ -596,9 +510,9 @@ async def modify_event(
         )
 
         link = updated_event.get("htmlLink", "No link available")
-        confirmation_message = f"Successfully modified event '{updated_event.get('summary', summary)}' (ID: {event_id}) for {log_user_email}. Link: {link}"
+        confirmation_message = f"Successfully modified event '{updated_event.get('summary', summary)}' (ID: {event_id}) for {user_email}. Link: {link}"
         logger.info(
-            f"Event modified successfully for {log_user_email}. ID: {updated_event.get('id')}, Link: {link}"
+            f"Event modified successfully for {user_email}. ID: {updated_event.get('id')}, Link: {link}"
         )
         return types.CallToolResult(
             content=[types.TextContent(type="text", text=confirmation_message)]
@@ -609,7 +523,7 @@ async def modify_event(
             message = f"Event not found. The event with ID '{event_id}' could not be found in calendar '{calendar_id}'. LLM: The event may have been deleted, or the event ID might be incorrect. Verify the event exists using 'get_events' before attempting to modify it."
             logger.error(f"[modify_event] {message}")
         else:
-            message = f"API error modifying event (ID: {event_id}): {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with the user's email ({log_user_email if log_user_email != 'Unknown' else 'target Google account'}) and service_name='Google Calendar'."
+            message = f"API error modifying event (ID: {event_id}): {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with the user's email ({user_email if user_email != 'Unknown' else 'target Google account'}) and service_name='Google Calendar'."
             logger.error(message, exc_info=True)
         return types.CallToolResult(
             isError=True, content=[types.TextContent(type="text", text=message)]
@@ -624,36 +538,36 @@ async def modify_event(
 
 @server.tool()
 async def delete_event(
+    user_google_email: str,
     event_id: str,
-    user_google_email: Optional[str] = None,
     calendar_id: str = "primary",
-    mcp_session_id: Optional[str] = Header(None, alias="Mcp-Session-Id"),
 ) -> types.CallToolResult:
     """
-    Deletes an existing event. Prioritizes authenticated MCP session, then `user_google_email`.
-    If no valid authentication is found, guides the LLM to obtain user's email or use `start_google_auth` (provide service_name='Google Calendar').
+    Deletes an existing event.
 
     Args:
+        user_google_email (str): The user's Google email address. Required.
         event_id (str): The ID of the event to delete.
-        user_google_email (Optional[str]): User's Google email. Used if session isn't authenticated.
         calendar_id (str): Calendar ID (default: 'primary').
-        mcp_session_id (Optional[str]): Active MCP session ID (injected by FastMCP from Mcp-Session-Id header).
 
     Returns:
         A CallToolResult confirming deletion or an error/auth guidance message.
     """
+    tool_name = "delete_event"
     logger.info(
-        f"[delete_event] Invoked. Session: '{mcp_session_id}', Email: '{user_google_email}', Event ID: {event_id}"
+        f"[{tool_name}] Invoked. Email: '{user_google_email}', Event ID: {event_id}"
     )
-    auth_result = await _get_authenticated_calendar_service(
-        tool_name="delete_event",
+
+    auth_result = await get_authenticated_google_service(
+        service_name="calendar",
+        version="v3",
+        tool_name=tool_name,
         user_google_email=user_google_email,
-        mcp_session_id=mcp_session_id,
         required_scopes=[CALENDAR_EVENTS_SCOPE],
     )
     if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, log_user_email = auth_result
+        return auth_result  # Auth error
+    service, user_email = auth_result
 
     try:
 
@@ -689,8 +603,8 @@ async def delete_event(
             service.events().delete(calendarId=calendar_id, eventId=event_id).execute
         )
 
-        confirmation_message = f"Successfully deleted event (ID: {event_id}) from calendar '{calendar_id}' for {log_user_email}."
-        logger.info(f"Event deleted successfully for {log_user_email}. ID: {event_id}")
+        confirmation_message = f"Successfully deleted event (ID: {event_id}) from calendar '{calendar_id}' for {user_email}."
+        logger.info(f"Event deleted successfully for {user_email}. ID: {event_id}")
         return types.CallToolResult(
             content=[types.TextContent(type="text", text=confirmation_message)]
         )
@@ -700,7 +614,7 @@ async def delete_event(
             message = f"Event not found. The event with ID '{event_id}' could not be found in calendar '{calendar_id}'. LLM: The event may have been deleted already, or the event ID might be incorrect."
             logger.error(f"[delete_event] {message}")
         else:
-            message = f"API error deleting event (ID: {event_id}): {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with the user's email ({log_user_email if log_user_email != 'Unknown' else 'target Google account'}) and service_name='Google Calendar'."
+            message = f"API error deleting event (ID: {event_id}): {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with the user's email ({user_email if user_email != 'Unknown' else 'target Google account'}) and service_name='Google Calendar'."
             logger.error(message, exc_info=True)
         return types.CallToolResult(
             isError=True, content=[types.TextContent(type="text", text=message)]
