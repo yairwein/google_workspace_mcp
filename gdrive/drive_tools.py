@@ -8,6 +8,7 @@ import asyncio
 import re
 import os
 from typing import List, Optional, Dict, Any
+import zipfile, xml.etree.ElementTree as ET
 
 from mcp import types
 from fastapi import Header
@@ -24,6 +25,53 @@ from core.server import (
 )
 
 logger = logging.getLogger(__name__)
+
+# -------------------------------------------------------------------------
+# Helper: pull raw text from OOXML containers (docx / xlsx / pptx)
+# -------------------------------------------------------------------------
+def _extract_office_xml_text(file_bytes: bytes, mime_type: str) -> Optional[str]:
+    """
+    Very light-weight XML scraper for Word, Excel, PowerPoint files.
+    Returns plain-text if something readable is found, else None.
+    No external deps – just std-lib zipfile + ElementTree.
+    """
+    try:
+        with zipfile.ZipFile(io.BytesIO(file_bytes)) as zf:
+            # Map MIME → iterable of XML files to inspect
+            if mime_type == (
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            ):
+                targets = ["word/document.xml"]
+            elif mime_type == (
+                "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+            ):
+                targets = [n for n in zf.namelist() if n.startswith("ppt/slides/slide")]
+            elif mime_type == (
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            ):
+                targets = [n for n in zf.namelist() if n.startswith("xl/worksheets/sheet")]
+            else:
+                return None
+
+            pieces: List[str] = []
+            for member in targets:
+                try:
+                    xml_root = ET.fromstring(zf.read(member))
+                    # In both Word/PowerPoint the text is in <w:t> or <a:t>;
+                    # in Excel, cell values are in <v>.
+                    for elem in xml_root.iter():
+                        tag = elem.tag.split("}")[-1]  # strip namespace
+                        if tag in {"t", "v"} and elem.text:
+                            pieces.append(elem.text)
+                    pieces.append("\n")  # separator per part / sheet / slide
+                except Exception:
+                    continue  # ignore individual slide/sheet errors
+            text = "\n".join(pieces).strip()
+            return text or None
+    except Exception as e:
+        logger.error(f"Failed to extract file content: {e}")
+        # Any failure → quietly signal "not handled"
+        return None
 
 @server.tool()
 async def search_drive_files(
@@ -105,17 +153,19 @@ async def get_drive_file_content(
     file_id: str,
 ) -> types.CallToolResult:
     """
-    Retrieves the content of a specific file from Google Drive by its ID.
-    Handles both native Google Docs/Sheets/Slides (exporting them to plain text or CSV) and other file types (downloading directly).
+    Retrieves the content of a specific Google Drive file by ID.
+
+    • Native Google Docs, Sheets, Slides → exported as text / CSV.
+    • Office files (.docx, .xlsx, .pptx) → unzipped & parsed with std-lib to
+      extract readable text.
+    • Any other file → downloaded; tries UTF-8 decode, else notes binary.
 
     Args:
-        user_google_email (str): The user's Google email address. Required.
-        file_id (str): The unique ID of the Google Drive file to retrieve content from. This ID is typically obtained from `search_drive_files` or `list_drive_items`.
+        user_google_email: The user’s Google email address.
+        file_id: Drive file ID.
 
     Returns:
-        types.CallToolResult: Contains the file metadata (name, ID, type, link) and its content (decoded as UTF-8 if possible, otherwise indicates binary content),
-                               an error message if the API call fails or the file is not accessible/found,
-                               or an authentication guidance message if credentials are required.
+        types.CallToolResult with plain-text content (or error info).
     """
     tool_name = "get_drive_file_content"
     logger.info(f"[{tool_name}] Invoked. File ID: '{file_id}'")
@@ -128,46 +178,91 @@ async def get_drive_file_content(
         required_scopes=[DRIVE_READONLY_SCOPE],
     )
     if isinstance(auth_result, types.CallToolResult):
-        return auth_result  # Auth error
-    service, user_email = auth_result
+        return auth_result  # authentication problem
+    service, _ = auth_result
 
     try:
+        # ------------------------------------------------------------------
+        # Metadata lookup
+        # ------------------------------------------------------------------
         file_metadata = await asyncio.to_thread(
-            service.files().get(fileId=file_id, fields="id, name, mimeType, webViewLink").execute
+            service.files().get(
+                fileId=file_id, fields="id, name, mimeType, webViewLink"
+            ).execute
         )
-        mime_type = file_metadata.get('mimeType', '')
-        file_name = file_metadata.get('name', 'Unknown File')
-        content_text = f"File: \"{file_name}\" (ID: {file_id}, Type: {mime_type})\nLink: {file_metadata.get('webViewLink', '#')}\n\n--- CONTENT ---\n"
+        mime_type = file_metadata.get("mimeType", "")
+        file_name = file_metadata.get("name", "Unknown File")
 
-        export_mime_type = None
-        if mime_type == 'application/vnd.google-apps.document': export_mime_type = 'text/plain'
-        elif mime_type == 'application/vnd.google-apps.spreadsheet': export_mime_type = 'text/csv'
-        elif mime_type == 'application/vnd.google-apps.presentation': export_mime_type = 'text/plain'
+        # ------------------------------------------------------------------
+        # Decide export vs. direct download
+        # ------------------------------------------------------------------
+        export_mime_type = {
+            "application/vnd.google-apps.document": "text/plain",
+            "application/vnd.google-apps.spreadsheet": "text/csv",
+            "application/vnd.google-apps.presentation": "text/plain",
+        }.get(mime_type)
 
-        request_obj = service.files().export_media(fileId=file_id, mimeType=export_mime_type) if export_mime_type \
+        request_obj = (
+            service.files().export_media(fileId=file_id, mimeType=export_mime_type)
+            if export_mime_type
             else service.files().get_media(fileId=file_id)
+        )
 
+        # ------------------------------------------------------------------
+        # Download
+        # ------------------------------------------------------------------
         fh = io.BytesIO()
         downloader = MediaIoBaseDownload(fh, request_obj)
-        done = False
         loop = asyncio.get_event_loop()
+        done = False
         while not done:
             status, done = await loop.run_in_executor(None, downloader.next_chunk)
 
         file_content_bytes = fh.getvalue()
-        try:
-            file_content_str = file_content_bytes.decode('utf-8')
-        except UnicodeDecodeError:
-            file_content_str = f"[Content is binary or uses an unsupported text encoding. Length: {len(file_content_bytes)} bytes]"
-        content_text += file_content_str
-        logger.info(f"Successfully retrieved content for Drive file ID: {file_id}")
-        return types.CallToolResult(content=[types.TextContent(type="text", text=content_text)])
+
+        # ------------------------------------------------------------------
+        # Attempt Office XML extraction
+        # ------------------------------------------------------------------
+        office_text = _extract_office_xml_text(file_content_bytes, mime_type)
+        if office_text:
+            body_text = office_text
+        else:
+            # Fallback: try UTF-8; otherwise flag binary
+            try:
+                body_text = file_content_bytes.decode("utf-8")
+            except UnicodeDecodeError:
+                body_text = (
+                    f"[Binary or unsupported text encoding — "
+                    f"{len(file_content_bytes)} bytes]"
+                )
+
+        # ------------------------------------------------------------------
+        # Assemble response
+        # ------------------------------------------------------------------
+        header = (
+            f'File: "{file_name}" (ID: {file_id}, Type: {mime_type})\n'
+            f'Link: {file_metadata.get("webViewLink", "#")}\n\n--- CONTENT ---\n'
+        )
+        return types.CallToolResult(
+            content=[types.TextContent(type="text", text=header + body_text)]
+        )
+
     except HttpError as error:
-        logger.error(f"API error getting Drive file content for {file_id}: {error}", exc_info=True)
-        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=f"API error: {error}")])
+        logger.error(
+            f"API error getting Drive file content for {file_id}: {error}",
+            exc_info=True,
+        )
+        return types.CallToolResult(
+            isError=True,
+            content=[types.TextContent(type="text", text=f"API error: {error}")],
+        )
     except Exception as e:
         logger.exception(f"Unexpected error getting Drive file content for {file_id}: {e}")
-        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=f"Unexpected error: {e}")])
+        return types.CallToolResult(
+            isError=True,
+            content=[types.TextContent(type="text", text=f"Unexpected error: {e}")],
+        )
+
 
 @server.tool()
 async def list_drive_items(
