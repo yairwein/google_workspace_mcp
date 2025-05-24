@@ -185,7 +185,7 @@ async def get_drive_file_content(
                 body_text = file_content_bytes.decode("utf-8")
             except UnicodeDecodeError:
                 body_text = (
-                    f"[Binary or unsupported text encoding — "
+                    f"[Binary or unsupported text encoding for mimeType '{mime_type}' - "
                     f"{len(file_content_bytes)} bytes]"
                 )
 
