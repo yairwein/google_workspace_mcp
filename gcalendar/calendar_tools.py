@@ -185,8 +185,13 @@ async def get_events(
     tool_name = "get_events"
 
     auth_result = await get_authenticated_google_service(
+        service_name="calendar",
+        version="v3",
+        tool_name=tool_name,
+        user_google_email=user_google_email,
         required_scopes=[CALENDAR_READONLY_SCOPE],
     )
+
     if isinstance(auth_result, types.CallToolResult):
         return auth_result  # Auth error
     service, user_email = auth_result
@@ -408,6 +413,7 @@ async def modify_event(
     Returns:
         A CallToolResult confirming modification or an error/auth guidance message.
     """
+    tool_name = "modify_event"
     logger.info(
         f"[{tool_name}] Invoked. Email: '{user_google_email}', Event ID: {event_id}"
     )

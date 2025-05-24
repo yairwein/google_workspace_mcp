@@ -84,7 +84,7 @@ async def search_drive_files(
         if not files:
             return types.CallToolResult(content=[types.TextContent(type="text", text=f"No files found for '{query}'.")])
 
-        formatted_files_text_parts = [f"Found {len(files)} files for {user_email_from_creds} matching '{query}':"]
+        formatted_files_text_parts = [f"Found {len(files)} files for {user_google_email} matching '{query}':"]
         for item in files:
             size_str = f", Size: {item.get('size', 'N/A')}" if 'size' in item else ""
             formatted_files_text_parts.append(
@@ -215,7 +215,7 @@ async def list_drive_items(
         if not files:
             return types.CallToolResult(content=[types.TextContent(type="text", text=f"No items found in folder '{folder_id}'.")])
 
-        formatted_items_text_parts = [f"Found {len(files)} items in folder '{folder_id}' for {user_email_from_creds}:"]
+        formatted_items_text_parts = [f"Found {len(files)} items in folder '{folder_id}' for {user_google_email}:"]
         for item in files:
             size_str = f", Size: {item.get('size', 'N/A')}" if 'size' in item else ""
             formatted_items_text_parts.append(
