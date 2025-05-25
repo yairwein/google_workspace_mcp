@@ -78,8 +78,8 @@ The Google Workspace MCP Server integrates Google Workspace services (Calendar, 
 ### Installation
 
 ```bash
-# Clone the repository (replace with the actual URL if different)
-git clone https://github.com/your-username/google_workspace_mcp.git
+# Clone the repository (replace with your fork URL if different)
+git clone https://github.com/taylorwilsdon/google_workspace_mcp.git
 cd google_workspace_mcp
 
 # Create a virtual environment and install dependencies
@@ -144,7 +144,7 @@ Runs the server with an HTTP transport layer on port 8000.
 <details>
 <summary><b>Single-User Mode</b></summary>
 
-For simplified single-user environments, you can run the server in single-user mode, which bypasses session-to-OAuth mapping and uses any available credentials from the `.credentials` directory:
+Multi-user MCP is kind of a mess, so right now now everything runs best as 1:1 mapping between client snd server. That will change as soon as Claude can permform OAuth 2.1 flows, so this MCP was built eith a flag for simplified single-user environments. You can run the server in single-user mode, which bypasses session-to-OAuth mapping and uses any available credentials from the `.credentials` directory:
 
 ```bash
 python main.py --single-user
