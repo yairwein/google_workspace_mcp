@@ -56,9 +56,9 @@ The Google Workspace MCP Server integrates Google Workspace services (Calendar, 
 
 - **🔐 OAuth 2.0 Authentication**: Securely connects to Google APIs using user-authorized credentials with automatic token refresh and centralized authentication flow
 - **📅 Google Calendar Integration**: Full calendar management - list calendars, fetch events, create/modify/delete events with support for all-day and timed events
-- **📁 Google Drive Integration**: Search files, list folder contents, read file content, and create new files
-- **📧 Gmail Integration**: Complete email management - search messages, retrieve content, send emails, and create drafts
-- **📄 Google Docs Integration**: Search for documents, read document content, list documents in folders, and create new documents
+- **📁 Google Drive Integration**: Search files, list folder contents, read file content, and create new files. Supports extraction and retrieval of .docx, .xlsx and other Microsoft Office formats natively! 
+- **📧 Gmail Integration**: Complete email management - search messages, retrieve content, send emails, and create drafts with full support for all query syntax
+- **📄 Google Docs Integration**: Search for documents, read document content, list documents in folders, and create new documents right from your chat!
 - **🔄 Multiple Transport Options**: Streamable HTTP + SSE fallback
 - **🔌 `mcpo` Compatibility**: Easily expose the server as an OpenAPI endpoint for integration with tools like Open WebUI
 - **🧩 Extensible Design**: Simple structure for adding support for more Google Workspace APIs and tools
