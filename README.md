@@ -227,14 +227,20 @@ The server supports multiple connection methods:
 }
 ```
 
-
 <summary><b>Using mcpo (Recommended for OpenAPI Spec Access)</b></summary>
+With config.json (for multi-mcp mcpo usage):
 
 1. Install `mcpo`: `uv pip install mcpo` or `pip install mcpo`
 2. Create a `config.json` (see [Integration with Open WebUI](#integration-with-open-webui))
-3. Run `mcpo` pointing to your config: `mcpo --config config.json --port 8000 [--api-key YOUR_SECRET_KEY]`
-4. The MCP server API will be available at: `http://localhost:8000/gworkspace` (or the name defined in `config.json`)
-5. OpenAPI documentation (Swagger UI) available at: `http://localhost:8000/gworkspace/docs`
+3. Run `mcpo` pointing to your config: `uvx mcpo --config config.json --port 8001`
+4. The MCP server API will be available at: `http://localhost:8000/google_workspace` (or the name defined in `config.json`)
+5. OpenAPI documentation (Swagger UI) available at: `http://localhost:8001/google_workspace/docs`
+
+With startup command (for single-mcp mcpo usage):
+1. Install `mcpo`: `uv pip install mcpo` or `pip install mcpo`
+2. Start with `uvx mcpo --port 8001 --api-key "top-secret" --server-type "streamablehttp" -- http://localhost:8000/mcp`
+3. The MCP server API will be available at: `http://localhost:8001/openapi.json` (or the name defined in `config.json`)
+4. OpenAPI documentation (Swagger UI) available at: `http://localhost:8001/docs`
 
 <summary><b>HTTP Mode</b></summary>
 
@@ -249,23 +255,17 @@ The server supports multiple connection methods:
 To use this server as a tool provider within Open WebUI:
 
 1. **Create `mcpo` Configuration**:
-   Create a file named `config.json` with the following structure to have mcpo run the process. You can also use it remote and feed mcpo hostname and port, but you will need to make sure they don't both try to use 8000. **Replace `/path/to/google_workspace_mcp` with the actual absolute path to this project directory.**
+   Create a file named `config.json` with the following structure to have mcpo make the streamable HTTP endpoint available as an OpenAPI spec tool.
 
    ```json
-   {
-    "mcpServers": {
-      "gworkspace": {
-        "options": {
-          "cwd": "/Users/taylorwilsdon/tmp/google_workspace_mcp",
-          "env": {
-            "OAUTHLIB_INSECURE_TRANSPORT": "1"
-          },
-          "command": "uv",
-          "args": ["run", "main.py"]
-        }
+  {
+      "mcpServers": {
+          "google_workspace": {
+              "type": "streamablehttp",
+              "url": "http://localhost:8000/mcp"
+          }
       }
-    }
-   }
+  }
    ```
    *Note: Using `uv run main.py` ensures the correct virtual environment is used.*
 
@@ -282,7 +282,7 @@ To use this server as a tool provider within Open WebUI:
    - Navigate to your Open WebUI settings
    - Go to "Connections" -> "Tools"
    - Click "Add Tool"
-   - Enter the Server URL: `http://localhost:8000/gworkspace` (matching the `mcpo` base URL and server name from `config.json`)
+   - Enter the Server URL: `http://localhost:8001/google_workspace` (matching the `mcpo` base URL and server name from `config.json`)
    - If you used an `--api-key` with `mcpo`, enter it as the API Key
    - Save the configuration
    - The Google Workspace tools should now be available when interacting with models in Open WebUI
