@@ -249,12 +249,13 @@ The server supports multiple connection methods:
 To use this server as a tool provider within Open WebUI:
 
 1. **Create `mcpo` Configuration**:
-   Create a file named `config.json` with the following structure. **Replace `/path/to/google_workspace_mcp` with the actual absolute path to this project directory.**
+   Create a file named `config.json` with the following structure to have mcpo run the process. You can also use it remote and feed mcpo hostname and port, but you will need to make sure they don't both try to use 8000. **Replace `/path/to/google_workspace_mcp` with the actual absolute path to this project directory.**
 
    ```json
    {
      "mcpServers": {
        "gworkspace": {
+         "type": "streamable_http",
          "command": "uv",
          "args": [
            "run",
