@@ -219,7 +219,7 @@ With config.json (for multi-mcp mcpo usage):
 1. Install `mcpo`: `uv pip install mcpo` or `pip install mcpo`
 2. Create a `config.json` (see [Integration with Open WebUI](#integration-with-open-webui))
 3. Run `mcpo` pointing to your config: `uvx mcpo --config config.json --port 8001`
-4. The MCP server API will be available at: `http://localhost:8000/google_workspace` (or the name defined in `config.json`)
+4. The MCP server API will be available at: `http://localhost:8001/google_workspace` (or the name defined in `config.json`)
 5. OpenAPI documentation (Swagger UI) available at: `http://localhost:8001/google_workspace/docs`
 
 With startup command (for single-mcp mcpo usage):
