@@ -265,9 +265,8 @@ To use this server as a tool provider within Open WebUI:
               "url": "http://localhost:8000/mcp"
           }
       }
-  }
+   }
    ```
-   *Note: Using `uv run main.py` ensures the correct virtual environment is used.*
 
 2. **Start the `mcpo` Server**:
    ```bash
