@@ -78,6 +78,39 @@ def _generate_gmail_web_url(item_id: str, account_index: int = 0) -> str:
     return f"https://mail.google.com/mail/u/{account_index}/#all/{item_id}"
 
 
+def _format_gmail_results_plain(messages: list, query: str) -> str:
+    """Format Gmail search results in clean, LLM-friendly plain text."""
+    if not messages:
+        return f"No messages found for query: '{query}'"
+
+    lines = [
+        f"Found {len(messages)} messages matching '{query}':",
+        "",
+        "📧 MESSAGES:",
+    ]
+
+    for i, msg in enumerate(messages, 1):
+        message_url = _generate_gmail_web_url(msg["id"])
+        thread_url = _generate_gmail_web_url(msg["threadId"])
+
+        lines.extend([
+            f"  {i}. Message ID: {msg['id']}",
+            f"     Web Link: {message_url}",
+            f"     Thread ID: {msg['threadId']}",
+            f"     Thread Link: {thread_url}",
+            ""
+        ])
+
+    lines.extend([
+        "💡 USAGE:",
+        "  • Use Message ID with get_gmail_message_content()",
+        "  • Use Thread ID with get_gmail_thread_content()",
+        "  • Click web links to view in Gmail browser interface"
+    ])
+
+    return "\n".join(lines)
+
+
 @server.tool()
 async def search_gmail_messages(
     query: str,
@@ -94,7 +127,7 @@ async def search_gmail_messages(
         page_size (int): The maximum number of messages to return. Defaults to 10.
 
     Returns:
-        types.CallToolResult: Contains XML-structured results with Message IDs, Thread IDs, and clickable Gmail web interface URLs for each found message, or an error/auth guidance message.
+        types.CallToolResult: Contains LLM-friendly structured results with Message IDs, Thread IDs, and clickable Gmail web interface URLs for each found message, or an error/auth guidance message.
     """
     tool_name = "search_gmail_messages"
     logger.info(
@@ -121,44 +154,11 @@ async def search_gmail_messages(
             .execute
         )
         messages = response.get("messages", [])
-        if not messages:
-            return types.CallToolResult(
-                content=[
-                    types.TextContent(
-                        type="text", text=f"No messages found for '{query}'."
-                    )
-                ]
-            )
 
-        # Build enhanced output with XML structure and Gmail web links
-        lines = [
-            f"Found {len(messages)} messages:",
-            "",
-            "Note: Use Message ID with get_gmail_message_content, Thread ID with get_gmail_thread_content",
-            "Click the Gmail links below to view messages/threads directly in your browser:",
-            "",
-            f'<gmail_results count="{len(messages)}">',
-        ]
-
-        for i, msg in enumerate(messages, 1):
-            message_url = _generate_gmail_web_url(msg["id"])
-            thread_url = _generate_gmail_web_url(msg["threadId"])
-
-            lines.extend(
-                [
-                    f'    <message index="{i}">',
-                    f'        <message_id>{msg["id"]}</message_id>',
-                    f"        <message_url>{message_url}</message_url>",
-                    f'        <thread_id>{msg["threadId"]}</thread_id>',
-                    f"        <thread_url>{thread_url}</thread_url>",
-                    f"    </message>",
-                ]
-            )
-
-        lines.append("</gmail_results>")
+        formatted_output = _format_gmail_results_plain(messages, query)
 
         return types.CallToolResult(
-            content=[types.TextContent(type="text", text="\n".join(lines))]
+            content=[types.TextContent(type="text", text=formatted_output)]
         )
 
     except HttpError as e:
