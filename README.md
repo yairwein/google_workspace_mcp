@@ -162,19 +162,6 @@ This mode is particularly helpful when you don't need multi-user session managem
 </details>
 
 <details>
-<summary><b>Using mcpo (Recommended for Open WebUI and other OpenAPI spec compatible clients)</b></summary>
-
-Requires `mcpo` installed (`uv pip install mcpo` or `pip install mcpo`).
-
-```bash
-# Ensure config.json points to your project directory
-mcpo --config config.json --port 8000
-```
-
-See the [Integration with Open WebUI](#integration-with-open-webui) section for a `config.json` example.
-</details>
-
-<details>
 <summary><b>Using Docker</b></summary>
 
 You can build and run the server using the provided [`Dockerfile`](Dockerfile).
@@ -202,15 +189,14 @@ The default ports are `8000`, but can be changed via the `WORKSPACE_MCP_PORT` en
 | OAuth Callback | `8000` | Handled internally by the server via the `/oauth2callback` route |
 | HTTP Mode Server | `8000` | Default when using HTTP transport |
 
+<img width="810" alt="image" src="https://github.com/user-attachments/assets/7f91aa4e-6763-4dc8-8368-05049aa5c2c7" />
+
 ### Connecting to the Server
 
 The server supports multiple connection methods:
 
 **Claude Desktop:**
 > Can run anywhere and be used via `mcp-remote` or invoked locally either with `uv run main.py` as the arg or by using `mcp-remote` with localhost.
-
-<img width="810" alt="image" src="https://github.com/user-attachments/assets/7f91aa4e-6763-4dc8-8368-05049aa5c2c7" />
-
 
 **config.json:**
 ```json
@@ -270,12 +256,9 @@ To use this server as a tool provider within Open WebUI:
 
 2. **Start the `mcpo` Server**:
    ```bash
-   # Make sure OAUTHLIB_INSECURE_TRANSPORT=1 is set in your shell environment
-   # OR rely on the 'env' setting in config.json
-   export OAUTHLIB_INSECURE_TRANSPORT=1
-   mcpo --port 8000 --config config.json --api-key "your-optional-secret-key"
+   mcpo --port 8001 --config config.json --api-key "your-optional-secret-key"
    ```
-   This command starts the `mcpo` proxy, which in turn manages the `google_workspace_mcp` server process based on the configuration.
+   This command starts the `mcpo` proxy, serving your active (assuming port 8000) Google Workspace MCP on port 8001. 
 
 3. **Configure Open WebUI**:
    - Navigate to your Open WebUI settings
