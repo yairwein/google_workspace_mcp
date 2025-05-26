@@ -253,22 +253,18 @@ To use this server as a tool provider within Open WebUI:
 
    ```json
    {
-     "mcpServers": {
-       "gworkspace": {
-         "type": "streamable_http",
-         "command": "uv",
-         "args": [
-           "run",
-           "main.py"
-         ],
-         "options": {
-           "cwd": "/path/to/google_workspace_mcp",
-           "env": {
-             "OAUTHLIB_INSECURE_TRANSPORT": "1"
-           }
-         }
-       }
-     }
+    "mcpServers": {
+      "gworkspace": {
+        "options": {
+          "cwd": "/Users/taylorwilsdon/tmp/google_workspace_mcp",
+          "env": {
+            "OAUTHLIB_INSECURE_TRANSPORT": "1"
+          },
+          "command": "uv",
+          "args": ["run", "main.py"]
+        }
+      }
+    }
    }
    ```
    *Note: Using `uv run main.py` ensures the correct virtual environment is used.*
