@@ -56,9 +56,9 @@ The Google Workspace MCP Server integrates Google Workspace services (Calendar, 
 
 - **🔐 OAuth 2.0 Authentication**: Securely connects to Google APIs using user-authorized credentials with automatic token refresh and centralized authentication flow
 - **📅 Google Calendar Integration**: Full calendar management - list calendars, fetch events, create/modify/delete events with support for all-day and timed events
-- **📁 Google Drive Integration**: Search files, list folder contents, read file content, and create new files
-- **📧 Gmail Integration**: Complete email management - search messages, retrieve content, send emails, and create drafts
-- **📄 Google Docs Integration**: Search for documents, read document content, list documents in folders, and create new documents
+- **📁 Google Drive Integration**: Search files, list folder contents, read file content, and create new files. Supports extraction and retrieval of .docx, .xlsx and other Microsoft Office formats natively! 
+- **📧 Gmail Integration**: Complete email management - search messages, retrieve content, send emails, and create drafts with full support for all query syntax
+- **📄 Google Docs Integration**: Search for documents, read document content, list documents in folders, and create new documents right from your chat!
 - **🔄 Multiple Transport Options**: Streamable HTTP + SSE fallback
 - **🔌 `mcpo` Compatibility**: Easily expose the server as an OpenAPI endpoint for integration with tools like Open WebUI
 - **🧩 Extensible Design**: Simple structure for adding support for more Google Workspace APIs and tools
@@ -78,8 +78,8 @@ The Google Workspace MCP Server integrates Google Workspace services (Calendar, 
 ### Installation
 
 ```bash
-# Clone the repository (replace with the actual URL if different)
-git clone https://github.com/your-username/google_workspace_mcp.git
+# Clone the repository (replace with your fork URL if different)
+git clone https://github.com/taylorwilsdon/google_workspace_mcp.git
 cd google_workspace_mcp
 
 # Create a virtual environment and install dependencies
@@ -144,7 +144,7 @@ Runs the server with an HTTP transport layer on port 8000.
 <details>
 <summary><b>Single-User Mode</b></summary>
 
-For simplified single-user environments, you can run the server in single-user mode, which bypasses session-to-OAuth mapping and uses any available credentials from the `.credentials` directory:
+Multi-user MCP is kind of a mess, so right now now everything runs best as 1:1 mapping between client snd server. That will change as soon as Claude can permform OAuth 2.1 flows, so this MCP was built eith a flag for simplified single-user environments. You can run the server in single-user mode, which bypasses session-to-OAuth mapping and uses any available credentials from the `.credentials` directory:
 
 ```bash
 python main.py --single-user
@@ -159,19 +159,6 @@ In single-user mode:
 - Still requires initial OAuth authentication to create credential files
 
 This mode is particularly helpful when you don't need multi-user session management and want simplified credential handling.
-</details>
-
-<details>
-<summary><b>Using mcpo (Recommended for Open WebUI and other OpenAPI spec compatible clients)</b></summary>
-
-Requires `mcpo` installed (`uv pip install mcpo` or `pip install mcpo`).
-
-```bash
-# Ensure config.json points to your project directory
-mcpo --config config.json --port 8000
-```
-
-See the [Integration with Open WebUI](#integration-with-open-webui) section for a `config.json` example.
 </details>
 
 <details>
@@ -209,9 +196,6 @@ The server supports multiple connection methods:
 **Claude Desktop:**
 > Can run anywhere and be used via `mcp-remote` or invoked locally either with `uv run main.py` as the arg or by using `mcp-remote` with localhost.
 
-<img width="810" alt="image" src="https://github.com/user-attachments/assets/7f91aa4e-6763-4dc8-8368-05049aa5c2c7" />
-
-
 **config.json:**
 ```json
 {
@@ -227,14 +211,20 @@ The server supports multiple connection methods:
 }
 ```
 
-
 <summary><b>Using mcpo (Recommended for OpenAPI Spec Access)</b></summary>
+With config.json (for multi-mcp mcpo usage):
 
 1. Install `mcpo`: `uv pip install mcpo` or `pip install mcpo`
 2. Create a `config.json` (see [Integration with Open WebUI](#integration-with-open-webui))
-3. Run `mcpo` pointing to your config: `mcpo --config config.json --port 8000 [--api-key YOUR_SECRET_KEY]`
-4. The MCP server API will be available at: `http://localhost:8000/gworkspace` (or the name defined in `config.json`)
-5. OpenAPI documentation (Swagger UI) available at: `http://localhost:8000/gworkspace/docs`
+3. Run `mcpo` pointing to your config: `uvx mcpo --config config.json --port 8001`
+4. The MCP server API will be available at: `http://localhost:8001/google_workspace` (or the name defined in `config.json`)
+5. OpenAPI documentation (Swagger UI) available at: `http://localhost:8001/google_workspace/docs`
+
+With startup command (for single-mcp mcpo usage):
+1. Install `mcpo`: `uv pip install mcpo` or `pip install mcpo`
+2. Start with `uvx mcpo --port 8001 --api-key "top-secret" --server-type "streamablehttp" -- http://localhost:8000/mcp`
+3. The MCP server API will be available at: `http://localhost:8001/openapi.json` (or the name defined in `config.json`)
+4. OpenAPI documentation (Swagger UI) available at: `http://localhost:8001/docs`
 
 <summary><b>HTTP Mode</b></summary>
 
@@ -249,43 +239,30 @@ The server supports multiple connection methods:
 To use this server as a tool provider within Open WebUI:
 
 1. **Create `mcpo` Configuration**:
-   Create a file named `config.json` with the following structure. **Replace `/path/to/google_workspace_mcp` with the actual absolute path to this project directory.**
+   Create a file named `config.json` with the following structure to have mcpo make the streamable HTTP endpoint available as an OpenAPI spec tool.
 
    ```json
-   {
-     "mcpServers": {
-       "gworkspace": {
-         "command": "uv",
-         "args": [
-           "run",
-           "main.py"
-         ],
-         "options": {
-           "cwd": "/path/to/google_workspace_mcp",
-           "env": {
-             "OAUTHLIB_INSECURE_TRANSPORT": "1"
-           }
-         }
-       }
-     }
+     {
+      "mcpServers": {
+          "google_workspace": {
+              "type": "streamablehttp",
+              "url": "http://localhost:8000/mcp"
+          }
+      }
    }
    ```
-   *Note: Using `uv run main.py` ensures the correct virtual environment is used.*
 
 2. **Start the `mcpo` Server**:
    ```bash
-   # Make sure OAUTHLIB_INSECURE_TRANSPORT=1 is set in your shell environment
-   # OR rely on the 'env' setting in config.json
-   export OAUTHLIB_INSECURE_TRANSPORT=1
-   mcpo --port 8000 --config config.json --api-key "your-optional-secret-key"
+   mcpo --port 8001 --config config.json --api-key "your-optional-secret-key"
    ```
-   This command starts the `mcpo` proxy, which in turn manages the `google_workspace_mcp` server process based on the configuration.
+   This command starts the `mcpo` proxy, serving your active (assuming port 8000) Google Workspace MCP on port 8001. 
 
 3. **Configure Open WebUI**:
    - Navigate to your Open WebUI settings
    - Go to "Connections" -> "Tools"
    - Click "Add Tool"
-   - Enter the Server URL: `http://localhost:8000/gworkspace` (matching the `mcpo` base URL and server name from `config.json`)
+   - Enter the Server URL: `http://localhost:8001/google_workspace` (matching the `mcpo` base URL and server name from `config.json`)
    - If you used an `--api-key` with `mcpo`, enter it as the API Key
    - Save the configuration
    - The Google Workspace tools should now be available when interacting with models in Open WebUI
@@ -479,9 +456,9 @@ if not credentials or not credentials.valid:
 ---
 
 ## Screenshots:
-<img width="1018" alt="image" src="https://github.com/user-attachments/assets/656cea40-1f66-40c1-b94c-5a2c900c969d" />
-<img src="https://github.com/user-attachments/assets/d3c2a834-fcca-4dc5-8990-6d6dc1d96048" />
-
+<img width="810" alt="image" src="https://github.com/user-attachments/assets/656cea40-1f66-40c1-b94c-5a2c900c969d" />
+<img width="810" src="https://github.com/user-attachments/assets/d3c2a834-fcca-4dc5-8990-6d6dc1d96048" />
+<img width="810" alt="image" src="https://github.com/user-attachments/assets/7f91aa4e-6763-4dc8-8368-05049aa5c2c7" />
 
 ## 📄 License
 
