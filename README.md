@@ -258,7 +258,7 @@ To use this server as a tool provider within Open WebUI:
    Create a file named `config.json` with the following structure to have mcpo make the streamable HTTP endpoint available as an OpenAPI spec tool.
 
    ```json
-  {
+     {
       "mcpServers": {
           "google_workspace": {
               "type": "streamablehttp",
