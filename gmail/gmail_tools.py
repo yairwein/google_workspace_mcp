@@ -63,6 +63,54 @@ def _extract_message_body(payload):
     return body_data
 
 
+def _generate_gmail_web_url(item_id: str, account_index: int = 0) -> str:
+    """
+    Generate Gmail web interface URL for a message or thread ID.
+    Uses #all to access messages from any Gmail folder/label (not just inbox).
+
+    Args:
+        item_id: Gmail message ID or thread ID
+        account_index: Google account index (default 0 for primary account)
+
+    Returns:
+        Gmail web interface URL that opens the message/thread in Gmail web interface
+    """
+    return f"https://mail.google.com/mail/u/{account_index}/#all/{item_id}"
+
+
+def _format_gmail_results_plain(messages: list, query: str) -> str:
+    """Format Gmail search results in clean, LLM-friendly plain text."""
+    if not messages:
+        return f"No messages found for query: '{query}'"
+
+    lines = [
+        f"Found {len(messages)} messages matching '{query}':",
+        "",
+        "📧 MESSAGES:",
+    ]
+
+    for i, msg in enumerate(messages, 1):
+        message_url = _generate_gmail_web_url(msg["id"])
+        thread_url = _generate_gmail_web_url(msg["threadId"])
+
+        lines.extend([
+            f"  {i}. Message ID: {msg['id']}",
+            f"     Web Link: {message_url}",
+            f"     Thread ID: {msg['threadId']}",
+            f"     Thread Link: {thread_url}",
+            ""
+        ])
+
+    lines.extend([
+        "💡 USAGE:",
+        "  • Use Message ID with get_gmail_message_content()",
+        "  • Use Thread ID with get_gmail_thread_content()",
+        "  • Click web links to view in Gmail browser interface"
+    ])
+
+    return "\n".join(lines)
+
+
 @server.tool()
 async def search_gmail_messages(
     query: str,
@@ -71,7 +119,7 @@ async def search_gmail_messages(
 ) -> types.CallToolResult:
     """
     Searches messages in a user's Gmail account based on a query.
-    Returns both Message IDs and Thread IDs for each found message.
+    Returns both Message IDs and Thread IDs for each found message, along with Gmail web interface links for manual verification.
 
     Args:
         query (str): The search query. Supports standard Gmail search operators.
@@ -79,7 +127,7 @@ async def search_gmail_messages(
         page_size (int): The maximum number of messages to return. Defaults to 10.
 
     Returns:
-        types.CallToolResult: Contains a list of found messages with both Message IDs (for get_gmail_message_content) and Thread IDs (for get_gmail_thread_content), or an error/auth guidance message.
+        types.CallToolResult: Contains LLM-friendly structured results with Message IDs, Thread IDs, and clickable Gmail web interface URLs for each found message, or an error/auth guidance message.
     """
     tool_name = "search_gmail_messages"
     logger.info(
@@ -106,34 +154,11 @@ async def search_gmail_messages(
             .execute
         )
         messages = response.get("messages", [])
-        if not messages:
-            return types.CallToolResult(
-                content=[
-                    types.TextContent(
-                        type="text", text=f"No messages found for '{query}'."
-                    )
-                ]
-            )
 
-        # Build enhanced output showing both message ID and thread ID
-        lines = [
-            f"Found {len(messages)} messages:",
-            "",
-            "Note: Use Message ID with get_gmail_message_content, Thread ID with get_gmail_thread_content",
-            "",
-        ]
-
-        for i, msg in enumerate(messages, 1):
-            lines.extend(
-                [
-                    f"{i}. Message ID: {msg['id']}",
-                    f"   Thread ID:  {msg['threadId']}",
-                    "",
-                ]
-            )
+        formatted_output = _format_gmail_results_plain(messages, query)
 
         return types.CallToolResult(
-            content=[types.TextContent(type="text", text="\n".join(lines))]
+            content=[types.TextContent(type="text", text=formatted_output)]
         )
 
     except HttpError as e:
