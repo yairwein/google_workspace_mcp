@@ -189,8 +189,6 @@ The default ports are `8000`, but can be changed via the `WORKSPACE_MCP_PORT` en
 | OAuth Callback | `8000` | Handled internally by the server via the `/oauth2callback` route |
 | HTTP Mode Server | `8000` | Default when using HTTP transport |
 
-<img width="810" alt="image" src="https://github.com/user-attachments/assets/7f91aa4e-6763-4dc8-8368-05049aa5c2c7" />
-
 ### Connecting to the Server
 
 The server supports multiple connection methods:
@@ -458,9 +456,9 @@ if not credentials or not credentials.valid:
 ---
 
 ## Screenshots:
-<img width="1018" alt="image" src="https://github.com/user-attachments/assets/656cea40-1f66-40c1-b94c-5a2c900c969d" />
-<img src="https://github.com/user-attachments/assets/d3c2a834-fcca-4dc5-8990-6d6dc1d96048" />
-
+<img width="810" alt="image" src="https://github.com/user-attachments/assets/656cea40-1f66-40c1-b94c-5a2c900c969d" />
+<img width="810" src="https://github.com/user-attachments/assets/d3c2a834-fcca-4dc5-8990-6d6dc1d96048" />
+<img width="810" alt="image" src="https://github.com/user-attachments/assets/7f91aa4e-6763-4dc8-8368-05049aa5c2c7" />
 
 ## 📄 License
 
