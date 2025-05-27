@@ -7,7 +7,7 @@ This module provides MCP tools for interacting with the Gmail API.
 import logging
 import asyncio
 import base64
-from typing import Optional
+from typing import Optional, List, Dict, Literal
 
 from email.mime.text import MIMEText
 
@@ -63,6 +63,24 @@ def _extract_message_body(payload):
     return body_data
 
 
+def _extract_headers(payload: dict, header_names: List[str]) -> Dict[str, str]:
+    """
+    Extract specified headers from a Gmail message payload.
+
+    Args:
+        payload: The message payload from Gmail API
+        header_names: List of header names to extract
+
+    Returns:
+        Dict mapping header names to their values
+    """
+    headers = {}
+    for header in payload.get("headers", []):
+        if header["name"] in header_names:
+            headers[header["name"]] = header["value"]
+    return headers
+
+
 def _generate_gmail_web_url(item_id: str, account_index: int = 0) -> str:
     """
     Generate Gmail web interface URL for a message or thread ID.
@@ -103,9 +121,10 @@ def _format_gmail_results_plain(messages: list, query: str) -> str:
 
     lines.extend([
         "💡 USAGE:",
-        "  • Use Message ID with get_gmail_message_content()",
-        "  • Use Thread ID with get_gmail_thread_content()",
-        "  • Click web links to view in Gmail browser interface"
+        "  • Pass the Message IDs **as a list** to get_gmail_messages_content_batch()",
+        "    e.g. get_gmail_messages_content_batch(message_ids=[...])",
+        "  • Pass the Thread IDs to get_gmail_thread_content() (single) _or_",
+        "    get_gmail_threads_content_batch() (coming soon)"
     ])
 
     return "\n".join(lines)
@@ -271,6 +290,190 @@ async def get_gmail_message_content(
     except Exception as e:
         logger.exception(
             f"[{tool_name}] Unexpected error getting Gmail message content: {e}"
+        )
+        return types.CallToolResult(
+            isError=True,
+            content=[types.TextContent(type="text", text=f"Unexpected error: {e}")],
+        )
+
+
+@server.tool()
+async def get_gmail_messages_content_batch(
+    message_ids: List[str],
+    user_google_email: str,
+    format: Literal["full", "metadata"] = "full",
+) -> types.CallToolResult:
+    """
+    Retrieves the content of multiple Gmail messages in a single batch request.
+    Supports up to 100 messages per request using Google's batch API.
+
+    Args:
+        message_ids (List[str]): List of Gmail message IDs to retrieve (max 100).
+        user_google_email (str): The user's Google email address. Required.
+        format (Literal["full", "metadata"]): Message format. "full" includes body, "metadata" only headers.
+
+    Returns:
+        types.CallToolResult: Contains a list of message contents or error details.
+    """
+    tool_name = "get_gmail_messages_content_batch"
+    logger.info(
+        f"[{tool_name}] Invoked. Message count: {len(message_ids)}, Email: '{user_google_email}'"
+    )
+
+    if not message_ids:
+        return types.CallToolResult(
+            content=[types.TextContent(type="text", text="No message IDs provided")]
+        )
+
+    auth_result = await get_authenticated_google_service(
+        service_name="gmail",
+        version="v1",
+        tool_name=tool_name,
+        user_google_email=user_google_email,
+        required_scopes=[GMAIL_READONLY_SCOPE],
+    )
+    if isinstance(auth_result, types.CallToolResult):
+        return auth_result  # Auth error
+    service, user_email = auth_result
+
+    try:
+        output_messages = []
+
+        # Process in chunks of 100 (Gmail batch limit)
+        for chunk_start in range(0, len(message_ids), 100):
+            chunk_ids = message_ids[chunk_start:chunk_start + 100]
+            results: Dict[str, Dict] = {}
+
+            def _batch_callback(request_id, response, exception):
+                """Callback for batch requests"""
+                results[request_id] = {"data": response, "error": exception}
+
+            # Try to use batch API
+            try:
+                batch = service.new_batch_http_request(callback=_batch_callback)
+
+                for mid in chunk_ids:
+                    if format == "metadata":
+                        req = service.users().messages().get(
+                            userId="me",
+                            id=mid,
+                            format="metadata",
+                            metadataHeaders=["Subject", "From"]
+                        )
+                    else:
+                        req = service.users().messages().get(
+                            userId="me",
+                            id=mid,
+                            format="full"
+                        )
+                    batch.add(req, request_id=mid)
+
+                # Execute batch request
+                await asyncio.to_thread(batch.execute)
+
+            except Exception as batch_error:
+                # Fallback to asyncio.gather if batch API fails
+                logger.warning(
+                    f"[{tool_name}] Batch API failed, falling back to asyncio.gather: {batch_error}"
+                )
+
+                async def fetch_message(mid: str):
+                    try:
+                        if format == "metadata":
+                            msg = await asyncio.to_thread(
+                                service.users().messages().get(
+                                    userId="me",
+                                    id=mid,
+                                    format="metadata",
+                                    metadataHeaders=["Subject", "From"]
+                                ).execute
+                            )
+                        else:
+                            msg = await asyncio.to_thread(
+                                service.users().messages().get(
+                                    userId="me",
+                                    id=mid,
+                                    format="full"
+                                ).execute
+                            )
+                        return mid, msg, None
+                    except Exception as e:
+                        return mid, None, e
+
+                # Fetch all messages in parallel
+                fetch_results = await asyncio.gather(
+                    *[fetch_message(mid) for mid in chunk_ids],
+                    return_exceptions=False
+                )
+
+                # Convert to results format
+                for mid, msg, error in fetch_results:
+                    results[mid] = {"data": msg, "error": error}
+
+            # Process results for this chunk
+            for mid in chunk_ids:
+                entry = results.get(mid, {"data": None, "error": "No result"})
+
+                if entry["error"]:
+                    output_messages.append(
+                        f"⚠️ Message {mid}: {entry['error']}\n"
+                    )
+                else:
+                    message = entry["data"]
+                    if not message:
+                        output_messages.append(
+                            f"⚠️ Message {mid}: No data returned\n"
+                        )
+                        continue
+
+                    # Extract content based on format
+                    payload = message.get("payload", {})
+
+                    if format == "metadata":
+                        headers = _extract_headers(payload, ["Subject", "From"])
+                        subject = headers.get("Subject", "(no subject)")
+                        sender = headers.get("From", "(unknown sender)")
+
+                        output_messages.append(
+                            f"Message ID: {mid}\n"
+                            f"Subject: {subject}\n"
+                            f"From: {sender}\n"
+                            f"Web Link: {_generate_gmail_web_url(mid)}\n"
+                        )
+                    else:
+                        # Full format - extract body too
+                        headers = _extract_headers(payload, ["Subject", "From"])
+                        subject = headers.get("Subject", "(no subject)")
+                        sender = headers.get("From", "(unknown sender)")
+                        body = _extract_message_body(payload)
+
+                        output_messages.append(
+                            f"Message ID: {mid}\n"
+                            f"Subject: {subject}\n"
+                            f"From: {sender}\n"
+                            f"Web Link: {_generate_gmail_web_url(mid)}\n"
+                            f"\n{body or '[No text/plain body found]'}\n"
+                        )
+
+        # Combine all messages with separators
+        final_output = f"Retrieved {len(message_ids)} messages:\n\n"
+        final_output += "\n---\n\n".join(output_messages)
+
+        return types.CallToolResult(
+            content=[types.TextContent(type="text", text=final_output)]
+        )
+
+    except HttpError as e:
+        logger.error(
+            f"[{tool_name}] Gmail API error in batch retrieval: {e}", exc_info=True
+        )
+        return types.CallToolResult(
+            isError=True,
+            content=[types.TextContent(type="text", text=f"Gmail API error: {e}")],
+        )
+    except Exception as e:
+        logger.exception(
+            f"[{tool_name}] Unexpected error in batch retrieval: {e}"
         )
         return types.CallToolResult(
             isError=True,
