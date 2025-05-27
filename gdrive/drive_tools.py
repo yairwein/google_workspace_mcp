@@ -13,7 +13,7 @@ from mcp import types
 from fastapi import Header
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-from googleapiclient.http import MediaIoBaseDownload # For file content
+from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload # For file content
 import io # For file content
 
 from auth.google_auth import get_authenticated_google_service
@@ -324,7 +324,7 @@ async def create_drive_file(
         created_file = await asyncio.to_thread(
             service.files().create(
                 body=file_metadata,
-                media_body=MediaIoBaseDownload(media, service.files().get_media(fileId='placeholder')), # Placeholder request for MediaIoBaseDownload
+                media_body=MediaIoBaseUpload(media, mimetype=mime_type, resumable=True),
                 fields='id, name, webViewLink'
             ).execute
         )
