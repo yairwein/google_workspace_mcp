@@ -217,31 +217,23 @@ async def list_docs_in_folder(
     """
     Lists Google Docs within a specific Drive folder.
     """
-    logger.info(f"[list_docs_in_folder] Folder ID={folder_id}")
-    tool_scopes = [DRIVE_READONLY_SCOPE]
-    credentials = await asyncio.to_thread(
-        get_credentials,
+    tool_name = "list_docs_in_folder"
+    logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}', Folder ID: '{folder_id}'")
+
+    auth_result = await get_authenticated_google_service(
+        service_name="drive",
+        version="v3",
+        tool_name=tool_name,
         user_google_email=user_google_email,
-        required_scopes=tool_scopes,
-        client_secrets_path=CONFIG_CLIENT_SECRETS_PATH,
-        session_id=mcp_session_id
+        required_scopes=[DRIVE_READONLY_SCOPE],
     )
-    if not credentials or not credentials.valid:
-        logger.warning(f"[list_docs_in_folder] Missing credentials.")
-        if user_google_email and '@' in user_google_email:
-            return await start_auth_flow(
-                mcp_session_id=mcp_session_id,
-                user_google_email=user_google_email,
-                service_name="Google Drive",
-                redirect_uri=OAUTH_REDIRECT_URI
-            )
-        return types.CallToolResult(isError=True, content=[types.TextContent(type="text",
-            text="Google Drive Authentication required. LLM: Please ask for Google email and retry, or use the 'start_google_auth' tool with the email and service_name='Google Drive'.")])
+    if isinstance(auth_result, types.CallToolResult):
+        return auth_result  # Auth error
+    drive_service, user_email = auth_result # user_email will be consistent
 
     try:
-        drive = build('drive', 'v3', credentials=credentials)
         rsp = await asyncio.to_thread(
-            drive.files().list(
+            drive_service.files().list(
                 q=f"'{folder_id}' in parents and mimeType='application/vnd.google-apps.document' and trashed=false",
                 pageSize=page_size,
                 fields="files(id, name, modifiedTime, webViewLink)"
@@ -257,52 +249,50 @@ async def list_docs_in_folder(
         return types.CallToolResult(content=[types.TextContent(type="text", text="\n".join(out))])
 
     except HttpError as e:
-        logger.error(f"API error in list_docs_in_folder: {e}", exc_info=True)
+        logger.error(f"API error in {tool_name}: {e}", exc_info=True)
         return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=f"API error: {e}")])
+    except Exception as e:
+        logger.exception(f"Unexpected error in {tool_name}: {e}")
+        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=f"Unexpected error: {e}")])
 
 @server.tool()
 async def create_doc(
+    user_google_email: str, # Made user_google_email required
     title: str,
     content: str = '',
-    user_google_email: Optional[str] = None,
-    mcp_session_id: Optional[str] = Header(None, alias="Mcp-Session-Id")
 ) -> types.CallToolResult:
     """
     Creates a new Google Doc and optionally inserts initial content.
     """
-    logger.info(f"[create_doc] Title='{title}'")
-    tool_scopes = [DOCS_WRITE_SCOPE]
-    credentials = await asyncio.to_thread(
-        get_credentials,
+    tool_name = "create_doc"
+    logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}', Title='{title}'")
+
+    auth_result = await get_authenticated_google_service(
+        service_name="docs",
+        version="v1",
+        tool_name=tool_name,
         user_google_email=user_google_email,
-        required_scopes=tool_scopes,
-        client_secrets_path=CONFIG_CLIENT_SECRETS_PATH,
-        session_id=mcp_session_id
+        required_scopes=[DOCS_WRITE_SCOPE], # DOCS_WRITE_SCOPE includes Drive scope for creation if needed by API
     )
-    if not credentials or not credentials.valid:
-        logger.warning(f"[create_doc] Missing credentials.")
-        if user_google_email and '@' in user_google_email:
-            return await start_auth_flow(
-                mcp_session_id=mcp_session_id,
-                user_google_email=user_google_email,
-                service_name="Google Docs",
-                redirect_uri=OAUTH_REDIRECT_URI
-            )
-        return types.CallToolResult(isError=True, content=[types.TextContent(type="text",
-            text="Google Docs Authentication required. LLM: Please ask for Google email and retry, or use the 'start_google_auth' tool with the email and service_name='Google Docs'.")])
+    if isinstance(auth_result, types.CallToolResult):
+        return auth_result  # Auth error
+    docs_service, user_email = auth_result # user_email will be consistent
 
     try:
-        docs = build('docs', 'v1', credentials=credentials)
-        doc = await asyncio.to_thread(docs.documents().create(body={'title': title}).execute)
+        doc = await asyncio.to_thread(docs_service.documents().create(body={'title': title}).execute)
         doc_id = doc.get('documentId')
         if content:
             # Insert content at end
             requests = [{'insertText': {'location': {'index': 1}, 'text': content}}]
-            await asyncio.to_thread(docs.documents().batchUpdate(documentId=doc_id, body={'requests': requests}).execute)
+            await asyncio.to_thread(docs_service.documents().batchUpdate(documentId=doc_id, body={'requests': requests}).execute)
         link = f"https://docs.google.com/document/d/{doc_id}/edit"
-        msg = f"Created Google Doc '{title}' (ID: {doc_id}). Link: {link}"
+        msg = f"Created Google Doc '{title}' (ID: {doc_id}) for {user_email}. Link: {link}"
+        logger.info(f"Successfully created Google Doc '{title}' (ID: {doc_id}) for {user_email}. Link: {link}")
         return types.CallToolResult(content=[types.TextContent(type="text", text=msg)])
 
     except HttpError as e:
-        logger.error(f"API error in create_doc: {e}", exc_info=True)
+        logger.error(f"API error in {tool_name}: {e}", exc_info=True)
         return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=f"API error: {e}")])
+    except Exception as e:
+        logger.exception(f"Unexpected error in {tool_name}: {e}")
+        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=f"Unexpected error: {e}")])
