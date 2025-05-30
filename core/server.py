@@ -44,8 +44,11 @@ WORKSPACE_MCP_BASE_URI = os.getenv("WORKSPACE_MCP_BASE_URI", "http://localhost")
 # Basic MCP server instance
 server = FastMCP(
     name="google_workspace",
-    server_url=f"{WORKSPACE_MCP_BASE_URI}:{WORKSPACE_MCP_PORT}/mcp",  # Add absolute URL for Gemini native function calling
+    server_url=f"{WORKSPACE_MCP_BASE_URI}:{WORKSPACE_MCP_PORT}/mcp",
+    port=WORKSPACE_MCP_PORT
 )
+
+server.run(transport="streamable-http")
 
 # Configure OAuth redirect URI to use the MCP server's base uri and port
 OAUTH_REDIRECT_URI = f"{WORKSPACE_MCP_BASE_URI}:{WORKSPACE_MCP_PORT}/oauth2callback"
