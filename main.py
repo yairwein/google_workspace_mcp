@@ -59,9 +59,9 @@ def main():
     try:
         logger.info("Google Workspace MCP server starting...")
 
-        # Use FastMCP's native run method
-        # FastMCP handles the transport and server configuration internally
-        server.run()
+        # Use FastMCP's native run method with streamable-http transport
+        # The server is already configured with port and server_url in core/server.py
+        server.run(transport="streamable-http")
     except KeyboardInterrupt:
         logger.info("Server shutdown requested via keyboard interrupt")
         sys.exit(0)

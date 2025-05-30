@@ -48,8 +48,6 @@ server = FastMCP(
     port=WORKSPACE_MCP_PORT
 )
 
-server.run(transport="streamable-http")
-
 # Configure OAuth redirect URI to use the MCP server's base uri and port
 OAUTH_REDIRECT_URI = f"{WORKSPACE_MCP_BASE_URI}:{WORKSPACE_MCP_PORT}/oauth2callback"
 
