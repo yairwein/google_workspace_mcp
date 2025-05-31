@@ -1,12 +1,10 @@
-import asyncio
 import argparse
 import logging
 import os
 import sys
-import uvicorn
 
 # Local imports
-from core.server import server, create_application
+from core.server import server
 
 # Configure basic console logging
 logging.basicConfig(
@@ -45,7 +43,7 @@ import gdocs.docs_tools
 def main():
     """
     Main entry point for the Google Workspace MCP server.
-    Uses streamable-http transport via a Starlette application with SessionAwareStreamableHTTPManager.
+    Uses FastMCP's native streamable-http transport.
     """
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Google Workspace MCP Server')
@@ -61,16 +59,9 @@ def main():
     try:
         logger.info("Google Workspace MCP server starting...")
 
-        # Create the Starlette application with our custom session manager
-        app = create_application(base_path="/mcp")
-
-        # Run the application with uvicorn
-        uvicorn.run(
-            app,
-            host="0.0.0.0",
-            port=int(os.getenv("WORKSPACE_MCP_PORT", 8000)),
-            log_level="info"
-        )
+        # Use FastMCP's native run method with streamable-http transport
+        # The server is already configured with port and server_url in core/server.py
+        server.run(transport="streamable-http")
     except KeyboardInterrupt:
         logger.info("Server shutdown requested via keyboard interrupt")
         sys.exit(0)

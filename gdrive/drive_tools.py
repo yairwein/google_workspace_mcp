@@ -14,7 +14,7 @@ from fastapi import Header
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload # For file content
-import io # For file content
+import io
 
 from auth.google_auth import get_authenticated_google_service
 from core.utils import extract_office_xml_text
@@ -60,23 +60,20 @@ async def search_drive_files(
     service, user_email = auth_result
 
     try:
-
         # Check if the query looks like a structured Drive query or free text
-        # Basic check for operators or common keywords used in structured queries
         drive_query_pattern = r"(\w+\s*(=|!=|>|<|contains|in|has)\s*['\"]?.+?['\"]?|\w+\s*(=|!=|>|<)\s*\d+|trashed\s*=\s*(true|false)|starred\s*=\s*(true|false)|properties\s+has\s*\{.*?\}|appProperties\s+has\s*\{.*?\}|'[^']+'\s+in\s+parents)"
         is_structured_query = re.search(drive_query_pattern, query, re.IGNORECASE)
 
         if is_structured_query:
-            final_query = query # Use as is
+            final_query = query
         else:
-            # Assume free text search, escape single quotes and wrap
             escaped_query = query.replace("'", "\\'")
             final_query = f"fullText contains '{escaped_query}'"
             logger.info(f"[search_drive_files] Reformatting free text query '{query}' to '{final_query}'")
 
         results = await asyncio.to_thread(
             service.files().list(
-                q=final_query, # Use the potentially modified query
+                q=final_query,
                 pageSize=page_size,
                 fields="nextPageToken, files(id, name, mimeType, webViewLink, iconLink, modifiedTime, size)"
             ).execute
@@ -221,7 +218,7 @@ async def get_drive_file_content(
 async def list_drive_items(
     user_google_email: str,
     folder_id: str = 'root', # Default to root folder
-    page_size: int = 100, # Default page size for listing
+    page_size: int = 100,
 ) -> types.CallToolResult:
     """
     Lists files and folders directly within a specified Google Drive folder.
@@ -254,7 +251,7 @@ async def list_drive_items(
     try:
         results = await asyncio.to_thread(
             service.files().list(
-                q=f"'{folder_id}' in parents and trashed=false", # List items directly in the folder
+                q=f"'{folder_id}' in parents and trashed=false",
                 pageSize=page_size,
                 fields="nextPageToken, files(id, name, mimeType, webViewLink, iconLink, modifiedTime, size)"
             ).execute
@@ -283,8 +280,8 @@ async def create_drive_file(
     user_google_email: str,
     file_name: str,
     content: str,
-    folder_id: str = 'root', # Default to root folder
-    mime_type: str = 'text/plain', # Default to plain text
+    folder_id: str = 'root',
+    mime_type: str = 'text/plain',
 ) -> types.CallToolResult:
     """
     Creates a new file in Google Drive with the specified name, content, and optional parent folder.
@@ -310,7 +307,7 @@ async def create_drive_file(
         required_scopes=[DRIVE_FILE_SCOPE],
     )
     if isinstance(auth_result, types.CallToolResult):
-        return auth_result  # Auth error
+        return auth_result
     service, user_email = auth_result
 
     try:
@@ -319,7 +316,7 @@ async def create_drive_file(
             'parents': [folder_id],
             'mimeType': mime_type
         }
-        media = io.BytesIO(content.encode('utf-8')) # Encode content to bytes
+        media = io.BytesIO(content.encode('utf-8'))
 
         created_file = await asyncio.to_thread(
             service.files().create(

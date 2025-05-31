@@ -15,11 +15,6 @@ from googleapiclient.errors import HttpError
 from config.google_config import OAUTH_STATE_TO_SESSION_ID_MAP, SCOPES
 from mcp import types
 
-# Import our session ID getter
-from core.streamable_http import get_current_session_id
-
-
-
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -355,12 +350,9 @@ def get_credentials(
         credentials: Optional[Credentials] = None
         loaded_from_session = False
 
-        # Try to get the current session ID if not explicitly provided
+        # Session ID should be provided by the caller
         if not session_id:
-            current_session_id = get_current_session_id()
-            if current_session_id:
-                session_id = current_session_id
-                logger.info(f"[get_credentials] No session_id provided, using current session ID: '{session_id}'")
+            logger.debug("[get_credentials] No session_id provided")
 
         logger.debug(f"[get_credentials] Called for user_google_email: '{user_google_email}', session_id: '{session_id}', required_scopes: {required_scopes}")
 
