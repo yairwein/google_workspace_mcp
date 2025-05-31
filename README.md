@@ -2,7 +2,6 @@
 
 # Google Workspace MCP Server
 
-[![smithery badge](https://smithery.ai/badge/@taylorwilsdon/google_workspace_mcp)](https://smithery.ai/server/@taylorwilsdon/google_workspace_mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![UV](https://img.shields.io/badge/Package%20Installer-UV-blueviolet)](https://github.com/astral-sh/uv)
