@@ -194,7 +194,7 @@ The default ports are `8000`, but can be changed via the `WORKSPACE_MCP_PORT` en
 The server supports multiple connection methods:
 
 **Claude Desktop:**
-> Can run anywhere and be used via `mcp-remote` or invoked locally either with `uv run main.py` as the arg or by using `mcp-remote` with localhost.
+> Can run anywhere and be used via `mcp-remote` or invoked locally  with `uv run main.py` and using `mcp-remote` with localhost. Claude Desktop lacks native support for streamable HTTP or SSE.
 
 **config.json:**
 ```json
