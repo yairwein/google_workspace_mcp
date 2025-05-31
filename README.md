@@ -77,6 +77,15 @@ The Google Workspace MCP Server integrates Google Workspace services (Calendar, 
 
 ### Installation
 
+### Installing via Smithery
+
+To install Google Workspace Integration Server for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@taylorwilsdon/google_workspace_mcp):
+
+```bash
+npx -y @smithery/cli install @taylorwilsdon/google_workspace_mcp --client claude
+```
+
+### Manual Installation
 ```bash
 # Clone the repository (replace with your fork URL if different)
 git clone https://github.com/taylorwilsdon/google_workspace_mcp.git

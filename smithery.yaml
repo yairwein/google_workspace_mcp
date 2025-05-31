@@ -1,12 +1,13 @@
-# Smithery.ai configuration
+# Smithery configuration file: https://smithery.ai/docs/build/project-config
+
 startCommand:
-    type: http
-    configSchema:
-        type: object
-        required:
-            - clientSecretsPath
-        properties:
-            clientSecretsPath:
-                type: string
-                title: "Client Secrets JSON"
-                description: "Path to your client_secrets.json file"
+  type: http
+  configSchema:
+    # JSON Schema defining the configuration options for the MCP.
+    type: object
+    required:
+      - clientSecretsPath
+    properties:
+      clientSecretsPath:
+        type: string
+        description: Path to your client_secrets.json file
