@@ -6,11 +6,20 @@ name = "google-workspace-mcp"
 version = "0.1.1"
 description = "Comprehensive, highly performant Google Workspace Streamable HTTP & SSE MCP Server for Calendar, Gmail, Docs, Sheets, Slides & Drive"
 readme = "README.md"
-license = {file = "LICENSE"}
-authors = [
-    {name = "Taylor Wilsdon", email = "taylor@taylorwilsdon.com"}
+license = { file = "LICENSE" }
+authors = [{ name = "Taylor Wilsdon", email = "taylor@taylorwilsdon.com" }]
+keywords = [
+    "mcp",
+    "google",
+    "workspace",
+    "llm",
+    "ai",
+    "claude",
+    "model",
+    "context",
+    "protocol",
+    "server",
 ]
-keywords = ["mcp", "google", "workspace", "llm", "ai", "claude", "model", "context", "protocol", "server"]
 requires-python = ">=3.11"
 dependencies = [
     "fastmcp>=2.3.3",
@@ -36,13 +45,6 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Application Frameworks",
     "Typing :: Typed",
 ]
-
-urls = {
-    "Homepage"      = "https://github.com/taylorwilsdon/google_workspace_mcp",
-    "Source"        = "https://github.com/taylorwilsdon/google_workspace_mcp",
-    "Documentation" = "https://github.com/taylorwilsdon/google_workspace_mcp#readme",
-    "Issues"        = "https://github.com/taylorwilsdon/google_workspace_mcp/issues",
-}
 
 [tool.setuptools]
 packages = ["auth", "gcalendar", "core", "gdocs", "gdrive", "gmail", "config"]
