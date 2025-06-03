@@ -5,7 +5,7 @@ This module centralizes configuration variables for Google Workspace integration
 including OAuth scopes and the state map for authentication flows.
 """
 import logging
-from typing import Dict, Any # Removed str from typing import
+from typing import Dict
 
 logger = logging.getLogger(__name__)
 
@@ -21,9 +21,7 @@ CALENDAR_EVENTS_SCOPE = 'https://www.googleapis.com/auth/calendar.events'
 
 # Google Drive scopes
 DRIVE_READONLY_SCOPE = 'https://www.googleapis.com/auth/drive.readonly'
-# Add other Drive scopes here if needed in the future, e.g.:
-# DRIVE_METADATA_READONLY_SCOPE = 'https://www.googleapis.com/auth/drive.metadata.readonly'
-DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file' # Per-file access
+DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file'
 
 # Google Docs scopes
 DOCS_READONLY_SCOPE = 'https://www.googleapis.com/auth/documents.readonly'
@@ -33,8 +31,6 @@ DOCS_WRITE_SCOPE = 'https://www.googleapis.com/auth/documents'
 GMAIL_READONLY_SCOPE   = 'https://www.googleapis.com/auth/gmail.readonly'
 GMAIL_SEND_SCOPE       = 'https://www.googleapis.com/auth/gmail.send'
 GMAIL_COMPOSE_SCOPE    = 'https://www.googleapis.com/auth/gmail.compose'
-# Optional, if you later need label management:
-# GMAIL_LABELS_SCOPE     = 'https://www.googleapis.com/auth/gmail.labels'
 
 # Google Chat API scopes
 CHAT_READONLY_SCOPE = 'https://www.googleapis.com/auth/chat.messages.readonly'
