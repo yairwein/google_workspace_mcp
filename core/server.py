@@ -10,7 +10,6 @@ from mcp import types
 from mcp.server.fastmcp import FastMCP
 from starlette.requests import Request
 
-from google.auth.exceptions import RefreshError
 from auth.google_auth import handle_auth_callback, start_auth_flow, CONFIG_CLIENT_SECRETS_PATH
 
 # Import shared configuration
@@ -212,33 +211,3 @@ async def start_google_auth(
         service_name=service_name,
         redirect_uri=OAUTH_REDIRECT_URI
     )
-
-@server.tool()
-async def debug_current_session(
-    mcp_session_id: Optional[str] = Header(None, alias="Mcp-Session-Id")
-) -> Dict[str, Any]:
-    """
-    Debug tool to show information about the current session.
-
-    LLM Guidance:
-    - Use this tool to verify that session tracking is working correctly
-    - This tool will return the current session ID from the Mcp-Session-Id header
-
-    Args:
-        mcp_session_id: The MCP session ID header (automatically injected)
-
-    Returns:
-        Information about the current session
-    """
-    result = {
-        "current_session": {
-            "session_id": mcp_session_id,
-            "message": "Session tracking is handled natively by FastMCP"
-        }
-    }
-
-    if not mcp_session_id:
-        result["error"] = "No session ID provided in request"
-        result["error_details"] = "The Mcp-Session-Id header was not found"
-
-    return result
