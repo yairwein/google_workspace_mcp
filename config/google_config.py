@@ -37,7 +37,7 @@ GMAIL_COMPOSE_SCOPE    = 'https://www.googleapis.com/auth/gmail.compose'
 # GMAIL_LABELS_SCOPE     = 'https://www.googleapis.com/auth/gmail.labels'
 
 # Google Chat API scopes
-CHAT_READONLY_SCOPE = 'https://www.googleapis.com/auth/chat.readonly'
+CHAT_READONLY_SCOPE = 'https://www.googleapis.com/auth/chat.messages.readonly'
 CHAT_WRITE_SCOPE = 'https://www.googleapis.com/auth/chat.messages'
 CHAT_SPACES_SCOPE = 'https://www.googleapis.com/auth/chat.spaces'
 
