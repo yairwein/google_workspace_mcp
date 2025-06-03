@@ -14,8 +14,8 @@ from googleapiclient.errors import HttpError
 
 # Auth & server utilities
 from auth.google_auth import get_authenticated_google_service
-from core.server import (
-    server,
+from core.server import server
+from config.google_config import (
     CHAT_READONLY_SCOPE,
     CHAT_WRITE_SCOPE,
     CHAT_SPACES_SCOPE,

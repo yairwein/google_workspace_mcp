@@ -36,6 +36,11 @@ GMAIL_COMPOSE_SCOPE    = 'https://www.googleapis.com/auth/gmail.compose'
 # Optional, if you later need label management:
 # GMAIL_LABELS_SCOPE     = 'https://www.googleapis.com/auth/gmail.labels'
 
+# Google Chat API scopes
+CHAT_READONLY_SCOPE = 'https://www.googleapis.com/auth/chat.readonly'
+CHAT_WRITE_SCOPE = 'https://www.googleapis.com/auth/chat.messages'
+CHAT_SPACES_SCOPE = 'https://www.googleapis.com/auth/chat.spaces'
+
 # Base OAuth scopes required for user identification
 BASE_SCOPES = [
     USERINFO_EMAIL_SCOPE,
@@ -67,5 +72,12 @@ GMAIL_SCOPES = [
     GMAIL_COMPOSE_SCOPE
 ]
 
+# Chat-specific scopes
+CHAT_SCOPES = [
+    CHAT_READONLY_SCOPE,
+    CHAT_WRITE_SCOPE,
+    CHAT_SPACES_SCOPE
+]
+
 # Combined scopes for all supported Google Workspace operations
-SCOPES = list(set(BASE_SCOPES + CALENDAR_SCOPES + DRIVE_SCOPES + GMAIL_SCOPES + DOCS_SCOPES))
+SCOPES = list(set(BASE_SCOPES + CALENDAR_SCOPES + DRIVE_SCOPES + GMAIL_SCOPES + DOCS_SCOPES + CHAT_SCOPES))

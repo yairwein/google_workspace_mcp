@@ -31,12 +31,12 @@ from config.google_config import (
     GMAIL_SCOPES,
     DOCS_READONLY_SCOPE,
     DOCS_WRITE_SCOPE,
+    CHAT_READONLY_SCOPE,
+    CHAT_WRITE_SCOPE,
+    CHAT_SPACES_SCOPE,
+    CHAT_SCOPES,
     SCOPES
 )
-# Google Chat API scopes
-CHAT_READONLY_SCOPE = "https://www.googleapis.com/auth/chat.readonly"
-CHAT_WRITE_SCOPE = "https://www.googleapis.com/auth/chat.messages"
-CHAT_SPACES_SCOPE = "https://www.googleapis.com/auth/chat.spaces"
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
