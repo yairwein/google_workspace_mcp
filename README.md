@@ -77,14 +77,6 @@ The Google Workspace MCP Server integrates Google Workspace services (Calendar, 
 
 ### Installation
 
-### Installing via Smithery
-
-To install Google Workspace Integration Server for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@taylorwilsdon/google_workspace_mcp):
-
-```bash
-npx -y @smithery/cli install @taylorwilsdon/google_workspace_mcp --client claude
-```
-
 ### Manual Installation
 ```bash
 # Clone the repository (replace with your fork URL if different)
@@ -99,7 +91,7 @@ uv pip install -e .
 
 ### Configuration
 
-1. Create **OAuth 2.0 Credentials** (Desktop application type) in the [Google Cloud Console](https://console.cloud.google.com/).
+1. Create **OAuth 2.0 Credentials** (web application type) in the [Google Cloud Console](https://console.cloud.google.com/).
 2. Enable the **Google Calendar API**, **Google Drive API**, **Gmail API**, and **Google Docs API** for your project.
 3. Download the OAuth client credentials as `client_secret.json` and place it in the project's root directory.
 4. Add the following redirect URI to your OAuth client configuration in the Google Cloud Console. Note that `http://localhost:8000` is the default base URI and port, which can be customized via environment variables (`WORKSPACE_MCP_BASE_URI` and `WORKSPACE_MCP_PORT`). If you change these, you must update the redirect URI in the Google Cloud Console accordingly.
