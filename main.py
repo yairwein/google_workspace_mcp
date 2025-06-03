@@ -6,14 +6,12 @@ import sys
 # Local imports
 from core.server import server
 
-# Configure basic console logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-# Set up detailed file logging
 try:
     root_logger = logging.getLogger()
     log_file_dir = os.path.dirname(os.path.abspath(__file__))
@@ -59,8 +57,6 @@ def main():
 
     try:
         logger.info("Google Workspace MCP server starting...")
-
-        # Use FastMCP's native run method with streamable-http transport
         # The server is already configured with port and server_url in core/server.py
         server.run(transport="streamable-http")
     except KeyboardInterrupt:
