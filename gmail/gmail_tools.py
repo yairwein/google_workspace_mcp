@@ -161,7 +161,7 @@ async def search_gmail_messages(
         required_scopes=[GMAIL_READONLY_SCOPE],
     )
     if isinstance(auth_result, types.CallToolResult):
-        return auth_result  # Auth error
+        return auth_result
     service, user_email = auth_result
 
     try:

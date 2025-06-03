@@ -5,11 +5,9 @@ This module provides MCP tools for interacting with Google Chat API.
 """
 import logging
 import asyncio
-from typing import List, Optional, Dict, Any
+from typing import Optional
 
 from mcp import types
-from fastapi import Header
-from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 # Auth & server utilities

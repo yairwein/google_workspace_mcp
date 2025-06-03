@@ -6,14 +6,11 @@ This module provides MCP tools for interacting with Google Drive API.
 import logging
 import asyncio
 import re
-import os
 from typing import List, Optional, Dict, Any
 
 from mcp import types
-from fastapi import Header
-from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload # For file content
+from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 import io
 
 from auth.google_auth import get_authenticated_google_service
@@ -128,13 +125,10 @@ async def get_drive_file_content(
         required_scopes=[DRIVE_READONLY_SCOPE],
     )
     if isinstance(auth_result, types.CallToolResult):
-        return auth_result  # authentication problem
+        return auth_result
     service, _ = auth_result
 
     try:
-        # ------------------------------------------------------------------
-        # Metadata lookup
-        # ------------------------------------------------------------------
         file_metadata = await asyncio.to_thread(
             service.files().get(
                 fileId=file_id, fields="id, name, mimeType, webViewLink"
@@ -142,10 +136,6 @@ async def get_drive_file_content(
         )
         mime_type = file_metadata.get("mimeType", "")
         file_name = file_metadata.get("name", "Unknown File")
-
-        # ------------------------------------------------------------------
-        # Decide export vs. direct download
-        # ------------------------------------------------------------------
         export_mime_type = {
             "application/vnd.google-apps.document": "text/plain",
             "application/vnd.google-apps.spreadsheet": "text/csv",
@@ -157,10 +147,6 @@ async def get_drive_file_content(
             if export_mime_type
             else service.files().get_media(fileId=file_id)
         )
-
-        # ------------------------------------------------------------------
-        # Download
-        # ------------------------------------------------------------------
         fh = io.BytesIO()
         downloader = MediaIoBaseDownload(fh, request_obj)
         loop = asyncio.get_event_loop()
@@ -170,9 +156,7 @@ async def get_drive_file_content(
 
         file_content_bytes = fh.getvalue()
 
-        # ------------------------------------------------------------------
         # Attempt Office XML extraction
-        # ------------------------------------------------------------------
         office_text = extract_office_xml_text(file_content_bytes, mime_type)
         if office_text:
             body_text = office_text
@@ -186,9 +170,7 @@ async def get_drive_file_content(
                     f"{len(file_content_bytes)} bytes]"
                 )
 
-        # ------------------------------------------------------------------
         # Assemble response
-        # ------------------------------------------------------------------
         header = (
             f'File: "{file_name}" (ID: {file_id}, Type: {mime_type})\n'
             f'Link: {file_metadata.get("webViewLink", "#")}\n\n--- CONTENT ---\n'
@@ -217,7 +199,7 @@ async def get_drive_file_content(
 @server.tool()
 async def list_drive_items(
     user_google_email: str,
-    folder_id: str = 'root', # Default to root folder
+    folder_id: str = 'root',
     page_size: int = 100,
 ) -> types.CallToolResult:
     """
@@ -245,7 +227,7 @@ async def list_drive_items(
         required_scopes=[DRIVE_READONLY_SCOPE],
     )
     if isinstance(auth_result, types.CallToolResult):
-        return auth_result  # Auth error
+        return auth_result
     service, user_email = auth_result
 
     try:

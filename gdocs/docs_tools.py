@@ -6,11 +6,9 @@ This module provides MCP tools for interacting with Google Docs API and managing
 import logging
 import asyncio
 import io
-from typing import List, Optional, Dict, Any
+from typing import List
 
 from mcp import types
-from fastapi import Header
-from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaIoBaseDownload
 
@@ -151,7 +149,7 @@ async def get_doc_content(
             logger.info(f"[{tool_name}] Processing as Drive file (e.g., .docx, other). MimeType: {mime_type}")
 
             export_mime_type_map = {
-                 # Example: "application/vnd.google-apps.spreadsheet": "text/csv",
+                 # Example: "application/vnd.google-apps.spreadsheet"z: "text/csv",
                  # Native GSuite types that are not Docs would go here if this function
                  # was intended to export them. For .docx, direct download is used.
             }
@@ -272,17 +270,16 @@ async def create_doc(
         version="v1",
         tool_name=tool_name,
         user_google_email=user_google_email,
-        required_scopes=[DOCS_WRITE_SCOPE], # DOCS_WRITE_SCOPE includes Drive scope for creation if needed by API
+        required_scopes=[DOCS_WRITE_SCOPE],
     )
     if isinstance(auth_result, types.CallToolResult):
-        return auth_result  # Auth error
-    docs_service, user_email = auth_result # user_email will be consistent
+        return auth_result
+    docs_service, user_email = auth_result
 
     try:
         doc = await asyncio.to_thread(docs_service.documents().create(body={'title': title}).execute)
         doc_id = doc.get('documentId')
         if content:
-            # Insert content at end
             requests = [{'insertText': {'location': {'index': 1}, 'text': content}}]
             await asyncio.to_thread(docs_service.documents().batchUpdate(documentId=doc_id, body={'requests': requests}).execute)
         link = f"https://docs.google.com/document/d/{doc_id}/edit"
