@@ -105,5 +105,4 @@ def extract_office_xml_text(file_bytes: bytes, mime_type: str) -> Optional[str]:
         return None
     except Exception as e:
         logger.error(f"Failed to extract office XML text for {mime_type}: {e}", exc_info=True)
-        # Any failure → quietly signal "not handled"
         return None
