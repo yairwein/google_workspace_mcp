@@ -21,28 +21,36 @@
 
 ## 📑 Table of Contents
 
-- [Overview](#-overview)
-- [Features](#-features)
-- [Quick Start](#-quick-start)
-  - [Prerequisites](#prerequisites)
-  - [Installation](#installation)
-  - [Configuration](#configuration)
-  - [Start the Server](#start-the-server)
-  - [Connecting to the Server](#connecting-to-the-server)
-  - [Integration with Open WebUI](#integration-with-open-webui)
-  - [First-time Authentication](#first-time-authentication)
-- [Available Tools](#-available-tools)
-  - [Calendar](#calendar)
-  - [Google Drive](#google-drive)
-  - [Gmail](#gmail)
-  - [Google Docs](#google-docs)
-- [Development](#-development)
-  - [Project Structure](#project-structure)
-  - [Port Handling for OAuth](#port-handling-for-oauth)
-  - [Debugging](#debugging)
-  - [Adding New Tools](#adding-new-tools)
-- [Security Notes](#-security-notes)
-- [License](#-license)
+- [Google Workspace MCP Server](#google-workspace-mcp-server)
+  - [📑 Table of Contents](#-table-of-contents)
+  - [🌐 Overview](#-overview)
+  - [✨ Features](#-features)
+  - [🚀 Quick Start](#-quick-start)
+    - [Prerequisites](#prerequisites)
+    - [Installation](#installation)
+    - [Manual Installation](#manual-installation)
+    - [Configuration](#configuration)
+    - [Server Configuration](#server-configuration)
+    - [Environment Setup](#environment-setup)
+    - [Start the Server](#start-the-server)
+      - [Important Ports](#important-ports)
+    - [Connecting to the Server](#connecting-to-the-server)
+    - [Integration with Open WebUI](#integration-with-open-webui)
+    - [First-time Authentication](#first-time-authentication)
+  - [🧰 Available Tools](#-available-tools)
+    - [📅 Google Calendar](#-google-calendar)
+    - [📁 Google Drive](#-google-drive)
+    - [📧 Gmail](#-gmail)
+    - [📝 Google Docs](#-google-docs)
+    - [💬 Google Chat](#-google-chat)
+  - [🛠️ Development](#️-development)
+    - [Project Structure](#project-structure)
+    - [Port Handling for OAuth](#port-handling-for-oauth)
+    - [Debugging](#debugging)
+    - [Adding New Tools](#adding-new-tools)
+  - [🔒 Security Notes](#-security-notes)
+  - [Screenshots:](#screenshots)
+  - [📄 License](#-license)
 
 ---
 
@@ -337,6 +345,18 @@ Source: [`gmail/gmail_tools.py`](gmail/gmail_tools.py)
 
 Source: [`gdocs/docs_tools.py`](gdocs/docs_tools.py)
 
+### 💬 Google Chat
+
+Source: [`gchat/chat_tools.py`](gchat/chat_tools.py)
+
+| Tool             | Description                                                                 | Parameters |
+|------------------|-----------------------------------------------------------------------------|------------|
+| `list_spaces`    | Lists Google Chat spaces (rooms and DMs) accessible to the user.            | • `user_google_email` (required)<br>• `page_size` (optional, default: 100)<br>• `space_type` (optional, default: "all", can be "room" or "dm") |
+| `get_messages`   | Retrieves messages from a specific Google Chat space.                       | • `user_google_email` (required)<br>• `space_id` (required)<br>• `page_size` (optional, default: 50)<br>• `order_by` (optional, default: "createTime desc") |
+| `send_message`   | Sends a message to a Google Chat space.                                     | • `user_google_email` (required)<br>• `space_id` (required)<br>• `message_text` (required)<br>• `thread_key` (optional): To reply in a thread |
+| `search_messages`| Searches for messages across Chat spaces by text content.                   | • `user_google_email` (required)<br>• `query` (required): Text to search for<br>• `space_id` (optional): If provided, searches only in this space<br>• `page_size` (optional, default: 25) |
+
+> ℹ️ All Chat tools require `user_google_email` for authentication. If authentication fails or is required, the tool will return an error prompting the LLM to use the centralized `start_google_auth` tool with the user's email and `service_name="Google Chat"`.
 | Tool                 | Description                                                                         | Parameters |
 |----------------------|-------------------------------------------------------------------------------------|------------|
 | `search_docs`        | Search for Google Docs by name (using Drive API).                                   | • `query` (required): Text to search for in Doc names<br>• `user_google_email` (optional)<br>• `page_size` (optional, default: 10)<br>• `mcp_session_id` (injected automatically) |

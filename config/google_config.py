@@ -69,6 +69,3 @@ GMAIL_SCOPES = [
 
 # Combined scopes for all supported Google Workspace operations
 SCOPES = list(set(BASE_SCOPES + CALENDAR_SCOPES + DRIVE_SCOPES + GMAIL_SCOPES + DOCS_SCOPES))
-
-# Note: OAUTH_REDIRECT_URI is defined in core/server.py as it depends on the server's port.
-# It will be imported directly from core.server where needed.

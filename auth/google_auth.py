@@ -482,7 +482,7 @@ async def get_authenticated_google_service(
         )
 
         # Import here to avoid circular import
-        from config.google_config import OAUTH_REDIRECT_URI
+        from core.server import OAUTH_REDIRECT_URI
 
         # This call will return a CallToolResult which should be propagated
         return await start_auth_flow(

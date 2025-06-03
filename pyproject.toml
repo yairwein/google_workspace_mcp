@@ -47,4 +47,4 @@ classifiers = [
 ]
 
 [tool.setuptools]
-packages = ["auth", "gcalendar", "core", "gdocs", "gdrive", "gmail", "config"]
+packages = ["auth", "gcalendar", "core", "gdocs", "gdrive", "gmail", "config", "gchat"]

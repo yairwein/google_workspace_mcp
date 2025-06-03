@@ -33,6 +33,10 @@ from config.google_config import (
     DOCS_WRITE_SCOPE,
     SCOPES
 )
+# Google Chat API scopes
+CHAT_READONLY_SCOPE = "https://www.googleapis.com/auth/chat.readonly"
+CHAT_WRITE_SCOPE = "https://www.googleapis.com/auth/chat.messages"
+CHAT_SPACES_SCOPE = "https://www.googleapis.com/auth/chat.spaces"
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -202,7 +206,6 @@ async def start_google_auth(
 
     logger.info(f"Tool 'start_google_auth' invoked for user_google_email: '{user_google_email}', service: '{service_name}', session: '{mcp_session_id}'.")
     # Use the centralized start_auth_flow from auth.google_auth
-    # OAUTH_REDIRECT_URI is already defined in this file
     return await start_auth_flow(
         mcp_session_id=mcp_session_id,
         user_google_email=user_google_email,

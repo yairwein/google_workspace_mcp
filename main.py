@@ -38,6 +38,7 @@ import gcalendar.calendar_tools
 import gdrive.drive_tools
 import gmail.gmail_tools
 import gdocs.docs_tools
+import gchat.chat_tools
 
 
 def main():
