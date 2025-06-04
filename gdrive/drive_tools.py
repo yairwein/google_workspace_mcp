@@ -66,12 +66,28 @@ async def search_drive_files(
 
     try:
         # Check if the query looks like a structured Drive query or free text
-        drive_query_pattern = r"(\w+\s*(=|!=|>|<|contains|in|has)\s*['\"]?.+?['\"]?|\w+\s*(=|!=|>|<)\s*\d+|trashed\s*=\s*(true|false)|starred\s*=\s*(true|false)|properties\s+has\s*\{.*?\}|appProperties\s+has\s*\{.*?\}|'[^']+'\s+in\s+parents)"
-        is_structured_query = re.search(drive_query_pattern, query, re.IGNORECASE)
+        # Look for Drive API operators and structured query patterns
+        drive_query_patterns = [
+            r'\b\w+\s*(=|!=|>|<)\s*[\'"].*?[\'"]',  # field = 'value'
+            r'\b\w+\s*(=|!=|>|<)\s*\d+',            # field = number
+            r'\bcontains\b',                         # contains operator
+            r'\bin\s+parents\b',                     # in parents
+            r'\bhas\s*\{',                          # has {properties}
+            r'\btrashed\s*=\s*(true|false)\b',      # trashed=true/false
+            r'\bstarred\s*=\s*(true|false)\b',      # starred=true/false
+            r'[\'"][^\'"]+[\'"]\s+in\s+parents',    # 'parentId' in parents
+            r'\bfullText\s+contains\b',             # fullText contains
+            r'\bname\s*(=|contains)\b',             # name = or name contains
+            r'\bmimeType\s*(=|!=)\b',               # mimeType operators
+        ]
+
+        is_structured_query = any(re.search(pattern, query, re.IGNORECASE) for pattern in drive_query_patterns)
 
         if is_structured_query:
             final_query = query
+            logger.info(f"[search_drive_files] Using structured query as-is: '{final_query}'")
         else:
+            # For free text queries, wrap in fullText contains
             escaped_query = query.replace("'", "\\'")
             final_query = f"fullText contains '{escaped_query}'"
             logger.info(f"[search_drive_files] Reformatting free text query '{query}' to '{final_query}'")
@@ -306,7 +322,7 @@ async def create_drive_file(
     mime_type: str = 'text/plain',
 ) -> types.CallToolResult:
     """
-    Creates a new file in Google Drive with the specified name, content, and optional parent folder.
+    Creates a new file in Google Drive, supporting creation within shared drives.
 
     Args:
         user_google_email (str): The user's Google email address. Required.
