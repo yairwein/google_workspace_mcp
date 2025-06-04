@@ -116,7 +116,7 @@ async def list_calendars(
         required_scopes=[CALENDAR_READONLY_SCOPE],
     )
     if isinstance(auth_result, types.CallToolResult):
-        return auth_result  # Auth error
+        return auth_result
     service, user_email = auth_result
 
     try:
@@ -193,7 +193,7 @@ async def get_events(
     )
 
     if isinstance(auth_result, types.CallToolResult):
-        return auth_result  # Auth error
+        return auth_result
     service, user_email = auth_result
 
     try:
@@ -324,7 +324,7 @@ async def create_event(
         required_scopes=[CALENDAR_EVENTS_SCOPE],
     )
     if isinstance(auth_result, types.CallToolResult):
-        return auth_result  # Auth error
+        return auth_result
     service, user_email = auth_result
 
     try:
@@ -426,7 +426,7 @@ async def modify_event(
         required_scopes=[CALENDAR_EVENTS_SCOPE],
     )
     if isinstance(auth_result, types.CallToolResult):
-        return auth_result  # Auth error
+        return auth_result
     service, user_email = auth_result
 
     try:
@@ -566,7 +566,7 @@ async def delete_event(
         required_scopes=[CALENDAR_EVENTS_SCOPE],
     )
     if isinstance(auth_result, types.CallToolResult):
-        return auth_result  # Auth error
+        return auth_result
     service, user_email = auth_result
 
     try:

@@ -23,19 +23,82 @@ from core.server import (
 
 logger = logging.getLogger(__name__)
 
+# Precompiled regex patterns for Drive query detection
+DRIVE_QUERY_PATTERNS = [
+    re.compile(r'\b\w+\s*(=|!=|>|<)\s*[\'"].*?[\'"]', re.IGNORECASE),  # field = 'value'
+    re.compile(r'\b\w+\s*(=|!=|>|<)\s*\d+', re.IGNORECASE),            # field = number
+    re.compile(r'\bcontains\b', re.IGNORECASE),                         # contains operator
+    re.compile(r'\bin\s+parents\b', re.IGNORECASE),                     # in parents
+    re.compile(r'\bhas\s*\{', re.IGNORECASE),                          # has {properties}
+    re.compile(r'\btrashed\s*=\s*(true|false)\b', re.IGNORECASE),      # trashed=true/false
+    re.compile(r'\bstarred\s*=\s*(true|false)\b', re.IGNORECASE),      # starred=true/false
+    re.compile(r'[\'"][^\'"]+[\'"]\s+in\s+parents', re.IGNORECASE),    # 'parentId' in parents
+    re.compile(r'\bfullText\s+contains\b', re.IGNORECASE),             # fullText contains
+    re.compile(r'\bname\s*(=|contains)\b', re.IGNORECASE),             # name = or name contains
+    re.compile(r'\bmimeType\s*(=|!=)\b', re.IGNORECASE),               # mimeType operators
+]
+
+
+def _build_drive_list_params(
+    query: str,
+    page_size: int,
+    drive_id: Optional[str] = None,
+    include_items_from_all_drives: bool = True,
+    corpora: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Helper function to build common list parameters for Drive API calls.
+
+    Args:
+        query: The search query string
+        page_size: Maximum number of items to return
+        drive_id: Optional shared drive ID
+        include_items_from_all_drives: Whether to include items from all drives
+        corpora: Optional corpus specification
+
+    Returns:
+        Dictionary of parameters for Drive API list calls
+    """
+    list_params = {
+        "q": query,
+        "pageSize": page_size,
+        "fields": "nextPageToken, files(id, name, mimeType, webViewLink, iconLink, modifiedTime, size)",
+        "supportsAllDrives": True,
+        "includeItemsFromAllDrives": include_items_from_all_drives,
+    }
+
+    if drive_id:
+        list_params["driveId"] = drive_id
+        if corpora:
+            list_params["corpora"] = corpora
+        else:
+            list_params["corpora"] = "drive"
+    elif corpora:
+        list_params["corpora"] = corpora
+
+    return list_params
+
 @server.tool()
 async def search_drive_files(
     user_google_email: str,
     query: str,
     page_size: int = 10,
+    drive_id: Optional[str] = None,
+    include_items_from_all_drives: bool = True,
+    corpora: Optional[str] = None,
 ) -> types.CallToolResult:
     """
-    Searches for files and folders within a user's Google Drive based on a query string.
+    Searches for files and folders within a user's Google Drive, including shared drives.
 
     Args:
         user_google_email (str): The user's Google email address. Required.
-        query (str): The search query string. Supports Google Drive search operators (e.g., 'name contains "report"', 'mimeType="application/vnd.google-apps.document"', 'parents in "folderId"').
+        query (str): The search query string. Supports Google Drive search operators.
         page_size (int): The maximum number of files to return. Defaults to 10.
+        drive_id (Optional[str]): ID of the shared drive to search. If None, behavior depends on `corpora` and `include_items_from_all_drives`.
+        include_items_from_all_drives (bool): Whether shared drive items should be included in results. Defaults to True. This is effective when not specifying a `drive_id`.
+        corpora (Optional[str]): Bodies of items to query (e.g., 'user', 'domain', 'drive', 'allDrives').
+                                 If 'drive_id' is specified and 'corpora' is None, it defaults to 'drive'.
+                                 Otherwise, Drive API default behavior applies. Prefer 'user' or 'drive' over 'allDrives' for efficiency.
 
     Returns:
         types.CallToolResult: Contains a list of found files/folders with their details (ID, name, type, size, modified time, link),
@@ -53,27 +116,33 @@ async def search_drive_files(
         required_scopes=[DRIVE_READONLY_SCOPE],
     )
     if isinstance(auth_result, types.CallToolResult):
-        return auth_result  # Auth error
+        return auth_result
     service, user_email = auth_result
 
     try:
         # Check if the query looks like a structured Drive query or free text
-        drive_query_pattern = r"(\w+\s*(=|!=|>|<|contains|in|has)\s*['\"]?.+?['\"]?|\w+\s*(=|!=|>|<)\s*\d+|trashed\s*=\s*(true|false)|starred\s*=\s*(true|false)|properties\s+has\s*\{.*?\}|appProperties\s+has\s*\{.*?\}|'[^']+'\s+in\s+parents)"
-        is_structured_query = re.search(drive_query_pattern, query, re.IGNORECASE)
+        # Look for Drive API operators and structured query patterns
+        is_structured_query = any(pattern.search(query) for pattern in DRIVE_QUERY_PATTERNS)
 
         if is_structured_query:
             final_query = query
+            logger.info(f"[search_drive_files] Using structured query as-is: '{final_query}'")
         else:
+            # For free text queries, wrap in fullText contains
             escaped_query = query.replace("'", "\\'")
             final_query = f"fullText contains '{escaped_query}'"
             logger.info(f"[search_drive_files] Reformatting free text query '{query}' to '{final_query}'")
 
+        list_params = _build_drive_list_params(
+            query=final_query,
+            page_size=page_size,
+            drive_id=drive_id,
+            include_items_from_all_drives=include_items_from_all_drives,
+            corpora=corpora,
+        )
+
         results = await asyncio.to_thread(
-            service.files().list(
-                q=final_query,
-                pageSize=page_size,
-                fields="nextPageToken, files(id, name, mimeType, webViewLink, iconLink, modifiedTime, size)"
-            ).execute
+            service.files().list(**list_params).execute
         )
         files = results.get('files', [])
         if not files:
@@ -100,7 +169,7 @@ async def get_drive_file_content(
     file_id: str,
 ) -> types.CallToolResult:
     """
-    Retrieves the content of a specific Google Drive file by ID.
+    Retrieves the content of a specific Google Drive file by ID, supporting files in shared drives.
 
     • Native Google Docs, Sheets, Slides → exported as text / CSV.
     • Office files (.docx, .xlsx, .pptx) → unzipped & parsed with std-lib to
@@ -131,7 +200,7 @@ async def get_drive_file_content(
     try:
         file_metadata = await asyncio.to_thread(
             service.files().get(
-                fileId=file_id, fields="id, name, mimeType, webViewLink"
+                fileId=file_id, fields="id, name, mimeType, webViewLink", supportsAllDrives=True
             ).execute
         )
         mime_type = file_metadata.get("mimeType", "")
@@ -201,20 +270,25 @@ async def list_drive_items(
     user_google_email: str,
     folder_id: str = 'root',
     page_size: int = 100,
+    drive_id: Optional[str] = None,
+    include_items_from_all_drives: bool = True,
+    corpora: Optional[str] = None,
 ) -> types.CallToolResult:
     """
-    Lists files and folders directly within a specified Google Drive folder.
-    Defaults to the root folder if `folder_id` is not provided. Does not recurse into subfolders.
+    Lists files and folders, supporting shared drives.
+    If `drive_id` is specified, lists items within that shared drive. `folder_id` is then relative to that drive (or use drive_id as folder_id for root).
+    If `drive_id` is not specified, lists items from user's "My Drive" and accessible shared drives (if `include_items_from_all_drives` is True).
 
     Args:
         user_google_email (str): The user's Google email address. Required.
-        folder_id (str): The ID of the Google Drive folder to list items from. Defaults to 'root'.
-        page_size (int): The maximum number of items to return per page. Defaults to 100.
+        folder_id (str): The ID of the Google Drive folder. Defaults to 'root'. For a shared drive, this can be the shared drive's ID to list its root, or a folder ID within that shared drive.
+        page_size (int): The maximum number of items to return. Defaults to 100.
+        drive_id (Optional[str]): ID of the shared drive. If provided, the listing is scoped to this drive.
+        include_items_from_all_drives (bool): Whether items from all accessible shared drives should be included if `drive_id` is not set. Defaults to True.
+        corpora (Optional[str]): Corpus to query ('user', 'drive', 'allDrives'). If `drive_id` is set and `corpora` is None, 'drive' is used. If None and no `drive_id`, API defaults apply.
 
     Returns:
-        types.CallToolResult: Contains a list of files/folders within the specified folder, including their details (ID, name, type, size, modified time, link),
-                               an error message if the API call fails or the folder is not accessible/found,
-                               or an authentication guidance message if credentials are required.
+        types.CallToolResult: Contains a list of files/folders or an error.
     """
     tool_name = "list_drive_items"
     logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}', Folder ID: '{folder_id}'")
@@ -231,12 +305,18 @@ async def list_drive_items(
     service, user_email = auth_result
 
     try:
+        final_query = f"'{folder_id}' in parents and trashed=false"
+
+        list_params = _build_drive_list_params(
+            query=final_query,
+            page_size=page_size,
+            drive_id=drive_id,
+            include_items_from_all_drives=include_items_from_all_drives,
+            corpora=corpora,
+        )
+
         results = await asyncio.to_thread(
-            service.files().list(
-                q=f"'{folder_id}' in parents and trashed=false",
-                pageSize=page_size,
-                fields="nextPageToken, files(id, name, mimeType, webViewLink, iconLink, modifiedTime, size)"
-            ).execute
+            service.files().list(**list_params).execute
         )
         files = results.get('files', [])
         if not files:
@@ -266,13 +346,13 @@ async def create_drive_file(
     mime_type: str = 'text/plain',
 ) -> types.CallToolResult:
     """
-    Creates a new file in Google Drive with the specified name, content, and optional parent folder.
+    Creates a new file in Google Drive, supporting creation within shared drives.
 
     Args:
         user_google_email (str): The user's Google email address. Required.
         file_name (str): The name for the new file.
         content (str): The content to write to the file.
-        folder_id (str): The ID of the parent folder. Defaults to 'root'.
+        folder_id (str): The ID of the parent folder. Defaults to 'root'. For shared drives, this must be a folder ID within the shared drive.
         mime_type (str): The MIME type of the file. Defaults to 'text/plain'.
 
     Returns:
@@ -304,7 +384,8 @@ async def create_drive_file(
             service.files().create(
                 body=file_metadata,
                 media_body=MediaIoBaseUpload(media, mimetype=mime_type, resumable=True),
-                fields='id, name, webViewLink'
+                fields='id, name, webViewLink',
+                supportsAllDrives=True
             ).execute
         )
 
