@@ -23,6 +23,21 @@ from core.server import (
 
 logger = logging.getLogger(__name__)
 
+# Precompiled regex patterns for Drive query detection
+DRIVE_QUERY_PATTERNS = [
+    re.compile(r'\b\w+\s*(=|!=|>|<)\s*[\'"].*?[\'"]', re.IGNORECASE),  # field = 'value'
+    re.compile(r'\b\w+\s*(=|!=|>|<)\s*\d+', re.IGNORECASE),            # field = number
+    re.compile(r'\bcontains\b', re.IGNORECASE),                         # contains operator
+    re.compile(r'\bin\s+parents\b', re.IGNORECASE),                     # in parents
+    re.compile(r'\bhas\s*\{', re.IGNORECASE),                          # has {properties}
+    re.compile(r'\btrashed\s*=\s*(true|false)\b', re.IGNORECASE),      # trashed=true/false
+    re.compile(r'\bstarred\s*=\s*(true|false)\b', re.IGNORECASE),      # starred=true/false
+    re.compile(r'[\'"][^\'"]+[\'"]\s+in\s+parents', re.IGNORECASE),    # 'parentId' in parents
+    re.compile(r'\bfullText\s+contains\b', re.IGNORECASE),             # fullText contains
+    re.compile(r'\bname\s*(=|contains)\b', re.IGNORECASE),             # name = or name contains
+    re.compile(r'\bmimeType\s*(=|!=)\b', re.IGNORECASE),               # mimeType operators
+]
+
 
 def _build_drive_list_params(
     query: str,
@@ -107,21 +122,7 @@ async def search_drive_files(
     try:
         # Check if the query looks like a structured Drive query or free text
         # Look for Drive API operators and structured query patterns
-        drive_query_patterns = [
-            r'\b\w+\s*(=|!=|>|<)\s*[\'"].*?[\'"]',  # field = 'value'
-            r'\b\w+\s*(=|!=|>|<)\s*\d+',            # field = number
-            r'\bcontains\b',                         # contains operator
-            r'\bin\s+parents\b',                     # in parents
-            r'\bhas\s*\{',                          # has {properties}
-            r'\btrashed\s*=\s*(true|false)\b',      # trashed=true/false
-            r'\bstarred\s*=\s*(true|false)\b',      # starred=true/false
-            r'[\'"][^\'"]+[\'"]\s+in\s+parents',    # 'parentId' in parents
-            r'\bfullText\s+contains\b',             # fullText contains
-            r'\bname\s*(=|contains)\b',             # name = or name contains
-            r'\bmimeType\s*(=|!=)\b',               # mimeType operators
-        ]
-
-        is_structured_query = any(re.search(pattern, query, re.IGNORECASE) for pattern in drive_query_patterns)
+        is_structured_query = any(pattern.search(query) for pattern in DRIVE_QUERY_PATTERNS)
 
         if is_structured_query:
             final_query = query
