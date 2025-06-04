@@ -41,7 +41,7 @@ async def list_spaces(
         required_scopes=[CHAT_READONLY_SCOPE],
     )
     if isinstance(auth_result, types.CallToolResult):
-        return auth_result  # Auth error
+        return auth_result
     service, user_email = auth_result
 
     try:
@@ -59,7 +59,7 @@ async def list_spaces(
         response = await asyncio.to_thread(
             service.spaces().list(**request_params).execute
         )
-        
+
         spaces = response.get('spaces', [])
         if not spaces:
             return types.CallToolResult(content=[types.TextContent(type="text",
@@ -71,7 +71,7 @@ async def list_spaces(
             space_id = space.get('name', '')
             space_type_actual = space.get('spaceType', 'UNKNOWN')
             output.append(f"- {space_name} (ID: {space_id}, Type: {space_type_actual})")
-        
+
         return types.CallToolResult(content=[types.TextContent(type="text", text="\n".join(output))])
 
     except HttpError as e:
@@ -120,7 +120,7 @@ async def get_messages(
                 orderBy=order_by
             ).execute
         )
-        
+
         messages = response.get('messages', [])
         if not messages:
             return types.CallToolResult(content=[types.TextContent(type="text",
@@ -132,11 +132,11 @@ async def get_messages(
             create_time = msg.get('createTime', 'Unknown Time')
             text_content = msg.get('text', 'No text content')
             msg_name = msg.get('name', '')
-            
+
             output.append(f"[{create_time}] {sender}:")
             output.append(f"  {text_content}")
             output.append(f"  (Message ID: {msg_name})\n")
-        
+
         return types.CallToolResult(
             content=[types.TextContent(type="text", text="\n".join(output))]
         )
@@ -175,14 +175,14 @@ async def send_message(
         required_scopes=[CHAT_WRITE_SCOPE],
     )
     if isinstance(auth_result, types.CallToolResult):
-        return auth_result  # Auth error
+        return auth_result
     service, user_email = auth_result
 
     try:
         message_body = {
             'text': message_text
         }
-        
+
         # Add thread key if provided (for threaded replies)
         request_params = {
             'parent': space_id,
@@ -194,10 +194,10 @@ async def send_message(
         message = await asyncio.to_thread(
             service.spaces().messages().create(**request_params).execute
         )
-        
+
         message_name = message.get('name', '')
         create_time = message.get('createTime', '')
-        
+
         msg = f"Message sent to space '{space_id}' by {user_email}. Message ID: {message_name}, Time: {create_time}"
         logger.info(f"Successfully sent message to space '{space_id}' by {user_email}")
         return types.CallToolResult(content=[types.TextContent(type="text", text=msg)])
@@ -230,7 +230,7 @@ async def search_messages(
         required_scopes=[CHAT_READONLY_SCOPE],
     )
     if isinstance(auth_result, types.CallToolResult):
-        return auth_result  # Auth error
+        return auth_result
     service, user_email = auth_result
 
     try:
@@ -252,7 +252,7 @@ async def search_messages(
                 service.spaces().list(pageSize=100).execute
             )
             spaces = spaces_response.get('spaces', [])
-            
+
             messages = []
             for space in spaces[:10]:  # Limit to first 10 spaces to avoid timeout
                 try:
@@ -281,13 +281,13 @@ async def search_messages(
             create_time = msg.get('createTime', 'Unknown Time')
             text_content = msg.get('text', 'No text content')
             space_name = msg.get('_space_name', 'Unknown Space')
-            
+
             # Truncate long messages
             if len(text_content) > 100:
                 text_content = text_content[:100] + "..."
-            
+
             output.append(f"- [{create_time}] {sender} in '{space_name}': {text_content}")
-        
+
         return types.CallToolResult(content=[types.TextContent(type="text", text="\n".join(output))])
 
     except HttpError as e:

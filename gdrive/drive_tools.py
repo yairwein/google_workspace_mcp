@@ -61,7 +61,7 @@ async def search_drive_files(
         required_scopes=[DRIVE_READONLY_SCOPE],
     )
     if isinstance(auth_result, types.CallToolResult):
-        return auth_result  # Auth error
+        return auth_result
     service, user_email = auth_result
 
     try:

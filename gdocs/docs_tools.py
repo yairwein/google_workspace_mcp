@@ -44,7 +44,7 @@ async def search_docs(
         required_scopes=[DRIVE_READONLY_SCOPE],
     )
     if isinstance(auth_result, types.CallToolResult):
-        return auth_result  # Auth error
+        return auth_result
     service, user_email = auth_result
 
     try:
@@ -226,7 +226,7 @@ async def list_docs_in_folder(
         required_scopes=[DRIVE_READONLY_SCOPE],
     )
     if isinstance(auth_result, types.CallToolResult):
-        return auth_result  # Auth error
+        return auth_result
     drive_service, user_email = auth_result # user_email will be consistent
 
     try:

@@ -226,7 +226,7 @@ async def get_gmail_message_content(
         required_scopes=[GMAIL_READONLY_SCOPE],
     )
     if isinstance(auth_result, types.CallToolResult):
-        return auth_result  # Auth error
+        return auth_result
     service, user_email = auth_result
 
     try:
@@ -333,7 +333,7 @@ async def get_gmail_messages_content_batch(
         required_scopes=[GMAIL_READONLY_SCOPE],
     )
     if isinstance(auth_result, types.CallToolResult):
-        return auth_result  # Auth error
+        return auth_result
     service, user_email = auth_result
 
     try:
@@ -510,7 +510,7 @@ async def send_gmail_message(
         required_scopes=[GMAIL_SEND_SCOPE],
     )
     if isinstance(auth_result, types.CallToolResult):
-        return auth_result  # Auth error
+        return auth_result
     service, user_email = auth_result
 
     try:
@@ -583,7 +583,7 @@ async def draft_gmail_message(
         required_scopes=[GMAIL_COMPOSE_SCOPE],
     )
     if isinstance(auth_result, types.CallToolResult):
-        return auth_result  # Auth error
+        return auth_result
     service, user_email = auth_result
 
     try:
@@ -658,7 +658,7 @@ async def get_gmail_thread_content(
         required_scopes=[GMAIL_READONLY_SCOPE],
     )
     if isinstance(auth_result, types.CallToolResult):
-        return auth_result  # Auth error
+        return auth_result
     service, user_email = auth_result
 
     try:
