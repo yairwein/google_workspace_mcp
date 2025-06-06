@@ -11,7 +11,6 @@ from typing import Optional, List, Dict, Literal
 
 from email.mime.text import MIMEText
 
-
 from mcp import types
 from fastapi import Body
 from googleapiclient.errors import HttpError
@@ -797,10 +796,10 @@ async def list_gmail_labels(
             )
 
         lines = [f"Found {len(labels)} labels:", ""]
-        
+
         system_labels = []
         user_labels = []
-        
+
         for label in labels:
             if label.get("type") == "system":
                 system_labels.append(label)
@@ -867,7 +866,7 @@ async def manage_gmail_label(
             isError=True,
             content=[types.TextContent(type="text", text="Label name is required for create action.")],
         )
-    
+
     if action in ["update", "delete"] and not label_id:
         return types.CallToolResult(
             isError=True,
@@ -908,14 +907,14 @@ async def manage_gmail_label(
             current_label = await asyncio.to_thread(
                 service.users().labels().get(userId="me", id=label_id).execute
             )
-            
+
             label_object = {
                 "id": label_id,
                 "name": name if name is not None else current_label["name"],
                 "labelListVisibility": label_list_visibility,
                 "messageListVisibility": message_list_visibility,
             }
-            
+
             updated_label = await asyncio.to_thread(
                 service.users().labels().update(userId="me", id=label_id, body=label_object).execute
             )
@@ -933,7 +932,7 @@ async def manage_gmail_label(
                 service.users().labels().get(userId="me", id=label_id).execute
             )
             label_name = label["name"]
-            
+
             await asyncio.to_thread(
                 service.users().labels().delete(userId="me", id=label_id).execute
             )
