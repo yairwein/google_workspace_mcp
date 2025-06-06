@@ -22,6 +22,8 @@ from core.server import (
     GMAIL_READONLY_SCOPE,
     GMAIL_SEND_SCOPE,
     GMAIL_COMPOSE_SCOPE,
+    GMAIL_MODIFY_SCOPE,
+    GMAIL_LABELS_SCOPE,
     server,
 )
 
@@ -750,6 +752,287 @@ async def get_gmail_thread_content(
         logger.exception(
             f"[{tool_name}] Unexpected error getting Gmail thread content: {e}"
         )
+        return types.CallToolResult(
+            isError=True,
+            content=[types.TextContent(type="text", text=f"Unexpected error: {e}")],
+        )
+
+
+@server.tool()
+async def list_gmail_labels(
+    user_google_email: str,
+) -> types.CallToolResult:
+    """
+    Lists all labels in the user's Gmail account.
+
+    Args:
+        user_google_email (str): The user's Google email address. Required.
+
+    Returns:
+        types.CallToolResult: Contains a list of all labels with their IDs, names, and types, or an error message.
+    """
+    tool_name = "list_gmail_labels"
+    logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}'")
+
+    auth_result = await get_authenticated_google_service(
+        service_name="gmail",
+        version="v1",
+        tool_name=tool_name,
+        user_google_email=user_google_email,
+        required_scopes=[GMAIL_READONLY_SCOPE],
+    )
+    if isinstance(auth_result, types.CallToolResult):
+        return auth_result
+    service, user_email = auth_result
+
+    try:
+        response = await asyncio.to_thread(
+            service.users().labels().list(userId="me").execute
+        )
+        labels = response.get("labels", [])
+
+        if not labels:
+            return types.CallToolResult(
+                content=[types.TextContent(type="text", text="No labels found.")]
+            )
+
+        lines = [f"Found {len(labels)} labels:", ""]
+        
+        system_labels = []
+        user_labels = []
+        
+        for label in labels:
+            if label.get("type") == "system":
+                system_labels.append(label)
+            else:
+                user_labels.append(label)
+
+        if system_labels:
+            lines.append("📂 SYSTEM LABELS:")
+            for label in system_labels:
+                lines.append(f"  • {label['name']} (ID: {label['id']})")
+            lines.append("")
+
+        if user_labels:
+            lines.append("🏷️  USER LABELS:")
+            for label in user_labels:
+                lines.append(f"  • {label['name']} (ID: {label['id']})")
+
+        return types.CallToolResult(
+            content=[types.TextContent(type="text", text="\n".join(lines))]
+        )
+
+    except HttpError as e:
+        logger.error(f"[{tool_name}] Gmail API error listing labels: {e}", exc_info=True)
+        return types.CallToolResult(
+            isError=True,
+            content=[types.TextContent(type="text", text=f"Gmail API error: {e}")],
+        )
+    except Exception as e:
+        logger.exception(f"[{tool_name}] Unexpected error listing Gmail labels: {e}")
+        return types.CallToolResult(
+            isError=True,
+            content=[types.TextContent(type="text", text=f"Unexpected error: {e}")],
+        )
+
+
+@server.tool()
+async def manage_gmail_label(
+    user_google_email: str,
+    action: Literal["create", "update", "delete"],
+    name: Optional[str] = None,
+    label_id: Optional[str] = None,
+    label_list_visibility: Literal["labelShow", "labelHide"] = "labelShow",
+    message_list_visibility: Literal["show", "hide"] = "show",
+) -> types.CallToolResult:
+    """
+    Manages Gmail labels: create, update, or delete labels.
+
+    Args:
+        user_google_email (str): The user's Google email address. Required.
+        action (Literal["create", "update", "delete"]): Action to perform on the label.
+        name (Optional[str]): Label name. Required for create, optional for update.
+        label_id (Optional[str]): Label ID. Required for update and delete operations.
+        label_list_visibility (Literal["labelShow", "labelHide"]): Whether the label is shown in the label list.
+        message_list_visibility (Literal["show", "hide"]): Whether the label is shown in the message list.
+
+    Returns:
+        types.CallToolResult: Result of the label operation or an error message.
+    """
+    tool_name = "manage_gmail_label"
+    logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}', Action: '{action}'")
+
+    if action == "create" and not name:
+        return types.CallToolResult(
+            isError=True,
+            content=[types.TextContent(type="text", text="Label name is required for create action.")],
+        )
+    
+    if action in ["update", "delete"] and not label_id:
+        return types.CallToolResult(
+            isError=True,
+            content=[types.TextContent(type="text", text="Label ID is required for update and delete actions.")],
+        )
+
+    auth_result = await get_authenticated_google_service(
+        service_name="gmail",
+        version="v1",
+        tool_name=tool_name,
+        user_google_email=user_google_email,
+        required_scopes=[GMAIL_LABELS_SCOPE],
+    )
+    if isinstance(auth_result, types.CallToolResult):
+        return auth_result
+    service, user_email = auth_result
+
+    try:
+        if action == "create":
+            label_object = {
+                "name": name,
+                "labelListVisibility": label_list_visibility,
+                "messageListVisibility": message_list_visibility,
+            }
+            created_label = await asyncio.to_thread(
+                service.users().labels().create(userId="me", body=label_object).execute
+            )
+            return types.CallToolResult(
+                content=[
+                    types.TextContent(
+                        type="text",
+                        text=f"Label created successfully!\nName: {created_label['name']}\nID: {created_label['id']}"
+                    )
+                ]
+            )
+
+        elif action == "update":
+            current_label = await asyncio.to_thread(
+                service.users().labels().get(userId="me", id=label_id).execute
+            )
+            
+            label_object = {
+                "id": label_id,
+                "name": name if name is not None else current_label["name"],
+                "labelListVisibility": label_list_visibility,
+                "messageListVisibility": message_list_visibility,
+            }
+            
+            updated_label = await asyncio.to_thread(
+                service.users().labels().update(userId="me", id=label_id, body=label_object).execute
+            )
+            return types.CallToolResult(
+                content=[
+                    types.TextContent(
+                        type="text",
+                        text=f"Label updated successfully!\nName: {updated_label['name']}\nID: {updated_label['id']}"
+                    )
+                ]
+            )
+
+        elif action == "delete":
+            label = await asyncio.to_thread(
+                service.users().labels().get(userId="me", id=label_id).execute
+            )
+            label_name = label["name"]
+            
+            await asyncio.to_thread(
+                service.users().labels().delete(userId="me", id=label_id).execute
+            )
+            return types.CallToolResult(
+                content=[
+                    types.TextContent(
+                        type="text",
+                        text=f"Label '{label_name}' (ID: {label_id}) deleted successfully!"
+                    )
+                ]
+            )
+
+    except HttpError as e:
+        logger.error(f"[{tool_name}] Gmail API error: {e}", exc_info=True)
+        return types.CallToolResult(
+            isError=True,
+            content=[types.TextContent(type="text", text=f"Gmail API error: {e}")],
+        )
+    except Exception as e:
+        logger.exception(f"[{tool_name}] Unexpected error: {e}")
+        return types.CallToolResult(
+            isError=True,
+            content=[types.TextContent(type="text", text=f"Unexpected error: {e}")],
+        )
+
+
+@server.tool()
+async def modify_gmail_message_labels(
+    user_google_email: str,
+    message_id: str,
+    add_label_ids: Optional[List[str]] = None,
+    remove_label_ids: Optional[List[str]] = None,
+) -> types.CallToolResult:
+    """
+    Adds or removes labels from a Gmail message.
+
+    Args:
+        user_google_email (str): The user's Google email address. Required.
+        message_id (str): The ID of the message to modify.
+        add_label_ids (Optional[List[str]]): List of label IDs to add to the message.
+        remove_label_ids (Optional[List[str]]): List of label IDs to remove from the message.
+
+    Returns:
+        types.CallToolResult: Confirmation of label changes or an error message.
+    """
+    tool_name = "modify_gmail_message_labels"
+    logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}', Message ID: '{message_id}'")
+
+    if not add_label_ids and not remove_label_ids:
+        return types.CallToolResult(
+            isError=True,
+            content=[types.TextContent(type="text", text="At least one of add_label_ids or remove_label_ids must be provided.")],
+        )
+
+    auth_result = await get_authenticated_google_service(
+        service_name="gmail",
+        version="v1",
+        tool_name=tool_name,
+        user_google_email=user_google_email,
+        required_scopes=[GMAIL_MODIFY_SCOPE],
+    )
+    if isinstance(auth_result, types.CallToolResult):
+        return auth_result
+    service, user_email = auth_result
+
+    try:
+        body = {}
+        if add_label_ids:
+            body["addLabelIds"] = add_label_ids
+        if remove_label_ids:
+            body["removeLabelIds"] = remove_label_ids
+
+        await asyncio.to_thread(
+            service.users().messages().modify(userId="me", id=message_id, body=body).execute
+        )
+
+        actions = []
+        if add_label_ids:
+            actions.append(f"Added labels: {', '.join(add_label_ids)}")
+        if remove_label_ids:
+            actions.append(f"Removed labels: {', '.join(remove_label_ids)}")
+
+        return types.CallToolResult(
+            content=[
+                types.TextContent(
+                    type="text",
+                    text=f"Message labels updated successfully!\nMessage ID: {message_id}\n{'; '.join(actions)}"
+                )
+            ]
+        )
+
+    except HttpError as e:
+        logger.error(f"[{tool_name}] Gmail API error modifying message labels: {e}", exc_info=True)
+        return types.CallToolResult(
+            isError=True,
+            content=[types.TextContent(type="text", text=f"Gmail API error: {e}")],
+        )
+    except Exception as e:
+        logger.exception(f"[{tool_name}] Unexpected error modifying Gmail message labels: {e}")
         return types.CallToolResult(
             isError=True,
             content=[types.TextContent(type="text", text=f"Unexpected error: {e}")],
