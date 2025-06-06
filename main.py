@@ -31,12 +31,13 @@ try:
 except Exception as e:
     sys.stderr.write(f"CRITICAL: Failed to set up file logging to '{log_file_path}': {e}\n")
 
-# Import calendar tools to register them with the MCP server via decorators
+# Import tool modules to register them with the MCP server via decorators
 import gcalendar.calendar_tools
 import gdrive.drive_tools
 import gmail.gmail_tools
 import gdocs.docs_tools
 import gchat.chat_tools
+import gsheets.sheets_tools
 
 
 def main():

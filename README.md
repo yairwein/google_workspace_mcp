@@ -42,6 +42,7 @@
     - [📁 Google Drive](#-google-drive)
     - [📧 Gmail](#-gmail)
     - [📝 Google Docs](#-google-docs)
+    - [📊 Google Sheets](#-google-sheets)
     - [💬 Google Chat](#-google-chat)
   - [🛠️ Development](#️-development)
     - [Project Structure](#project-structure)
@@ -56,7 +57,7 @@
 
 ## 🌐 Overview
 
-The Google Workspace MCP Server integrates Google Workspace services (Calendar, Drive, Gmail, and Docs) with AI assistants and other applications using the Model Context Protocol (MCP). This allows AI systems to access and interact with user data from Google Workspace applications securely and efficiently.
+The Google Workspace MCP Server integrates Google Workspace services (Calendar, Drive, Gmail, Docs, Sheets, and Chat) with AI assistants and other applications using the Model Context Protocol (MCP). This allows AI systems to access and interact with user data from Google Workspace applications securely and efficiently.
 
 ---
 
@@ -67,6 +68,7 @@ The Google Workspace MCP Server integrates Google Workspace services (Calendar, 
 - **📁 Google Drive Integration**: Search files, list folder contents, read file content, and create new files. Supports extraction and retrieval of .docx, .xlsx and other Microsoft Office formats natively! 
 - **📧 Gmail Integration**: Complete email management - search messages, retrieve content, send emails, and create drafts with full support for all query syntax
 - **📄 Google Docs Integration**: Search for documents, read document content, list documents in folders, and create new documents right from your chat!
+- **📊 Google Sheets Integration**: Complete spreadsheet management - list spreadsheets, read/write/clear cell values, create spreadsheets and sheets, with flexible value modification
 - **🔄 Multiple Transport Options**: Streamable HTTP + SSE fallback
 - **🔌 `mcpo` Compatibility**: Easily expose the server as an OpenAPI endpoint for integration with tools like Open WebUI
 - **🧩 Extensible Design**: Simple structure for adding support for more Google Workspace APIs and tools
@@ -81,7 +83,7 @@ The Google Workspace MCP Server integrates Google Workspace services (Calendar, 
 
 - **Python 3.11+**
 - **[uv](https://github.com/astral-sh/uv)** package installer (or pip)
-- **Google Cloud Project** with OAuth 2.0 credentials enabled for required APIs (Calendar, Drive, Gmail, Docs)
+- **Google Cloud Project** with OAuth 2.0 credentials enabled for required APIs (Calendar, Drive, Gmail, Docs, Sheets, Chat)
 
 ### Installation
 
@@ -100,7 +102,7 @@ uv pip install -e .
 ### Configuration
 
 1. Create **OAuth 2.0 Credentials** (web application type) in the [Google Cloud Console](https://console.cloud.google.com/).
-2. Enable the **Google Calendar API**, **Google Drive API**, **Gmail API**, and **Google Docs API** for your project.
+2. Enable the **Google Calendar API**, **Google Drive API**, **Gmail API**, **Google Docs API**, and **Google Sheets API** for your project.
 3. Download the OAuth client credentials as `client_secret.json` and place it in the project's root directory.
 4. Add the following redirect URI to your OAuth client configuration in the Google Cloud Console. Note that `http://localhost:8000` is the default base URI and port, which can be customized via environment variables (`WORKSPACE_MCP_BASE_URI` and `WORKSPACE_MCP_PORT`). If you change these, you must update the redirect URI in the Google Cloud Console accordingly.
    ```
@@ -345,6 +347,30 @@ Source: [`gmail/gmail_tools.py`](gmail/gmail_tools.py)
 
 Source: [`gdocs/docs_tools.py`](gdocs/docs_tools.py)
 
+| Tool                 | Description                                                                         | Parameters |
+|----------------------|-------------------------------------------------------------------------------------|------------|
+| `search_docs`        | Search for Google Docs by name (using Drive API).                                   | • `query` (required): Text to search for in Doc names<br>• `user_google_email` (optional)<br>• `page_size` (optional, default: 10)<br>• `mcp_session_id` (injected automatically) |
+| `get_doc_content`    | Retrieve the plain text content of a Google Doc by its document ID.                 | • `document_id` (required)<br>• `user_google_email` (optional)<br>• `mcp_session_id` (injected automatically) |
+| `list_docs_in_folder`| List all Google Docs inside a given Drive folder (by folder ID, default = `root`).  | • `folder_id` (optional, default: `'root'`)<br>• `user_google_email` (optional)<br>• `page_size` (optional, default: 100)<br>• `mcp_session_id` (injected automatically) |
+| `create_doc`         | Create a new Google Doc, optionally with initial content.                           | • `title` (required): Name for the doc<br>• `content` (optional, default: empty)<br>• `user_google_email` (optional)<br>• `mcp_session_id` (injected automatically) |
+
+### 📊 Google Sheets
+
+Source: [`gsheets/sheets_tools.py`](gsheets/sheets_tools.py)
+
+| Tool | Description | Parameters |
+|------|-------------|------------|
+| `list_spreadsheets` | Lists spreadsheets from Google Drive that the user has access to. | • `user_google_email` (required): The user's Google email address<br>• `max_results` (optional, default: 25): Maximum number of spreadsheets to return |
+| `get_spreadsheet_info` | Gets information about a specific spreadsheet including its sheets. | • `user_google_email` (required): The user's Google email address<br>• `spreadsheet_id` (required): The ID of the spreadsheet to get info for |
+| `read_sheet_values` | Reads values from a specific range in a Google Sheet. | • `user_google_email` (required): The user's Google email address<br>• `spreadsheet_id` (required): The ID of the spreadsheet<br>• `range_name` (optional, default: "A1:Z1000"): The range to read (e.g., "Sheet1!A1:D10", "A1:D10") |
+| `modify_sheet_values` | Modifies values in a specific range of a Google Sheet - can write, update, or clear values. | • `user_google_email` (required): The user's Google email address<br>• `spreadsheet_id` (required): The ID of the spreadsheet<br>• `range_name` (required): The range to modify<br>• `values` (optional): 2D array of values to write/update. Required unless clear_values=True<br>• `value_input_option` (optional, default: "USER_ENTERED"): How to interpret input values ("RAW" or "USER_ENTERED")<br>• `clear_values` (optional, default: False): If True, clears the range instead of writing values |
+| `create_spreadsheet` | Creates a new Google Spreadsheet. | • `user_google_email` (required): The user's Google email address<br>• `title` (required): The title of the new spreadsheet<br>• `sheet_names` (optional): List of sheet names to create. If not provided, creates one sheet with default name |
+| `create_sheet` | Creates a new sheet within an existing spreadsheet. | • `user_google_email` (required): The user's Google email address<br>• `spreadsheet_id` (required): The ID of the spreadsheet<br>• `sheet_name` (required): The name of the new sheet |
+
+> ℹ️ All Sheets tools require `user_google_email` for authentication. If authentication fails or is required, the tool will return an error prompting the LLM to use the centralized `start_google_auth` tool with the user's email and `service_name="Google Sheets"`.
+
+> 📊 **Sheet Operations**: The `modify_sheet_values` tool consolidates write, update, and clear operations into a single flexible function. Use `clear_values=True` to clear a range, or provide `values` to write/update data.
+
 ### 💬 Google Chat
 
 Source: [`gchat/chat_tools.py`](gchat/chat_tools.py)
@@ -357,12 +383,6 @@ Source: [`gchat/chat_tools.py`](gchat/chat_tools.py)
 | `search_messages`| Searches for messages across Chat spaces by text content.                   | • `user_google_email` (required)<br>• `query` (required): Text to search for<br>• `space_id` (optional): If provided, searches only in this space<br>• `page_size` (optional, default: 25) |
 
 > ℹ️ All Chat tools require `user_google_email` for authentication. If authentication fails or is required, the tool will return an error prompting the LLM to use the centralized `start_google_auth` tool with the user's email and `service_name="Google Chat"`.
-| Tool                 | Description                                                                         | Parameters |
-|----------------------|-------------------------------------------------------------------------------------|------------|
-| `search_docs`        | Search for Google Docs by name (using Drive API).                                   | • `query` (required): Text to search for in Doc names<br>• `user_google_email` (optional)<br>• `page_size` (optional, default: 10)<br>• `mcp_session_id` (injected automatically) |
-| `get_doc_content`    | Retrieve the plain text content of a Google Doc by its document ID.                 | • `document_id` (required)<br>• `user_google_email` (optional)<br>• `mcp_session_id` (injected automatically) |
-| `list_docs_in_folder`| List all Google Docs inside a given Drive folder (by folder ID, default = `root`).  | • `folder_id` (optional, default: `'root'`)<br>• `user_google_email` (optional)<br>• `page_size` (optional, default: 100)<br>• `mcp_session_id` (injected automatically) |
-| `create_doc`         | Create a new Google Doc, optionally with initial content.                           | • `title` (required): Name for the doc<br>• `content` (optional, default: empty)<br>• `user_google_email` (optional)<br>• `mcp_session_id` (injected automatically) |
 
 ---
 
@@ -379,6 +399,7 @@ google_workspace_mcp/
 ├── gdocs/             # Google Docs tools (docs_tools.py)
 ├── gdrive/            # Google Drive tools (drive_tools.py)
 ├── gmail/             # Gmail tools (gmail_tools.py)
+├── gsheets/           # Google Sheets tools (sheets_tools.py)
 ├── .gitignore         # Git ignore file
 ├── client_secret.json # Google OAuth Credentials (DO NOT COMMIT)
 ├── config.json        # Example mcpo configuration
@@ -472,7 +493,7 @@ if not credentials or not credentials.valid:
   - Running `mcpo` behind a reverse proxy (like Nginx or Caddy) to handle HTTPS termination, proper logging, and more robust authentication
   - Binding `mcpo` only to trusted network interfaces if exposing it beyond localhost
 
-- **Scope Management**: The server requests specific OAuth scopes (permissions) for Calendar, Drive, and Gmail. Users grant access based on these scopes during the initial authentication. Do not request broader scopes than necessary for the implemented tools.
+- **Scope Management**: The server requests specific OAuth scopes (permissions) for Calendar, Drive, Gmail, Docs, Sheets, and Chat. Users grant access based on these scopes during the initial authentication. Do not request broader scopes than necessary for the implemented tools.
 
 ---
 

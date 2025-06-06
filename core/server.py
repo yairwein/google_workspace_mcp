@@ -36,6 +36,9 @@ from config.google_config import (
     CHAT_WRITE_SCOPE,
     CHAT_SPACES_SCOPE,
     CHAT_SCOPES,
+    SHEETS_READONLY_SCOPE,
+    SHEETS_WRITE_SCOPE,
+    SHEETS_SCOPES,
     SCOPES
 )
 
