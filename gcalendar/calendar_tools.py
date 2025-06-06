@@ -14,7 +14,7 @@ from typing import List, Optional, Dict, Any
 from mcp import types
 from googleapiclient.errors import HttpError
 
-from auth.google_auth import get_authenticated_google_service
+from auth.google_auth import get_authenticated_google_service, GoogleAuthenticationError
 
 from core.server import (
     server,
@@ -106,16 +106,16 @@ async def list_calendars(
         f"[{tool_name}] Invoked. Email: '{user_google_email}'"
     )
 
-    auth_result = await get_authenticated_google_service(
-        service_name="calendar",
-        version="v3",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[CALENDAR_READONLY_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+    try:
+        service, user_email = await get_authenticated_google_service(
+            service_name="calendar",
+            version="v3",
+            tool_name=tool_name,
+            user_google_email=user_google_email,
+            required_scopes=[CALENDAR_READONLY_SCOPE],
+        )
+    except GoogleAuthenticationError as e:
+        raise Exception(str(e))
 
     try:
         calendar_list_response = await asyncio.to_thread(
@@ -168,17 +168,16 @@ async def get_events(
     """
     tool_name = "get_events"
 
-    auth_result = await get_authenticated_google_service(
-        service_name="calendar",
-        version="v3",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[CALENDAR_READONLY_SCOPE],
-    )
-
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+    try:
+        service, user_email = await get_authenticated_google_service(
+            service_name="calendar",
+            version="v3",
+            tool_name=tool_name,
+            user_google_email=user_google_email,
+            required_scopes=[CALENDAR_READONLY_SCOPE],
+        )
+    except GoogleAuthenticationError as e:
+        raise Exception(str(e))
 
     try:
         logger.info(
@@ -287,16 +286,16 @@ async def create_event(
         f"[{tool_name}] Invoked. Email: '{user_google_email}', Summary: {summary}"
     )
 
-    auth_result = await get_authenticated_google_service(
-        service_name="calendar",
-        version="v3",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[CALENDAR_EVENTS_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+    try:
+        service, user_email = await get_authenticated_google_service(
+            service_name="calendar",
+            version="v3",
+            tool_name=tool_name,
+            user_google_email=user_google_email,
+            required_scopes=[CALENDAR_EVENTS_SCOPE],
+        )
+    except GoogleAuthenticationError as e:
+        raise Exception(str(e))
 
     try:
 
@@ -383,16 +382,16 @@ async def modify_event(
         f"[{tool_name}] Invoked. Email: '{user_google_email}', Event ID: {event_id}"
     )
 
-    auth_result = await get_authenticated_google_service(
-        service_name="calendar",
-        version="v3",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[CALENDAR_EVENTS_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+    try:
+        service, user_email = await get_authenticated_google_service(
+            service_name="calendar",
+            version="v3",
+            tool_name=tool_name,
+            user_google_email=user_google_email,
+            required_scopes=[CALENDAR_EVENTS_SCOPE],
+        )
+    except GoogleAuthenticationError as e:
+        raise Exception(str(e))
 
     try:
 
@@ -513,16 +512,16 @@ async def delete_event(
         f"[{tool_name}] Invoked. Email: '{user_google_email}', Event ID: {event_id}"
     )
 
-    auth_result = await get_authenticated_google_service(
-        service_name="calendar",
-        version="v3",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[CALENDAR_EVENTS_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+    try:
+        service, user_email = await get_authenticated_google_service(
+            service_name="calendar",
+            version="v3",
+            tool_name=tool_name,
+            user_google_email=user_google_email,
+            required_scopes=[CALENDAR_EVENTS_SCOPE],
+        )
+    except GoogleAuthenticationError as e:
+        raise Exception(str(e))
 
     try:
 

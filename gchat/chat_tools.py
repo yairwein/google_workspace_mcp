@@ -11,7 +11,7 @@ from mcp import types
 from googleapiclient.errors import HttpError
 
 # Auth & server utilities
-from auth.google_auth import get_authenticated_google_service
+from auth.google_auth import get_authenticated_google_service, GoogleAuthenticationError
 from core.server import server
 from config.google_config import (
     CHAT_READONLY_SCOPE,
@@ -36,16 +36,16 @@ async def list_spaces(
     tool_name = "list_spaces"
     logger.info(f"[{tool_name}] Email={user_google_email}, Type={space_type}")
 
-    auth_result = await get_authenticated_google_service(
-        service_name="chat",
-        version="v1",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[CHAT_READONLY_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+    try:
+        service, user_email = await get_authenticated_google_service(
+            service_name="chat",
+            version="v1",
+            tool_name=tool_name,
+            user_google_email=user_google_email,
+            required_scopes=[CHAT_READONLY_SCOPE],
+        )
+    except GoogleAuthenticationError as e:
+        raise Exception(str(e))
 
     try:
         # Build filter based on space_type
@@ -99,16 +99,16 @@ async def get_messages(
     tool_name = "get_messages"
     logger.info(f"[{tool_name}] Space ID: '{space_id}' for user '{user_google_email}'")
 
-    auth_result = await get_authenticated_google_service(
-        service_name="chat",
-        version="v1",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[CHAT_READONLY_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+    try:
+        service, user_email = await get_authenticated_google_service(
+            service_name="chat",
+            version="v1",
+            tool_name=tool_name,
+            user_google_email=user_google_email,
+            required_scopes=[CHAT_READONLY_SCOPE],
+        )
+    except GoogleAuthenticationError as e:
+        raise Exception(str(e))
 
     try:
         # Get space info first
@@ -166,16 +166,16 @@ async def send_message(
     tool_name = "send_message"
     logger.info(f"[{tool_name}] Email: '{user_google_email}', Space: '{space_id}'")
 
-    auth_result = await get_authenticated_google_service(
-        service_name="chat",
-        version="v1",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[CHAT_WRITE_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+    try:
+        service, user_email = await get_authenticated_google_service(
+            service_name="chat",
+            version="v1",
+            tool_name=tool_name,
+            user_google_email=user_google_email,
+            required_scopes=[CHAT_WRITE_SCOPE],
+        )
+    except GoogleAuthenticationError as e:
+        raise Exception(str(e))
 
     try:
         message_body = {
@@ -224,16 +224,16 @@ async def search_messages(
     tool_name = "search_messages"
     logger.info(f"[{tool_name}] Email={user_google_email}, Query='{query}'")
 
-    auth_result = await get_authenticated_google_service(
-        service_name="chat",
-        version="v1",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[CHAT_READONLY_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+    try:
+        service, user_email = await get_authenticated_google_service(
+            service_name="chat",
+            version="v1",
+            tool_name=tool_name,
+            user_google_email=user_google_email,
+            required_scopes=[CHAT_READONLY_SCOPE],
+        )
+    except GoogleAuthenticationError as e:
+        raise Exception(str(e))
 
     try:
         # If specific space provided, search within that space

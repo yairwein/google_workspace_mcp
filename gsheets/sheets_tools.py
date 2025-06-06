@@ -11,7 +11,7 @@ from typing import List, Optional
 from mcp import types
 from googleapiclient.errors import HttpError
 
-from auth.google_auth import get_authenticated_google_service
+from auth.google_auth import get_authenticated_google_service, GoogleAuthenticationError
 from core.server import server
 from config.google_config import SHEETS_READONLY_SCOPE, SHEETS_WRITE_SCOPE
 
@@ -37,16 +37,16 @@ async def list_spreadsheets(
     tool_name = "list_spreadsheets"
     logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}'")
 
-    auth_result = await get_authenticated_google_service(
-        service_name="drive",
-        version="v3",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[SHEETS_READONLY_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+    try:
+        service, user_email = await get_authenticated_google_service(
+            service_name="drive",
+            version="v3",
+            tool_name=tool_name,
+            user_google_email=user_google_email,
+            required_scopes=[SHEETS_READONLY_SCOPE],
+        )
+    except GoogleAuthenticationError as e:
+        raise Exception(str(e))
 
     try:
         files_response = await asyncio.to_thread(
@@ -105,16 +105,16 @@ async def get_spreadsheet_info(
     tool_name = "get_spreadsheet_info"
     logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}', Spreadsheet ID: {spreadsheet_id}")
 
-    auth_result = await get_authenticated_google_service(
-        service_name="sheets",
-        version="v4",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[SHEETS_READONLY_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+    try:
+        service, user_email = await get_authenticated_google_service(
+            service_name="sheets",
+            version="v4",
+            tool_name=tool_name,
+            user_google_email=user_google_email,
+            required_scopes=[SHEETS_READONLY_SCOPE],
+        )
+    except GoogleAuthenticationError as e:
+        raise Exception(str(e))
 
     try:
         spreadsheet = await asyncio.to_thread(
@@ -176,16 +176,16 @@ async def read_sheet_values(
     tool_name = "read_sheet_values"
     logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}', Spreadsheet: {spreadsheet_id}, Range: {range_name}")
 
-    auth_result = await get_authenticated_google_service(
-        service_name="sheets",
-        version="v4",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[SHEETS_READONLY_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+    try:
+        service, user_email = await get_authenticated_google_service(
+            service_name="sheets",
+            version="v4",
+            tool_name=tool_name,
+            user_google_email=user_google_email,
+            required_scopes=[SHEETS_READONLY_SCOPE],
+        )
+    except GoogleAuthenticationError as e:
+        raise Exception(str(e))
 
     try:
         result = await asyncio.to_thread(
@@ -255,16 +255,16 @@ async def modify_sheet_values(
     if not clear_values and not values:
         raise Exception("Either 'values' must be provided or 'clear_values' must be True.")
 
-    auth_result = await get_authenticated_google_service(
-        service_name="sheets",
-        version="v4",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[SHEETS_WRITE_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+    try:
+        service, user_email = await get_authenticated_google_service(
+            service_name="sheets",
+            version="v4",
+            tool_name=tool_name,
+            user_google_email=user_google_email,
+            required_scopes=[SHEETS_WRITE_SCOPE],
+        )
+    except GoogleAuthenticationError as e:
+        raise Exception(str(e))
 
     try:
         if clear_values:
@@ -335,16 +335,16 @@ async def create_spreadsheet(
     tool_name = "create_spreadsheet"
     logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}', Title: {title}")
 
-    auth_result = await get_authenticated_google_service(
-        service_name="sheets",
-        version="v4",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[SHEETS_WRITE_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+    try:
+        service, user_email = await get_authenticated_google_service(
+            service_name="sheets",
+            version="v4",
+            tool_name=tool_name,
+            user_google_email=user_google_email,
+            required_scopes=[SHEETS_WRITE_SCOPE],
+        )
+    except GoogleAuthenticationError as e:
+        raise Exception(str(e))
 
     try:
         spreadsheet_body = {
@@ -403,16 +403,16 @@ async def create_sheet(
     tool_name = "create_sheet"
     logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}', Spreadsheet: {spreadsheet_id}, Sheet: {sheet_name}")
 
-    auth_result = await get_authenticated_google_service(
-        service_name="sheets",
-        version="v4",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[SHEETS_WRITE_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+    try:
+        service, user_email = await get_authenticated_google_service(
+            service_name="sheets",
+            version="v4",
+            tool_name=tool_name,
+            user_google_email=user_google_email,
+            required_scopes=[SHEETS_WRITE_SCOPE],
+        )
+    except GoogleAuthenticationError as e:
+        raise Exception(str(e))
 
     try:
         request_body = {

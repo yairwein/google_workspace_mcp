@@ -15,7 +15,7 @@ from mcp import types
 from fastapi import Body
 from googleapiclient.errors import HttpError
 
-from auth.google_auth import get_authenticated_google_service
+from auth.google_auth import get_authenticated_google_service, GoogleAuthenticationError
 
 from core.server import (
     GMAIL_READONLY_SCOPE,
@@ -154,16 +154,16 @@ async def search_gmail_messages(
         f"[{tool_name}] Invoked. Email: '{user_google_email}', Query: '{query}'"
     )
 
-    auth_result = await get_authenticated_google_service(
-        service_name="gmail",
-        version="v1",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[GMAIL_READONLY_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+    try:
+        service, user_email = await get_authenticated_google_service(
+            service_name="gmail",
+            version="v1",
+            tool_name=tool_name,
+            user_google_email=user_google_email,
+            required_scopes=[GMAIL_READONLY_SCOPE],
+        )
+    except GoogleAuthenticationError as e:
+        raise Exception(str(e))
 
     try:
 
@@ -211,16 +211,16 @@ async def get_gmail_message_content(
         f"[{tool_name}] Invoked. Message ID: '{message_id}', Email: '{user_google_email}'"
     )
 
-    auth_result = await get_authenticated_google_service(
-        service_name="gmail",
-        version="v1",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[GMAIL_READONLY_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+    try:
+        service, user_email = await get_authenticated_google_service(
+            service_name="gmail",
+            version="v1",
+            tool_name=tool_name,
+            user_google_email=user_google_email,
+            required_scopes=[GMAIL_READONLY_SCOPE],
+        )
+    except GoogleAuthenticationError as e:
+        raise Exception(str(e))
 
     try:
         logger.info(f"[{tool_name}] Using service for: {user_google_email}")
@@ -308,16 +308,16 @@ async def get_gmail_messages_content_batch(
     if not message_ids:
         raise Exception("No message IDs provided")
 
-    auth_result = await get_authenticated_google_service(
-        service_name="gmail",
-        version="v1",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[GMAIL_READONLY_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+    try:
+        service, user_email = await get_authenticated_google_service(
+            service_name="gmail",
+            version="v1",
+            tool_name=tool_name,
+            user_google_email=user_google_email,
+            required_scopes=[GMAIL_READONLY_SCOPE],
+        )
+    except GoogleAuthenticationError as e:
+        raise Exception(str(e))
 
     try:
         output_messages = []
@@ -477,16 +477,16 @@ async def send_gmail_message(
     """
     tool_name = "send_gmail_message"
 
-    auth_result = await get_authenticated_google_service(
-        service_name="gmail",
-        version="v1",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[GMAIL_SEND_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+    try:
+        service, user_email = await get_authenticated_google_service(
+            service_name="gmail",
+            version="v1",
+            tool_name=tool_name,
+            user_google_email=user_google_email,
+            required_scopes=[GMAIL_SEND_SCOPE],
+        )
+    except GoogleAuthenticationError as e:
+        raise Exception(str(e))
 
     try:
 
@@ -538,16 +538,16 @@ async def draft_gmail_message(
         f"[{tool_name}] Invoked. Email: '{user_google_email}', Subject: '{subject}'"
     )
 
-    auth_result = await get_authenticated_google_service(
-        service_name="gmail",
-        version="v1",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[GMAIL_COMPOSE_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+    try:
+        service, user_email = await get_authenticated_google_service(
+            service_name="gmail",
+            version="v1",
+            tool_name=tool_name,
+            user_google_email=user_google_email,
+            required_scopes=[GMAIL_COMPOSE_SCOPE],
+        )
+    except GoogleAuthenticationError as e:
+        raise Exception(str(e))
 
     try:
 
@@ -601,16 +601,16 @@ async def get_gmail_thread_content(
         f"[{tool_name}] Invoked. Thread ID: '{thread_id}', Email: '{user_google_email}'"
     )
 
-    auth_result = await get_authenticated_google_service(
-        service_name="gmail",
-        version="v1",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[GMAIL_READONLY_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+    try:
+        service, user_email = await get_authenticated_google_service(
+            service_name="gmail",
+            version="v1",
+            tool_name=tool_name,
+            user_google_email=user_google_email,
+            required_scopes=[GMAIL_READONLY_SCOPE],
+        )
+    except GoogleAuthenticationError as e:
+        raise Exception(str(e))
 
     try:
         # Fetch the complete thread with all messages
@@ -709,16 +709,16 @@ async def list_gmail_labels(
     tool_name = "list_gmail_labels"
     logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}'")
 
-    auth_result = await get_authenticated_google_service(
-        service_name="gmail",
-        version="v1",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[GMAIL_READONLY_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+    try:
+        service, user_email = await get_authenticated_google_service(
+            service_name="gmail",
+            version="v1",
+            tool_name=tool_name,
+            user_google_email=user_google_email,
+            required_scopes=[GMAIL_READONLY_SCOPE],
+        )
+    except GoogleAuthenticationError as e:
+        raise Exception(str(e))
 
     try:
         response = await asyncio.to_thread(
@@ -793,16 +793,16 @@ async def manage_gmail_label(
     if action in ["update", "delete"] and not label_id:
         raise Exception("Label ID is required for update and delete actions.")
 
-    auth_result = await get_authenticated_google_service(
-        service_name="gmail",
-        version="v1",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[GMAIL_LABELS_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+    try:
+        service, user_email = await get_authenticated_google_service(
+            service_name="gmail",
+            version="v1",
+            tool_name=tool_name,
+            user_google_email=user_google_email,
+            required_scopes=[GMAIL_LABELS_SCOPE],
+        )
+    except GoogleAuthenticationError as e:
+        raise Exception(str(e))
 
     try:
         if action == "create":
@@ -877,16 +877,16 @@ async def modify_gmail_message_labels(
     if not add_label_ids and not remove_label_ids:
         raise Exception("At least one of add_label_ids or remove_label_ids must be provided.")
 
-    auth_result = await get_authenticated_google_service(
-        service_name="gmail",
-        version="v1",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[GMAIL_MODIFY_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+    try:
+        service, user_email = await get_authenticated_google_service(
+            service_name="gmail",
+            version="v1",
+            tool_name=tool_name,
+            user_google_email=user_google_email,
+            required_scopes=[GMAIL_MODIFY_SCOPE],
+        )
+    except GoogleAuthenticationError as e:
+        raise Exception(str(e))
 
     try:
         body = {}

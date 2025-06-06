@@ -13,7 +13,7 @@ from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaIoBaseDownload
 
 # Auth & server utilities
-from auth.google_auth import get_authenticated_google_service
+from auth.google_auth import get_authenticated_google_service, GoogleAuthenticationError
 from core.utils import extract_office_xml_text
 from core.server import (
     server,
@@ -39,16 +39,16 @@ async def search_docs(
     tool_name = "search_docs"
     logger.info(f"[{tool_name}] Email={user_google_email}, Query='{query}'")
 
-    auth_result = await get_authenticated_google_service(
-        service_name="drive",
-        version="v3",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[DRIVE_READONLY_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+    try:
+        service, user_email = await get_authenticated_google_service(
+            service_name="drive",
+            version="v3",
+            tool_name=tool_name,
+            user_google_email=user_google_email,
+            required_scopes=[DRIVE_READONLY_SCOPE],
+        )
+    except GoogleAuthenticationError as e:
+        raise Exception(str(e))
 
     try:
         escaped_query = query.replace("'", "\\'")
@@ -92,16 +92,16 @@ async def get_doc_content(
     logger.info(f"[{tool_name}] Invoked. Document/File ID: '{document_id}' for user '{user_google_email}'")
 
     # Step 1: Authenticate with Drive API to get metadata
-    drive_auth_result = await get_authenticated_google_service(
-        service_name="drive",
-        version="v3",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[DRIVE_READONLY_SCOPE],
-    )
-    if isinstance(drive_auth_result, types.CallToolResult):
-        return drive_auth_result
-    drive_service, user_email = drive_auth_result # user_email will be consistent
+    try:
+        drive_service, user_email = await get_authenticated_google_service(
+            service_name="drive",
+            version="v3",
+            tool_name=tool_name,
+            user_google_email=user_google_email,
+            required_scopes=[DRIVE_READONLY_SCOPE],
+        ) # user_email will be consistent
+    except GoogleAuthenticationError as e:
+        raise Exception(str(e))
 
     try:
         # Step 2: Get file metadata from Drive
@@ -121,16 +121,16 @@ async def get_doc_content(
         # Step 3: Process based on mimeType
         if mime_type == "application/vnd.google-apps.document":
             logger.info(f"[{tool_name}] Processing as native Google Doc.")
-            docs_auth_result = await get_authenticated_google_service(
-                service_name="docs",
-                version="v1",
-                tool_name=tool_name,
-                user_google_email=user_google_email,
-                required_scopes=[DOCS_READONLY_SCOPE],
-            )
-            if isinstance(docs_auth_result, types.CallToolResult):
-                return docs_auth_result
-            docs_service, _ = docs_auth_result # user_email already obtained from drive_auth
+            try:
+                docs_service, _ = await get_authenticated_google_service(
+                    service_name="docs",
+                    version="v1",
+                    tool_name=tool_name,
+                    user_google_email=user_google_email,
+                    required_scopes=[DOCS_READONLY_SCOPE],
+                ) # user_email already obtained from drive_auth
+            except GoogleAuthenticationError as e:
+                raise Exception(str(e))
 
             doc_data = await asyncio.to_thread(
                 docs_service.documents().get(documentId=document_id).execute
@@ -218,16 +218,16 @@ async def list_docs_in_folder(
     tool_name = "list_docs_in_folder"
     logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}', Folder ID: '{folder_id}'")
 
-    auth_result = await get_authenticated_google_service(
-        service_name="drive",
-        version="v3",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[DRIVE_READONLY_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    drive_service, user_email = auth_result # user_email will be consistent
+    try:
+        drive_service, user_email = await get_authenticated_google_service(
+            service_name="drive",
+            version="v3",
+            tool_name=tool_name,
+            user_google_email=user_google_email,
+            required_scopes=[DRIVE_READONLY_SCOPE],
+        ) # user_email will be consistent
+    except GoogleAuthenticationError as e:
+        raise Exception(str(e))
 
     try:
         rsp = await asyncio.to_thread(
@@ -267,16 +267,16 @@ async def create_doc(
     tool_name = "create_doc"
     logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}', Title='{title}'")
 
-    auth_result = await get_authenticated_google_service(
-        service_name="docs",
-        version="v1",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[DOCS_WRITE_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    docs_service, user_email = auth_result
+    try:
+        docs_service, user_email = await get_authenticated_google_service(
+            service_name="docs",
+            version="v1",
+            tool_name=tool_name,
+            user_google_email=user_google_email,
+            required_scopes=[DOCS_WRITE_SCOPE],
+        )
+    except GoogleAuthenticationError as e:
+        raise Exception(str(e))
 
     try:
         doc = await asyncio.to_thread(docs_service.documents().create(body={'title': title}).execute)

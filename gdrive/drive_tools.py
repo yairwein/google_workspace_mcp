@@ -13,7 +13,7 @@ from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 import io
 
-from auth.google_auth import get_authenticated_google_service
+from auth.google_auth import get_authenticated_google_service, GoogleAuthenticationError
 from core.utils import extract_office_xml_text
 from core.server import server
 from core.server import (
@@ -106,16 +106,16 @@ async def search_drive_files(
     tool_name = "search_drive_files"
     logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}', Query: '{query}'")
 
-    auth_result = await get_authenticated_google_service(
-        service_name="drive",
-        version="v3",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[DRIVE_READONLY_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+    try:
+        service, user_email = await get_authenticated_google_service(
+            service_name="drive",
+            version="v3",
+            tool_name=tool_name,
+            user_google_email=user_google_email,
+            required_scopes=[DRIVE_READONLY_SCOPE],
+        )
+    except GoogleAuthenticationError as e:
+        raise Exception(str(e))
 
     try:
         # Check if the query looks like a structured Drive query or free text
@@ -184,16 +184,16 @@ async def get_drive_file_content(
     tool_name = "get_drive_file_content"
     logger.info(f"[{tool_name}] Invoked. File ID: '{file_id}'")
 
-    auth_result = await get_authenticated_google_service(
-        service_name="drive",
-        version="v3",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[DRIVE_READONLY_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, _ = auth_result
+    try:
+        service, _ = await get_authenticated_google_service(
+            service_name="drive",
+            version="v3",
+            tool_name=tool_name,
+            user_google_email=user_google_email,
+            required_scopes=[DRIVE_READONLY_SCOPE],
+        )
+    except GoogleAuthenticationError as e:
+        raise Exception(str(e))
 
     try:
         file_metadata = await asyncio.to_thread(
@@ -283,16 +283,16 @@ async def list_drive_items(
     tool_name = "list_drive_items"
     logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}', Folder ID: '{folder_id}'")
 
-    auth_result = await get_authenticated_google_service(
-        service_name="drive",
-        version="v3",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[DRIVE_READONLY_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+    try:
+        service, user_email = await get_authenticated_google_service(
+            service_name="drive",
+            version="v3",
+            tool_name=tool_name,
+            user_google_email=user_google_email,
+            required_scopes=[DRIVE_READONLY_SCOPE],
+        )
+    except GoogleAuthenticationError as e:
+        raise Exception(str(e))
 
     try:
         final_query = f"'{folder_id}' in parents and trashed=false"
@@ -351,16 +351,16 @@ async def create_drive_file(
     tool_name = "create_drive_file"
     logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}', File Name: {file_name}, Folder ID: {folder_id}")
 
-    auth_result = await get_authenticated_google_service(
-        service_name="drive",
-        version="v3",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[DRIVE_FILE_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+    try:
+        service, user_email = await get_authenticated_google_service(
+            service_name="drive",
+            version="v3",
+            tool_name=tool_name,
+            user_google_email=user_google_email,
+            required_scopes=[DRIVE_FILE_SCOPE],
+        )
+    except GoogleAuthenticationError as e:
+        raise Exception(str(e))
 
     try:
         file_metadata = {
