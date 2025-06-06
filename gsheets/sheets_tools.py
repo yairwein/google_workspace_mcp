@@ -1,0 +1,517 @@
+"""
+Google Sheets MCP Tools
+
+This module provides MCP tools for interacting with Google Sheets API.
+"""
+
+import logging
+import asyncio
+from typing import List, Optional, Dict, Any, Union
+
+from mcp import types
+from googleapiclient.errors import HttpError
+
+from auth.google_auth import get_authenticated_google_service
+from core.server import server
+from config.google_config import SHEETS_READONLY_SCOPE, SHEETS_WRITE_SCOPE
+
+# Configure module logger
+logger = logging.getLogger(__name__)
+
+
+@server.tool()
+async def list_spreadsheets(
+    user_google_email: str,
+    max_results: int = 25,
+) -> types.CallToolResult:
+    """
+    Lists spreadsheets from Google Drive that the user has access to.
+    
+    Args:
+        user_google_email (str): The user's Google email address. Required.
+        max_results (int): Maximum number of spreadsheets to return. Defaults to 25.
+    
+    Returns:
+        types.CallToolResult: Contains a list of spreadsheet files (name, ID, modified time),
+                               an error message if the API call fails,
+                               or an authentication guidance message if credentials are required.
+    """
+    tool_name = "list_spreadsheets"
+    logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}'")
+
+    auth_result = await get_authenticated_google_service(
+        service_name="drive",
+        version="v3",
+        tool_name=tool_name,
+        user_google_email=user_google_email,
+        required_scopes=[SHEETS_READONLY_SCOPE],
+    )
+    if isinstance(auth_result, types.CallToolResult):
+        return auth_result
+    service, user_email = auth_result
+
+    try:
+        files_response = await asyncio.to_thread(
+            service.files()
+            .list(
+                q="mimeType='application/vnd.google-apps.spreadsheet'",
+                pageSize=max_results,
+                fields="files(id,name,modifiedTime,webViewLink)",
+                orderBy="modifiedTime desc",
+            )
+            .execute
+        )
+        
+        files = files_response.get("files", [])
+        if not files:
+            return types.CallToolResult(
+                content=[
+                    types.TextContent(
+                        type="text", text=f"No spreadsheets found for {user_email}."
+                    )
+                ]
+            )
+
+        spreadsheets_list = [
+            f"- \"{file['name']}\" (ID: {file['id']}) | Modified: {file.get('modifiedTime', 'Unknown')} | Link: {file.get('webViewLink', 'No link')}"
+            for file in files
+        ]
+        
+        text_output = (
+            f"Successfully listed {len(files)} spreadsheets for {user_email}:\n"
+            + "\n".join(spreadsheets_list)
+        )
+        
+        logger.info(f"Successfully listed {len(files)} spreadsheets for {user_email}.")
+        return types.CallToolResult(
+            content=[types.TextContent(type="text", text=text_output)]
+        )
+        
+    except HttpError as error:
+        message = f"API error listing spreadsheets: {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with user's email and service_name='Google Sheets'."
+        logger.error(message, exc_info=True)
+        return types.CallToolResult(
+            isError=True, content=[types.TextContent(type="text", text=message)]
+        )
+    except Exception as e:
+        message = f"Unexpected error listing spreadsheets: {e}."
+        logger.exception(message)
+        return types.CallToolResult(
+            isError=True, content=[types.TextContent(type="text", text=message)]
+        )
+
+
+@server.tool()
+async def get_spreadsheet_info(
+    user_google_email: str,
+    spreadsheet_id: str,
+) -> types.CallToolResult:
+    """
+    Gets information about a specific spreadsheet including its sheets.
+    
+    Args:
+        user_google_email (str): The user's Google email address. Required.
+        spreadsheet_id (str): The ID of the spreadsheet to get info for. Required.
+    
+    Returns:
+        types.CallToolResult: Contains spreadsheet information (title, sheets list),
+                               an error message if the API call fails,
+                               or an authentication guidance message if credentials are required.
+    """
+    tool_name = "get_spreadsheet_info"
+    logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}', Spreadsheet ID: {spreadsheet_id}")
+
+    auth_result = await get_authenticated_google_service(
+        service_name="sheets",
+        version="v4",
+        tool_name=tool_name,
+        user_google_email=user_google_email,
+        required_scopes=[SHEETS_READONLY_SCOPE],
+    )
+    if isinstance(auth_result, types.CallToolResult):
+        return auth_result
+    service, user_email = auth_result
+
+    try:
+        spreadsheet = await asyncio.to_thread(
+            service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute
+        )
+        
+        title = spreadsheet.get("properties", {}).get("title", "Unknown")
+        sheets = spreadsheet.get("sheets", [])
+        
+        sheets_info = []
+        for sheet in sheets:
+            sheet_props = sheet.get("properties", {})
+            sheet_name = sheet_props.get("title", "Unknown")
+            sheet_id = sheet_props.get("sheetId", "Unknown")
+            grid_props = sheet_props.get("gridProperties", {})
+            rows = grid_props.get("rowCount", "Unknown")
+            cols = grid_props.get("columnCount", "Unknown")
+            
+            sheets_info.append(
+                f"  - \"{sheet_name}\" (ID: {sheet_id}) | Size: {rows}x{cols}"
+            )
+        
+        text_output = (
+            f"Spreadsheet: \"{title}\" (ID: {spreadsheet_id})\n"
+            f"Sheets ({len(sheets)}):\n"
+            + "\n".join(sheets_info) if sheets_info else "  No sheets found"
+        )
+        
+        logger.info(f"Successfully retrieved info for spreadsheet {spreadsheet_id} for {user_email}.")
+        return types.CallToolResult(
+            content=[types.TextContent(type="text", text=text_output)]
+        )
+        
+    except HttpError as error:
+        message = f"API error getting spreadsheet info: {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with user's email and service_name='Google Sheets'."
+        logger.error(message, exc_info=True)
+        return types.CallToolResult(
+            isError=True, content=[types.TextContent(type="text", text=message)]
+        )
+    except Exception as e:
+        message = f"Unexpected error getting spreadsheet info: {e}."
+        logger.exception(message)
+        return types.CallToolResult(
+            isError=True, content=[types.TextContent(type="text", text=message)]
+        )
+
+
+@server.tool()
+async def read_sheet_values(
+    user_google_email: str,
+    spreadsheet_id: str,
+    range_name: str = "A1:Z1000",
+) -> types.CallToolResult:
+    """
+    Reads values from a specific range in a Google Sheet.
+    
+    Args:
+        user_google_email (str): The user's Google email address. Required.
+        spreadsheet_id (str): The ID of the spreadsheet. Required.
+        range_name (str): The range to read (e.g., "Sheet1!A1:D10", "A1:D10"). Defaults to "A1:Z1000".
+    
+    Returns:
+        types.CallToolResult: Contains the values from the specified range,
+                               an error message if the API call fails,
+                               or an authentication guidance message if credentials are required.
+    """
+    tool_name = "read_sheet_values"
+    logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}', Spreadsheet: {spreadsheet_id}, Range: {range_name}")
+
+    auth_result = await get_authenticated_google_service(
+        service_name="sheets",
+        version="v4",
+        tool_name=tool_name,
+        user_google_email=user_google_email,
+        required_scopes=[SHEETS_READONLY_SCOPE],
+    )
+    if isinstance(auth_result, types.CallToolResult):
+        return auth_result
+    service, user_email = auth_result
+
+    try:
+        result = await asyncio.to_thread(
+            service.spreadsheets()
+            .values()
+            .get(spreadsheetId=spreadsheet_id, range=range_name)
+            .execute
+        )
+        
+        values = result.get("values", [])
+        if not values:
+            return types.CallToolResult(
+                content=[
+                    types.TextContent(
+                        type="text", text=f"No data found in range '{range_name}' for {user_email}."
+                    )
+                ]
+            )
+
+        # Format the output as a readable table
+        formatted_rows = []
+        for i, row in enumerate(values, 1):
+            # Pad row with empty strings to show structure
+            padded_row = row + [""] * max(0, len(values[0]) - len(row)) if values else row
+            formatted_rows.append(f"Row {i:2d}: {padded_row}")
+        
+        text_output = (
+            f"Successfully read {len(values)} rows from range '{range_name}' in spreadsheet {spreadsheet_id} for {user_email}:\n"
+            + "\n".join(formatted_rows[:50])  # Limit to first 50 rows for readability
+            + (f"\n... and {len(values) - 50} more rows" if len(values) > 50 else "")
+        )
+        
+        logger.info(f"Successfully read {len(values)} rows for {user_email}.")
+        return types.CallToolResult(
+            content=[types.TextContent(type="text", text=text_output)]
+        )
+        
+    except HttpError as error:
+        message = f"API error reading sheet values: {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with user's email and service_name='Google Sheets'."
+        logger.error(message, exc_info=True)
+        return types.CallToolResult(
+            isError=True, content=[types.TextContent(type="text", text=message)]
+        )
+    except Exception as e:
+        message = f"Unexpected error reading sheet values: {e}."
+        logger.exception(message)
+        return types.CallToolResult(
+            isError=True, content=[types.TextContent(type="text", text=message)]
+        )
+
+
+@server.tool()
+async def modify_sheet_values(
+    user_google_email: str,
+    spreadsheet_id: str,
+    range_name: str,
+    values: Optional[List[List[str]]] = None,
+    value_input_option: str = "USER_ENTERED",
+    clear_values: bool = False,
+) -> types.CallToolResult:
+    """
+    Modifies values in a specific range of a Google Sheet - can write, update, or clear values.
+    
+    Args:
+        user_google_email (str): The user's Google email address. Required.
+        spreadsheet_id (str): The ID of the spreadsheet. Required.
+        range_name (str): The range to modify (e.g., "Sheet1!A1:D10", "A1:D10"). Required.
+        values (Optional[List[List[str]]]): 2D array of values to write/update. Required unless clear_values=True.
+        value_input_option (str): How to interpret input values ("RAW" or "USER_ENTERED"). Defaults to "USER_ENTERED".
+        clear_values (bool): If True, clears the range instead of writing values. Defaults to False.
+    
+    Returns:
+        types.CallToolResult: Confirms successful modification operation,
+                               an error message if the API call fails,
+                               or an authentication guidance message if credentials are required.
+    """
+    tool_name = "modify_sheet_values"
+    operation = "clear" if clear_values else "write"
+    logger.info(f"[{tool_name}] Invoked. Operation: {operation}, Email: '{user_google_email}', Spreadsheet: {spreadsheet_id}, Range: {range_name}")
+
+    if not clear_values and not values:
+        message = "Either 'values' must be provided or 'clear_values' must be True."
+        return types.CallToolResult(
+            isError=True, content=[types.TextContent(type="text", text=message)]
+        )
+
+    auth_result = await get_authenticated_google_service(
+        service_name="sheets",
+        version="v4",
+        tool_name=tool_name,
+        user_google_email=user_google_email,
+        required_scopes=[SHEETS_WRITE_SCOPE],
+    )
+    if isinstance(auth_result, types.CallToolResult):
+        return auth_result
+    service, user_email = auth_result
+
+    try:
+        if clear_values:
+            result = await asyncio.to_thread(
+                service.spreadsheets()
+                .values()
+                .clear(spreadsheetId=spreadsheet_id, range=range_name)
+                .execute
+            )
+            
+            cleared_range = result.get("clearedRange", range_name)
+            text_output = f"Successfully cleared range '{cleared_range}' in spreadsheet {spreadsheet_id} for {user_email}."
+            logger.info(f"Successfully cleared range '{cleared_range}' for {user_email}.")
+        else:
+            body = {"values": values}
+            
+            result = await asyncio.to_thread(
+                service.spreadsheets()
+                .values()
+                .update(
+                    spreadsheetId=spreadsheet_id,
+                    range=range_name,
+                    valueInputOption=value_input_option,
+                    body=body,
+                )
+                .execute
+            )
+            
+            updated_cells = result.get("updatedCells", 0)
+            updated_rows = result.get("updatedRows", 0)
+            updated_columns = result.get("updatedColumns", 0)
+            
+            text_output = (
+                f"Successfully updated range '{range_name}' in spreadsheet {spreadsheet_id} for {user_email}. "
+                f"Updated: {updated_cells} cells, {updated_rows} rows, {updated_columns} columns."
+            )
+            logger.info(f"Successfully updated {updated_cells} cells for {user_email}.")
+        
+        return types.CallToolResult(
+            content=[types.TextContent(type="text", text=text_output)]
+        )
+        
+    except HttpError as error:
+        message = f"API error modifying sheet values: {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with user's email and service_name='Google Sheets'."
+        logger.error(message, exc_info=True)
+        return types.CallToolResult(
+            isError=True, content=[types.TextContent(type="text", text=message)]
+        )
+    except Exception as e:
+        message = f"Unexpected error modifying sheet values: {e}."
+        logger.exception(message)
+        return types.CallToolResult(
+            isError=True, content=[types.TextContent(type="text", text=message)]
+        )
+
+
+@server.tool()
+async def create_spreadsheet(
+    user_google_email: str,
+    title: str,
+    sheet_names: Optional[List[str]] = None,
+) -> types.CallToolResult:
+    """
+    Creates a new Google Spreadsheet.
+    
+    Args:
+        user_google_email (str): The user's Google email address. Required.
+        title (str): The title of the new spreadsheet. Required.
+        sheet_names (Optional[List[str]]): List of sheet names to create. If not provided, creates one sheet with default name.
+    
+    Returns:
+        types.CallToolResult: Contains the new spreadsheet information (ID, URL),
+                               an error message if the API call fails,
+                               or an authentication guidance message if credentials are required.
+    """
+    tool_name = "create_spreadsheet"
+    logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}', Title: {title}")
+
+    auth_result = await get_authenticated_google_service(
+        service_name="sheets",
+        version="v4",
+        tool_name=tool_name,
+        user_google_email=user_google_email,
+        required_scopes=[SHEETS_WRITE_SCOPE],
+    )
+    if isinstance(auth_result, types.CallToolResult):
+        return auth_result
+    service, user_email = auth_result
+
+    try:
+        spreadsheet_body = {
+            "properties": {
+                "title": title
+            }
+        }
+        
+        if sheet_names:
+            spreadsheet_body["sheets"] = [
+                {"properties": {"title": sheet_name}} for sheet_name in sheet_names
+            ]
+        
+        spreadsheet = await asyncio.to_thread(
+            service.spreadsheets().create(body=spreadsheet_body).execute
+        )
+        
+        spreadsheet_id = spreadsheet.get("spreadsheetId")
+        spreadsheet_url = spreadsheet.get("spreadsheetUrl")
+        
+        text_output = (
+            f"Successfully created spreadsheet '{title}' for {user_email}. "
+            f"ID: {spreadsheet_id} | URL: {spreadsheet_url}"
+        )
+        
+        logger.info(f"Successfully created spreadsheet for {user_email}. ID: {spreadsheet_id}")
+        return types.CallToolResult(
+            content=[types.TextContent(type="text", text=text_output)]
+        )
+        
+    except HttpError as error:
+        message = f"API error creating spreadsheet: {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with user's email and service_name='Google Sheets'."
+        logger.error(message, exc_info=True)
+        return types.CallToolResult(
+            isError=True, content=[types.TextContent(type="text", text=message)]
+        )
+    except Exception as e:
+        message = f"Unexpected error creating spreadsheet: {e}."
+        logger.exception(message)
+        return types.CallToolResult(
+            isError=True, content=[types.TextContent(type="text", text=message)]
+        )
+
+
+@server.tool()
+async def create_sheet(
+    user_google_email: str,
+    spreadsheet_id: str,
+    sheet_name: str,
+) -> types.CallToolResult:
+    """
+    Creates a new sheet within an existing spreadsheet.
+    
+    Args:
+        user_google_email (str): The user's Google email address. Required.
+        spreadsheet_id (str): The ID of the spreadsheet. Required.
+        sheet_name (str): The name of the new sheet. Required.
+    
+    Returns:
+        types.CallToolResult: Confirms successful sheet creation,
+                               an error message if the API call fails,
+                               or an authentication guidance message if credentials are required.
+    """
+    tool_name = "create_sheet"
+    logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}', Spreadsheet: {spreadsheet_id}, Sheet: {sheet_name}")
+
+    auth_result = await get_authenticated_google_service(
+        service_name="sheets",
+        version="v4",
+        tool_name=tool_name,
+        user_google_email=user_google_email,
+        required_scopes=[SHEETS_WRITE_SCOPE],
+    )
+    if isinstance(auth_result, types.CallToolResult):
+        return auth_result
+    service, user_email = auth_result
+
+    try:
+        request_body = {
+            "requests": [
+                {
+                    "addSheet": {
+                        "properties": {
+                            "title": sheet_name
+                        }
+                    }
+                }
+            ]
+        }
+        
+        response = await asyncio.to_thread(
+            service.spreadsheets()
+            .batchUpdate(spreadsheetId=spreadsheet_id, body=request_body)
+            .execute
+        )
+        
+        sheet_id = response["replies"][0]["addSheet"]["properties"]["sheetId"]
+        
+        text_output = (
+            f"Successfully created sheet '{sheet_name}' (ID: {sheet_id}) in spreadsheet {spreadsheet_id} for {user_email}."
+        )
+        
+        logger.info(f"Successfully created sheet for {user_email}. Sheet ID: {sheet_id}")
+        return types.CallToolResult(
+            content=[types.TextContent(type="text", text=text_output)]
+        )
+        
+    except HttpError as error:
+        message = f"API error creating sheet: {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with user's email and service_name='Google Sheets'."
+        logger.error(message, exc_info=True)
+        return types.CallToolResult(
+            isError=True, content=[types.TextContent(type="text", text=message)]
+        )
+    except Exception as e:
+        message = f"Unexpected error creating sheet: {e}."
+        logger.exception(message)
+        return types.CallToolResult(
+            isError=True, content=[types.TextContent(type="text", text=message)]
+        )
+
+

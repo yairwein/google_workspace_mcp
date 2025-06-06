@@ -39,6 +39,10 @@ CHAT_READONLY_SCOPE = 'https://www.googleapis.com/auth/chat.messages.readonly'
 CHAT_WRITE_SCOPE = 'https://www.googleapis.com/auth/chat.messages'
 CHAT_SPACES_SCOPE = 'https://www.googleapis.com/auth/chat.spaces'
 
+# Google Sheets API scopes
+SHEETS_READONLY_SCOPE = 'https://www.googleapis.com/auth/spreadsheets.readonly'
+SHEETS_WRITE_SCOPE = 'https://www.googleapis.com/auth/spreadsheets'
+
 # Base OAuth scopes required for user identification
 BASE_SCOPES = [
     USERINFO_EMAIL_SCOPE,
@@ -79,5 +83,11 @@ CHAT_SCOPES = [
     CHAT_SPACES_SCOPE
 ]
 
+# Sheets-specific scopes
+SHEETS_SCOPES = [
+    SHEETS_READONLY_SCOPE,
+    SHEETS_WRITE_SCOPE
+]
+
 # Combined scopes for all supported Google Workspace operations
-SCOPES = list(set(BASE_SCOPES + CALENDAR_SCOPES + DRIVE_SCOPES + GMAIL_SCOPES + DOCS_SCOPES + CHAT_SCOPES))
+SCOPES = list(set(BASE_SCOPES + CALENDAR_SCOPES + DRIVE_SCOPES + GMAIL_SCOPES + DOCS_SCOPES + CHAT_SCOPES + SHEETS_SCOPES))
