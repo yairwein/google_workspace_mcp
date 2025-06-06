@@ -31,6 +31,8 @@ DOCS_WRITE_SCOPE = 'https://www.googleapis.com/auth/documents'
 GMAIL_READONLY_SCOPE   = 'https://www.googleapis.com/auth/gmail.readonly'
 GMAIL_SEND_SCOPE       = 'https://www.googleapis.com/auth/gmail.send'
 GMAIL_COMPOSE_SCOPE    = 'https://www.googleapis.com/auth/gmail.compose'
+GMAIL_MODIFY_SCOPE     = 'https://www.googleapis.com/auth/gmail.modify'
+GMAIL_LABELS_SCOPE     = 'https://www.googleapis.com/auth/gmail.labels'
 
 # Google Chat API scopes
 CHAT_READONLY_SCOPE = 'https://www.googleapis.com/auth/chat.messages.readonly'
@@ -65,7 +67,9 @@ DRIVE_SCOPES = [
 GMAIL_SCOPES = [
     GMAIL_READONLY_SCOPE,
     GMAIL_SEND_SCOPE,
-    GMAIL_COMPOSE_SCOPE
+    GMAIL_COMPOSE_SCOPE,
+    GMAIL_MODIFY_SCOPE,
+    GMAIL_LABELS_SCOPE
 ]
 
 # Chat-specific scopes
