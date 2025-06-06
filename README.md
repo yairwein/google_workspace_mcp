@@ -14,7 +14,7 @@
 
 **See it in action:**
 <div align="center">
-  <video width="860" src="https://github.com/user-attachments/assets/af05efc5-bc49-4886-90d1-7a2b26dd0c1c"></video>
+  <video width="832" src="https://github.com/user-attachments/assets/a342ebb4-1319-4060-a974-39d202329710"></video>
 </div>
 
 ---
