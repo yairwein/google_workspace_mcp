@@ -29,9 +29,12 @@ async def search_docs(
     user_google_email: str,
     query: str,
     page_size: int = 10,
-) -> types.CallToolResult:
+) -> str:
     """
     Searches for Google Docs by name using Drive API (mimeType filter).
+    
+    Returns:
+        str: A formatted list of Google Docs matching the search query.
     """
     tool_name = "search_docs"
     logger.info(f"[{tool_name}] Email={user_google_email}, Query='{query}'")
@@ -59,29 +62,31 @@ async def search_docs(
         )
         files = response.get('files', [])
         if not files:
-            return types.CallToolResult(content=[types.TextContent(type="text",
-                text=f"No Google Docs found matching '{query}'.")])
+            return f"No Google Docs found matching '{query}'."
 
         output = [f"Found {len(files)} Google Docs matching '{query}':"]
         for f in files:
             output.append(
                 f"- {f['name']} (ID: {f['id']}) Modified: {f.get('modifiedTime')} Link: {f.get('webViewLink')}"
             )
-        return types.CallToolResult(content=[types.TextContent(type="text", text="\n".join(output))])
+        return "\n".join(output)
 
     except HttpError as e:
         logger.error(f"API error in search_docs: {e}", exc_info=True)
-        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=f"API error: {e}")])
+        raise Exception(f"API error: {e}")
 
 @server.tool()
 async def get_doc_content(
     user_google_email: str,
     document_id: str,
-) -> types.CallToolResult:
+) -> str:
     """
     Retrieves content of a Google Doc or a Drive file (like .docx) identified by document_id.
     - Native Google Docs: Fetches content via Docs API.
     - Office files (.docx, etc.) stored in Drive: Downloads via Drive API and extracts text.
+    
+    Returns:
+        str: The document content with metadata header.
     """
     tool_name = "get_doc_content"
     logger.info(f"[{tool_name}] Invoked. Document/File ID: '{document_id}' for user '{user_google_email}'")
@@ -186,34 +191,29 @@ async def get_doc_content(
             f'File: "{file_name}" (ID: {document_id}, Type: {mime_type})\n'
             f'Link: {web_view_link}\n\n--- CONTENT ---\n'
         )
-        return types.CallToolResult(
-            content=[types.TextContent(type="text", text=header + body_text)]
-        )
+        return header + body_text
 
     except HttpError as error:
         logger.error(
             f"[{tool_name}] API error for ID {document_id}: {error}",
             exc_info=True,
         )
-        return types.CallToolResult(
-            isError=True,
-            content=[types.TextContent(type="text", text=f"API error processing document/file ID {document_id}: {error}")],
-        )
+        raise Exception(f"API error processing document/file ID {document_id}: {error}")
     except Exception as e:
         logger.exception(f"[{tool_name}] Unexpected error for ID {document_id}: {e}")
-        return types.CallToolResult(
-            isError=True,
-            content=[types.TextContent(type="text", text=f"Unexpected error processing document/file ID {document_id}: {e}")],
-        )
+        raise Exception(f"Unexpected error processing document/file ID {document_id}: {e}")
 
 @server.tool()
 async def list_docs_in_folder(
     user_google_email: str,
     folder_id: str = 'root',
     page_size: int = 100
-) -> types.CallToolResult:
+) -> str:
     """
     Lists Google Docs within a specific Drive folder.
+    
+    Returns:
+        str: A formatted list of Google Docs in the specified folder.
     """
     tool_name = "list_docs_in_folder"
     logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}', Folder ID: '{folder_id}'")
@@ -239,28 +239,30 @@ async def list_docs_in_folder(
         )
         items = rsp.get('files', [])
         if not items:
-            return types.CallToolResult(content=[types.TextContent(type="text",
-                text=f"No Google Docs found in folder '{folder_id}'.")])
+            return f"No Google Docs found in folder '{folder_id}'."
         out = [f"Found {len(items)} Docs in folder '{folder_id}':"]
         for f in items:
             out.append(f"- {f['name']} (ID: {f['id']}) Modified: {f.get('modifiedTime')} Link: {f.get('webViewLink')}")
-        return types.CallToolResult(content=[types.TextContent(type="text", text="\n".join(out))])
+        return "\n".join(out)
 
     except HttpError as e:
         logger.error(f"API error in {tool_name}: {e}", exc_info=True)
-        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=f"API error: {e}")])
+        raise Exception(f"API error: {e}")
     except Exception as e:
         logger.exception(f"Unexpected error in {tool_name}: {e}")
-        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=f"Unexpected error: {e}")])
+        raise Exception(f"Unexpected error: {e}")
 
 @server.tool()
 async def create_doc(
     user_google_email: str, # Made user_google_email required
     title: str,
     content: str = '',
-) -> types.CallToolResult:
+) -> str:
     """
     Creates a new Google Doc and optionally inserts initial content.
+    
+    Returns:
+        str: Confirmation message with document ID and link.
     """
     tool_name = "create_doc"
     logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}', Title='{title}'")
@@ -285,11 +287,11 @@ async def create_doc(
         link = f"https://docs.google.com/document/d/{doc_id}/edit"
         msg = f"Created Google Doc '{title}' (ID: {doc_id}) for {user_email}. Link: {link}"
         logger.info(f"Successfully created Google Doc '{title}' (ID: {doc_id}) for {user_email}. Link: {link}")
-        return types.CallToolResult(content=[types.TextContent(type="text", text=msg)])
+        return msg
 
     except HttpError as e:
         logger.error(f"API error in {tool_name}: {e}", exc_info=True)
-        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=f"API error: {e}")])
+        raise Exception(f"API error: {e}")
     except Exception as e:
         logger.exception(f"Unexpected error in {tool_name}: {e}")
-        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=f"Unexpected error: {e}")])
+        raise Exception(f"Unexpected error: {e}")
