@@ -13,13 +13,9 @@ from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 import io
 
-from auth.google_auth import get_authenticated_google_service, GoogleAuthenticationError
+from auth.service_decorator import require_google_service
 from core.utils import extract_office_xml_text
 from core.server import server
-from core.server import (
-    DRIVE_READONLY_SCOPE,
-    DRIVE_FILE_SCOPE,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +75,9 @@ def _build_drive_list_params(
     return list_params
 
 @server.tool()
+@require_google_service("drive", "drive_read")
 async def search_drive_files(
+    service,
     user_google_email: str,
     query: str,
     page_size: int = 10,
@@ -103,19 +101,7 @@ async def search_drive_files(
     Returns:
         str: A formatted list of found files/folders with their details (ID, name, type, size, modified time, link).
     """
-    tool_name = "search_drive_files"
-    logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}', Query: '{query}'")
-
-    try:
-        service, user_email = await get_authenticated_google_service(
-            service_name="drive",
-            version="v3",
-            tool_name=tool_name,
-            user_google_email=user_google_email,
-            required_scopes=[DRIVE_READONLY_SCOPE],
-        )
-    except GoogleAuthenticationError as e:
-        raise Exception(str(e))
+    logger.info(f"[search_drive_files] Invoked. Email: '{user_google_email}', Query: '{query}'")
 
     try:
         # Check if the query looks like a structured Drive query or free text
@@ -162,7 +148,9 @@ async def search_drive_files(
         raise Exception(f"Unexpected error: {e}")
 
 @server.tool()
+@require_google_service("drive", "drive_read")
 async def get_drive_file_content(
+    service,
     user_google_email: str,
     file_id: str,
 ) -> str:
@@ -181,19 +169,7 @@ async def get_drive_file_content(
     Returns:
         str: The file content as plain text with metadata header.
     """
-    tool_name = "get_drive_file_content"
-    logger.info(f"[{tool_name}] Invoked. File ID: '{file_id}'")
-
-    try:
-        service, _ = await get_authenticated_google_service(
-            service_name="drive",
-            version="v3",
-            tool_name=tool_name,
-            user_google_email=user_google_email,
-            required_scopes=[DRIVE_READONLY_SCOPE],
-        )
-    except GoogleAuthenticationError as e:
-        raise Exception(str(e))
+    logger.info(f"[get_drive_file_content] Invoked. File ID: '{file_id}'")
 
     try:
         file_metadata = await asyncio.to_thread(
@@ -255,8 +231,9 @@ async def get_drive_file_content(
         raise Exception(f"Unexpected error: {e}")
 
 
-@server.tool()
+@require_google_service("drive", "drive_read")
 async def list_drive_items(
+    service,
     user_google_email: str,
     folder_id: str = 'root',
     page_size: int = 100,
@@ -280,19 +257,7 @@ async def list_drive_items(
     Returns:
         str: A formatted list of files/folders in the specified folder.
     """
-    tool_name = "list_drive_items"
-    logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}', Folder ID: '{folder_id}'")
-
-    try:
-        service, user_email = await get_authenticated_google_service(
-            service_name="drive",
-            version="v3",
-            tool_name=tool_name,
-            user_google_email=user_google_email,
-            required_scopes=[DRIVE_READONLY_SCOPE],
-        )
-    except GoogleAuthenticationError as e:
-        raise Exception(str(e))
+    logger.info(f"[list_drive_items] Invoked. Email: '{user_google_email}', Folder ID: '{folder_id}'")
 
     try:
         final_query = f"'{folder_id}' in parents and trashed=false"
@@ -327,8 +292,9 @@ async def list_drive_items(
         logger.exception(f"Unexpected error listing Drive items in folder {folder_id}: {e}")
         raise Exception(f"Unexpected error: {e}")
 
-@server.tool()
+@require_google_service("drive", "drive_file")
 async def create_drive_file(
+    service,
     user_google_email: str,
     file_name: str,
     content: str,
@@ -348,19 +314,7 @@ async def create_drive_file(
     Returns:
         str: Confirmation message of the successful file creation with file link.
     """
-    tool_name = "create_drive_file"
-    logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}', File Name: {file_name}, Folder ID: {folder_id}")
-
-    try:
-        service, user_email = await get_authenticated_google_service(
-            service_name="drive",
-            version="v3",
-            tool_name=tool_name,
-            user_google_email=user_google_email,
-            required_scopes=[DRIVE_FILE_SCOPE],
-        )
-    except GoogleAuthenticationError as e:
-        raise Exception(str(e))
+    logger.info(f"[create_drive_file] Invoked. Email: '{user_google_email}', File Name: {file_name}, Folder ID: {folder_id}")
 
     try:
         file_metadata = {
@@ -380,7 +334,7 @@ async def create_drive_file(
         )
 
         link = created_file.get('webViewLink', 'No link available')
-        confirmation_message = f"Successfully created file '{created_file.get('name', file_name)}' (ID: {created_file.get('id', 'N/A')}) in folder '{folder_id}' for {user_email}. Link: {link}"
+        confirmation_message = f"Successfully created file '{created_file.get('name', file_name)}' (ID: {created_file.get('id', 'N/A')}) in folder '{folder_id}' for {user_google_email}. Link: {link}"
         logger.info(f"Successfully created file. Link: {link}")
         return confirmation_message
 
