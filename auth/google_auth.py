@@ -486,16 +486,20 @@ async def get_authenticated_google_service(
         )
 
         # Import here to avoid circular import
-        from core.server import OAUTH_REDIRECT_URI
+        from core.server import get_oauth_redirect_uri_for_current_mode
+
+        # Ensure OAuth callback is available
+        redirect_uri = get_oauth_redirect_uri_for_current_mode()
+        # Note: We don't know the transport mode here, but the server should have set it
 
         # Generate auth URL and raise exception with it
         auth_response = await start_auth_flow(
             mcp_session_id=None,  # No longer using session-based auth
             user_google_email=user_google_email,
             service_name=f"Google {service_name.title()}",
-            redirect_uri=OAUTH_REDIRECT_URI,
+            redirect_uri=redirect_uri,
         )
-        
+
         # Extract the auth URL from the response and raise with it
         raise GoogleAuthenticationError(auth_response)
 

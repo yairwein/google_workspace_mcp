@@ -4,7 +4,7 @@ import os
 import sys
 
 # Local imports
-from core.server import server
+from core.server import server, set_transport_mode
 
 logging.basicConfig(
     level=logging.INFO,
@@ -85,7 +85,7 @@ def main():
         tool_imports[tool]()
         print(f"   {tool_icons[tool]} {tool.title()} - Google {tool.title()} API integration")
     print()
-    
+
     print(f"📊 Configuration Summary:")
     print(f"   🔧 Tools Enabled: {len(tools_to_import)}/{len(tool_imports)}")
     print(f"   🔑 Auth Method: OAuth 2.0 with PKCE")
@@ -99,14 +99,24 @@ def main():
         print()
 
     try:
+        # Set transport mode for OAuth callback handling
+        set_transport_mode(args.transport)
+
         if args.transport == 'streamable-http':
             print("🚀 Starting server on http://localhost:8000")
         else:
             print("🚀 Starting server in stdio mode")
-        
+            # Start minimal OAuth callback server for stdio mode
+            from auth.oauth_callback_server import ensure_oauth_callback_available
+            port = int(os.getenv('WORKSPACE_MCP_PORT', 8000))
+            if ensure_oauth_callback_available('stdio', port):
+                print(f"   OAuth callback server started on http://localhost:{port}/oauth2callback")
+            else:
+                print("   ⚠️  Warning: Failed to start OAuth callback server")
+
         print("   Ready for MCP connections!")
         print()
-        
+
         if args.transport == 'streamable-http':
             # The server is already configured with port and server_url in core/server.py
             server.run(transport="streamable-http")
@@ -114,10 +124,16 @@ def main():
             server.run()
     except KeyboardInterrupt:
         print("\n👋 Server shutdown requested")
+        # Clean up OAuth callback server if running
+        from auth.oauth_callback_server import cleanup_oauth_callback_server
+        cleanup_oauth_callback_server()
         sys.exit(0)
     except Exception as e:
         print(f"\n❌ Server error: {e}")
         logger.error(f"Unexpected error running server: {e}", exc_info=True)
+        # Clean up OAuth callback server if running
+        from auth.oauth_callback_server import cleanup_oauth_callback_server
+        cleanup_oauth_callback_server()
         sys.exit(1)
 
 if __name__ == "__main__":

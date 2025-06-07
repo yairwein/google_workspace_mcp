@@ -27,7 +27,7 @@ A production-ready MCP server that integrates all major Google Workspace service
 
 ## ✨ Features
 
-- **🔐 Advanced OAuth 2.0**: Secure authentication with automatic token refresh, session management, and service-specific scope handling
+- **🔐 Advanced OAuth 2.0**: Secure authentication with automatic token refresh, transport-aware callback handling, session management, and service-specific scope handling
 - **📅 Google Calendar**: Full calendar management with event CRUD operations
 - **📁 Google Drive**: File operations with native Microsoft Office format support (.docx, .xlsx)
 - **📧 Gmail**: Complete email management with search, send, and draft capabilities
@@ -145,10 +145,16 @@ If you need to use HTTP mode with Claude Desktop:
 
 ### First-Time Authentication
 
+The server features **transport-aware OAuth callback handling**:
+
+- **Stdio Mode**: Automatically starts a minimal HTTP server on port 8000 for OAuth callbacks
+- **HTTP Mode**: Uses the existing FastAPI server for OAuth callbacks
+- **Same OAuth Flow**: Both modes use `http://localhost:8000/oauth2callback` for consistency
+
 When calling a tool:
 1. Server returns authorization URL
 2. Open URL in browser and authorize
-3. Server handles OAuth callback automatically
+3. Server handles OAuth callback automatically (on port 8000 in both modes)
 4. Retry the original request
 
 ---
@@ -255,7 +261,8 @@ async def your_new_tool(service, param1: str, param2: int = 10):
 ## 🔒 Security
 
 - **Credentials**: Never commit `client_secret.json` or `.credentials/` directory
-- **OAuth Callback**: Uses `http://localhost` for development (requires `OAUTHLIB_INSECURE_TRANSPORT=1`)
+- **OAuth Callback**: Uses `http://localhost:8000/oauth2callback` for development (requires `OAUTHLIB_INSECURE_TRANSPORT=1`)
+- **Transport-Aware Callbacks**: Stdio mode starts a minimal HTTP server only for OAuth, ensuring callbacks work in all modes
 - **Production**: Use HTTPS for callback URIs and configure accordingly
 - **Network Exposure**: Consider authentication when using `mcpo` over networks
 - **Scope Minimization**: Tools request only necessary permissions
