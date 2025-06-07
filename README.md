@@ -1,3 +1,5 @@
+<div align="center">
+
 # Google Workspace MCP Server <img src="https://github.com/user-attachments/assets/b89524e4-6e6e-49e6-ba77-00d6df0c6e5c" width="80" align="right" />
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -8,6 +10,8 @@
 **The world's most feature-complete Google Workspace MCP server**
 
 *Connect MCP Clients, AI assistants and developer tools to Google Calendar, Drive, Gmail, Docs, Sheets, and Chat through the Model Context Protocol*
+
+</div>
 
 **See it in action:**
 <div align="center">
