@@ -1,0 +1,281 @@
+"""
+Transport-aware OAuth callback handling.
+
+In streamable-http mode: Uses the existing FastAPI server
+In stdio mode: Starts a minimal HTTP server just for OAuth callbacks
+"""
+
+import asyncio
+import logging
+import threading
+import time
+from typing import Optional, Dict, Any
+import socket
+
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse
+import uvicorn
+
+from auth.google_auth import handle_auth_callback, CONFIG_CLIENT_SECRETS_PATH
+from config.google_config import OAUTH_STATE_TO_SESSION_ID_MAP, SCOPES
+
+logger = logging.getLogger(__name__)
+
+class MinimalOAuthServer:
+    """
+    Minimal HTTP server for OAuth callbacks in stdio mode.
+    Only starts when needed and uses the same port (8000) as streamable-http mode.
+    """
+    
+    def __init__(self, port: int = 8000):
+        self.port = port
+        self.app = FastAPI()
+        self.server = None
+        self.server_thread = None
+        self.is_running = False
+        
+        # Setup the callback route
+        self._setup_callback_route()
+    
+    def _setup_callback_route(self):
+        """Setup the OAuth callback route."""
+        
+        @self.app.get("/oauth2callback")
+        async def oauth_callback(request: Request):
+            """Handle OAuth callback - same logic as in core/server.py"""
+            state = request.query_params.get("state")
+            code = request.query_params.get("code")
+            error = request.query_params.get("error")
+
+            if error:
+                error_message = f"Authentication failed: Google returned an error: {error}. State: {state}."
+                logger.error(error_message)
+                return HTMLResponse(content=f"""
+                    <html><head><title>Authentication Error</title></head>
+                    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; text-align: center;">
+                        <h2 style="color: #d32f2f;">Authentication Error</h2>
+                        <p>{error_message}</p>
+                        <p>Please ensure you grant the requested permissions. You can close this window and try again.</p>
+                        <script>setTimeout(function() {{ window.close(); }}, 10000);</script>
+                    </body></html>
+                """, status_code=400)
+
+            if not code:
+                error_message = "Authentication failed: No authorization code received from Google."
+                logger.error(error_message)
+                return HTMLResponse(content=f"""
+                    <html><head><title>Authentication Error</title></head>
+                    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; text-align: center;">
+                        <h2 style="color: #d32f2f;">Authentication Error</h2>
+                        <p>{error_message}</p>
+                        <p>You can close this window and try again.</p>
+                        <script>setTimeout(function() {{ window.close(); }}, 10000);</script>
+                    </body></html>
+                """, status_code=400)
+
+            try:
+                logger.info(f"OAuth callback: Received code (state: {state}). Attempting to exchange for tokens.")
+
+                mcp_session_id: Optional[str] = OAUTH_STATE_TO_SESSION_ID_MAP.pop(state, None)
+                if mcp_session_id:
+                    logger.info(f"OAuth callback: Retrieved MCP session ID '{mcp_session_id}' for state '{state}'.")
+                else:
+                    logger.warning(f"OAuth callback: No MCP session ID found for state '{state}'. Auth will not be tied to a specific session.")
+
+                # Exchange code for credentials
+                verified_user_id, credentials = handle_auth_callback(
+                    client_secrets_path=CONFIG_CLIENT_SECRETS_PATH,
+                    scopes=SCOPES,
+                    authorization_response=str(request.url),
+                    redirect_uri=f"http://localhost:{self.port}/oauth2callback",
+                    session_id=mcp_session_id
+                )
+
+                log_session_part = f" (linked to session: {mcp_session_id})" if mcp_session_id else ""
+                logger.info(f"OAuth callback: Successfully authenticated user: {verified_user_id} (state: {state}){log_session_part}.")
+
+                # Return success page
+                return HTMLResponse(content=f"""
+                    <html>
+                    <head>
+                        <title>Authentication Successful</title>
+                        <style>
+                            body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; text-align: center; color: #333; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
+                            .status {{ color: #4CAF50; font-size: 24px; margin-bottom: 15px; }}
+                            .message {{ margin-bottom: 20px; line-height: 1.6; }}
+                            .user-id {{ font-weight: bold; color: #2a2a2a; }}
+                            .button {{ background-color: #4CAF50; color: white; padding: 12px 25px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; text-decoration: none; display: inline-block; margin-top: 10px; }}
+                        </style>
+                        <script> setTimeout(function() {{ window.close(); }}, 10000); </script>
+                    </head>
+                    <body>
+                        <div class="status">✅ Authentication Successful</div>
+                        <div class="message">
+                            You have successfully authenticated as <span class="user-id">{verified_user_id}</span>.
+                            Credentials have been saved.
+                        </div>
+                        <div class="message">
+                            You can now close this window and **retry your original command** in the application.
+                        </div>
+                        <button class="button" onclick="window.close()">Close Window</button>
+                    </body>
+                    </html>
+                """)
+
+            except Exception as e:
+                error_message_detail = f"Error processing OAuth callback (state: {state}): {str(e)}"
+                logger.error(error_message_detail, exc_info=True)
+                return HTMLResponse(content=f"""
+                    <html>
+                    <head><title>Authentication Processing Error</title></head>
+                    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; text-align: center;">
+                        <h2 style="color: #d32f2f;">Authentication Processing Error</h2>
+                        <p>An unexpected error occurred while processing your authentication: {str(e)}</p>
+                        <p>Please try again. You can close this window.</p>
+                        <script>setTimeout(function() {{ window.close(); }}, 10000);</script>
+                    </body>
+                    </html>
+                """, status_code=500)
+    
+    def start(self) -> bool:
+        """
+        Start the minimal OAuth server.
+        
+        Returns:
+            True if started successfully, False otherwise
+        """
+        if self.is_running:
+            logger.info("Minimal OAuth server is already running")
+            return True
+        
+        # Check if port is available
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.bind(('localhost', self.port))
+        except OSError:
+            logger.error(f"Port {self.port} is already in use. Cannot start minimal OAuth server.")
+            return False
+        
+        def run_server():
+            """Run the server in a separate thread."""
+            try:
+                config = uvicorn.Config(
+                    self.app, 
+                    host="localhost", 
+                    port=self.port,
+                    log_level="warning",
+                    access_log=False
+                )
+                self.server = uvicorn.Server(config)
+                asyncio.run(self.server.serve())
+                
+            except Exception as e:
+                logger.error(f"Minimal OAuth server error: {e}", exc_info=True)
+        
+        # Start server in background thread
+        self.server_thread = threading.Thread(target=run_server, daemon=True)
+        self.server_thread.start()
+        
+        # Wait for server to start
+        max_wait = 3.0
+        start_time = time.time()
+        while time.time() - start_time < max_wait:
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    result = s.connect_ex(('localhost', self.port))
+                    if result == 0:
+                        self.is_running = True
+                        logger.info(f"Minimal OAuth server started on port {self.port}")
+                        return True
+            except Exception:
+                pass
+            time.sleep(0.1)
+        
+        logger.error(f"Failed to start minimal OAuth server on port {self.port}")
+        return False
+    
+    def stop(self):
+        """Stop the minimal OAuth server."""
+        if not self.is_running:
+            return
+        
+        try:
+            if self.server:
+                if hasattr(self.server, 'should_exit'):
+                    self.server.should_exit = True
+                
+            if self.server_thread and self.server_thread.is_alive():
+                self.server_thread.join(timeout=3.0)
+                
+            self.is_running = False
+            logger.info(f"Minimal OAuth server stopped (port {self.port})")
+            
+        except Exception as e:
+            logger.error(f"Error stopping minimal OAuth server: {e}", exc_info=True)
+
+
+# Global instance for stdio mode
+_minimal_oauth_server: Optional[MinimalOAuthServer] = None
+
+def get_oauth_redirect_uri(transport_mode: str = "stdio", port: int = 8000) -> str:
+    """
+    Get the appropriate OAuth redirect URI based on transport mode.
+    
+    Args:
+        transport_mode: "stdio" or "streamable-http"
+        port: Port number (default 8000)
+        
+    Returns:
+        OAuth redirect URI
+    """
+    return f"http://localhost:{port}/oauth2callback"
+
+def ensure_oauth_callback_available(transport_mode: str = "stdio", port: int = 8000) -> bool:
+    """
+    Ensure OAuth callback endpoint is available for the given transport mode.
+    
+    For streamable-http: Assumes the main server is already running
+    For stdio: Starts a minimal server if needed
+    
+    Args:
+        transport_mode: "stdio" or "streamable-http"  
+        port: Port number (default 8000)
+        
+    Returns:
+        True if callback endpoint is available, False otherwise
+    """
+    global _minimal_oauth_server
+    
+    if transport_mode == "streamable-http":
+        # In streamable-http mode, the main FastAPI server should handle callbacks
+        logger.debug("Using existing FastAPI server for OAuth callbacks (streamable-http mode)")
+        return True
+    
+    elif transport_mode == "stdio":
+        # In stdio mode, start minimal server if not already running
+        if _minimal_oauth_server is None:
+            logger.info(f"Creating minimal OAuth server instance for port {port}")
+            _minimal_oauth_server = MinimalOAuthServer(port)
+        
+        if not _minimal_oauth_server.is_running:
+            logger.info("Starting minimal OAuth server for stdio mode")
+            result = _minimal_oauth_server.start()
+            if result:
+                logger.info(f"Minimal OAuth server successfully started on port {port}")
+            else:
+                logger.error(f"Failed to start minimal OAuth server on port {port}")
+            return result
+        else:
+            logger.info("Minimal OAuth server is already running")
+            return True
+    
+    else:
+        logger.error(f"Unknown transport mode: {transport_mode}")
+        return False
+
+def cleanup_oauth_callback_server():
+    """Clean up the minimal OAuth server if it was started."""
+    global _minimal_oauth_server
+    if _minimal_oauth_server:
+        _minimal_oauth_server.stop()
+        _minimal_oauth_server = None
