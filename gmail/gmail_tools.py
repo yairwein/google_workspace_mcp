@@ -15,7 +15,7 @@ from mcp import types
 from fastapi import Body
 from googleapiclient.errors import HttpError
 
-from auth.google_auth import get_authenticated_google_service, GoogleAuthenticationError
+from auth.service_decorator import require_google_service
 
 from core.server import (
     GMAIL_READONLY_SCOPE,
@@ -132,10 +132,9 @@ def _format_gmail_results_plain(messages: list, query: str) -> str:
 
 
 @server.tool()
+@require_google_service("gmail", "gmail_read")
 async def search_gmail_messages(
-    query: str,
-    user_google_email: str,
-    page_size: int = 10,
+    service, query: str, user_google_email: str, page_size: int = 10
 ) -> str:
     """
     Searches messages in a user's Gmail account based on a query.
@@ -149,24 +148,9 @@ async def search_gmail_messages(
     Returns:
         str: LLM-friendly structured results with Message IDs, Thread IDs, and clickable Gmail web interface URLs for each found message.
     """
-    tool_name = "search_gmail_messages"
-    logger.info(
-        f"[{tool_name}] Invoked. Email: '{user_google_email}', Query: '{query}'"
-    )
+    logger.info(f"[search_gmail_messages] Email: '{user_google_email}', Query: '{query}'")
 
     try:
-        service, user_email = await get_authenticated_google_service(
-            service_name="gmail",
-            version="v1",
-            tool_name=tool_name,
-            user_google_email=user_google_email,
-            required_scopes=[GMAIL_READONLY_SCOPE],
-        )
-    except GoogleAuthenticationError as e:
-        raise Exception(str(e))
-
-    try:
-
         response = await asyncio.to_thread(
             service.users()
             .messages()
@@ -174,27 +158,25 @@ async def search_gmail_messages(
             .execute
         )
         messages = response.get("messages", [])
-
         formatted_output = _format_gmail_results_plain(messages, query)
 
+        logger.info(f"[search_gmail_messages] Found {len(messages)} messages")
         return formatted_output
 
     except HttpError as e:
-        logger.error(
-            f"[{tool_name}] Gmail API error searching messages: {e}", exc_info=True
-        )
-        raise Exception(f"Gmail API error: {e}")
+        error_msg = f"Gmail API error: {e.reason}" if e.resp.status != 400 else f"Invalid query: '{query}'"
+        logger.error(f"[search_gmail_messages] {error_msg}")
+        raise Exception(error_msg)
     except Exception as e:
-        logger.exception(
-            f"[{tool_name}] Unexpected error searching Gmail messages: {e}"
-        )
-        raise Exception(f"Unexpected error: {e}")
+        error_msg = f"Error searching Gmail: {str(e)}"
+        logger.error(f"[search_gmail_messages] {error_msg}")
+        raise Exception(error_msg)
 
 
 @server.tool()
+@require_google_service("gmail", "gmail_read")
 async def get_gmail_message_content(
-    message_id: str,
-    user_google_email: str,
+    service, message_id: str, user_google_email: str
 ) -> str:
     """
     Retrieves the full content (subject, sender, plain text body) of a specific Gmail message.
@@ -206,24 +188,12 @@ async def get_gmail_message_content(
     Returns:
         str: The message details including subject, sender, and body content.
     """
-    tool_name = "get_gmail_message_content"
     logger.info(
-        f"[{tool_name}] Invoked. Message ID: '{message_id}', Email: '{user_google_email}'"
+        f"[get_gmail_message_content] Invoked. Message ID: '{message_id}', Email: '{user_google_email}'"
     )
 
     try:
-        service, user_email = await get_authenticated_google_service(
-            service_name="gmail",
-            version="v1",
-            tool_name=tool_name,
-            user_google_email=user_google_email,
-            required_scopes=[GMAIL_READONLY_SCOPE],
-        )
-    except GoogleAuthenticationError as e:
-        raise Exception(str(e))
-
-    try:
-        logger.info(f"[{tool_name}] Using service for: {user_google_email}")
+        logger.info(f"[get_gmail_message_content] Using service for: {user_google_email}")
 
         # Fetch message metadata first to get headers
         message_metadata = await asyncio.to_thread(
@@ -272,18 +242,20 @@ async def get_gmail_message_content(
 
     except HttpError as e:
         logger.error(
-            f"[{tool_name}] Gmail API error getting message content: {e}", exc_info=True
+            f"[get_gmail_message_content] Gmail API error getting message content: {e}", exc_info=True
         )
         raise Exception(f"Gmail API error: {e}")
     except Exception as e:
         logger.exception(
-            f"[{tool_name}] Unexpected error getting Gmail message content: {e}"
+            f"[get_gmail_message_content] Unexpected error getting Gmail message content: {e}"
         )
         raise Exception(f"Unexpected error: {e}")
 
 
 @server.tool()
+@require_google_service("gmail", "gmail_read")
 async def get_gmail_messages_content_batch(
+    service,
     message_ids: List[str],
     user_google_email: str,
     format: Literal["full", "metadata"] = "full",
@@ -300,24 +272,12 @@ async def get_gmail_messages_content_batch(
     Returns:
         str: A formatted list of message contents with separators.
     """
-    tool_name = "get_gmail_messages_content_batch"
     logger.info(
-        f"[{tool_name}] Invoked. Message count: {len(message_ids)}, Email: '{user_google_email}'"
+        f"[get_gmail_messages_content_batch] Invoked. Message count: {len(message_ids)}, Email: '{user_google_email}'"
     )
 
     if not message_ids:
         raise Exception("No message IDs provided")
-
-    try:
-        service, user_email = await get_authenticated_google_service(
-            service_name="gmail",
-            version="v1",
-            tool_name=tool_name,
-            user_google_email=user_google_email,
-            required_scopes=[GMAIL_READONLY_SCOPE],
-        )
-    except GoogleAuthenticationError as e:
-        raise Exception(str(e))
 
     try:
         output_messages = []
@@ -357,7 +317,7 @@ async def get_gmail_messages_content_batch(
             except Exception as batch_error:
                 # Fallback to asyncio.gather if batch API fails
                 logger.warning(
-                    f"[{tool_name}] Batch API failed, falling back to asyncio.gather: {batch_error}"
+                    f"[get_gmail_messages_content_batch] Batch API failed, falling back to asyncio.gather: {batch_error}"
                 )
 
                 async def fetch_message(mid: str):
@@ -446,18 +406,20 @@ async def get_gmail_messages_content_batch(
 
     except HttpError as e:
         logger.error(
-            f"[{tool_name}] Gmail API error in batch retrieval: {e}", exc_info=True
+            f"[get_gmail_messages_content_batch] Gmail API error in batch retrieval: {e}", exc_info=True
         )
         raise Exception(f"Gmail API error: {e}")
     except Exception as e:
         logger.exception(
-            f"[{tool_name}] Unexpected error in batch retrieval: {e}"
+            f"[get_gmail_messages_content_batch] Unexpected error in batch retrieval: {e}"
         )
         raise Exception(f"Unexpected error: {e}")
 
 
 @server.tool()
+@require_google_service("gmail", GMAIL_SEND_SCOPE)
 async def send_gmail_message(
+    service,
     user_google_email: str,
     to: str = Body(..., description="Recipient email address."),
     subject: str = Body(..., description="Email subject."),
@@ -475,21 +437,7 @@ async def send_gmail_message(
     Returns:
         str: Confirmation message with the sent email's message ID.
     """
-    tool_name = "send_gmail_message"
-
     try:
-        service, user_email = await get_authenticated_google_service(
-            service_name="gmail",
-            version="v1",
-            tool_name=tool_name,
-            user_google_email=user_google_email,
-            required_scopes=[GMAIL_SEND_SCOPE],
-        )
-    except GoogleAuthenticationError as e:
-        raise Exception(str(e))
-
-    try:
-
         # Prepare the email
         message = MIMEText(body)
         message["to"] = to
@@ -506,16 +454,18 @@ async def send_gmail_message(
 
     except HttpError as e:
         logger.error(
-            f"[{tool_name}] Gmail API error sending message: {e}", exc_info=True
+            f"[send_gmail_message] Gmail API error sending message: {e}", exc_info=True
         )
         raise Exception(f"Gmail API error: {e}")
     except Exception as e:
-        logger.exception(f"[{tool_name}] Unexpected error sending Gmail message: {e}")
+        logger.exception(f"[send_gmail_message] Unexpected error sending Gmail message: {e}")
         raise Exception(f"Unexpected error: {e}")
 
 
 @server.tool()
+@require_google_service("gmail", GMAIL_COMPOSE_SCOPE)
 async def draft_gmail_message(
+    service,
     user_google_email: str,
     subject: str = Body(..., description="Email subject."),
     body: str = Body(..., description="Email body (plain text)."),
@@ -533,24 +483,11 @@ async def draft_gmail_message(
     Returns:
         str: Confirmation message with the created draft's ID.
     """
-    tool_name = "draft_gmail_message"
     logger.info(
-        f"[{tool_name}] Invoked. Email: '{user_google_email}', Subject: '{subject}'"
+        f"[draft_gmail_message] Invoked. Email: '{user_google_email}', Subject: '{subject}'"
     )
 
     try:
-        service, user_email = await get_authenticated_google_service(
-            service_name="gmail",
-            version="v1",
-            tool_name=tool_name,
-            user_google_email=user_google_email,
-            required_scopes=[GMAIL_COMPOSE_SCOPE],
-        )
-    except GoogleAuthenticationError as e:
-        raise Exception(str(e))
-
-    try:
-
         # Prepare the email
         message = MIMEText(body)
         message["subject"] = subject
@@ -573,18 +510,18 @@ async def draft_gmail_message(
 
     except HttpError as e:
         logger.error(
-            f"[{tool_name}] Gmail API error creating draft: {e}", exc_info=True
+            f"[draft_gmail_message] Gmail API error creating draft: {e}", exc_info=True
         )
         raise Exception(f"Gmail API error: {e}")
     except Exception as e:
-        logger.exception(f"[{tool_name}] Unexpected error creating Gmail draft: {e}")
+        logger.exception(f"[draft_gmail_message] Unexpected error creating Gmail draft: {e}")
         raise Exception(f"Unexpected error: {e}")
 
 
 @server.tool()
+@require_google_service("gmail", "gmail_read")
 async def get_gmail_thread_content(
-    thread_id: str,
-    user_google_email: str,
+    service, thread_id: str, user_google_email: str
 ) -> str:
     """
     Retrieves the complete content of a Gmail conversation thread, including all messages.
@@ -596,21 +533,9 @@ async def get_gmail_thread_content(
     Returns:
         str: The complete thread content with all messages formatted for reading.
     """
-    tool_name = "get_gmail_thread_content"
     logger.info(
-        f"[{tool_name}] Invoked. Thread ID: '{thread_id}', Email: '{user_google_email}'"
+        f"[get_gmail_thread_content] Invoked. Thread ID: '{thread_id}', Email: '{user_google_email}'"
     )
-
-    try:
-        service, user_email = await get_authenticated_google_service(
-            service_name="gmail",
-            version="v1",
-            tool_name=tool_name,
-            user_google_email=user_google_email,
-            required_scopes=[GMAIL_READONLY_SCOPE],
-        )
-    except GoogleAuthenticationError as e:
-        raise Exception(str(e))
 
     try:
         # Fetch the complete thread with all messages
@@ -683,20 +608,19 @@ async def get_gmail_thread_content(
 
     except HttpError as e:
         logger.error(
-            f"[{tool_name}] Gmail API error getting thread content: {e}", exc_info=True
+            f"[get_gmail_thread_content] Gmail API error getting thread content: {e}", exc_info=True
         )
         raise Exception(f"Gmail API error: {e}")
     except Exception as e:
         logger.exception(
-            f"[{tool_name}] Unexpected error getting Gmail thread content: {e}"
+            f"[get_gmail_thread_content] Unexpected error getting Gmail thread content: {e}"
         )
         raise Exception(f"Unexpected error: {e}")
 
 
 @server.tool()
-async def list_gmail_labels(
-    user_google_email: str,
-) -> str:
+@require_google_service("gmail", "gmail_read")
+async def list_gmail_labels(service, user_google_email: str) -> str:
     """
     Lists all labels in the user's Gmail account.
 
@@ -706,19 +630,7 @@ async def list_gmail_labels(
     Returns:
         str: A formatted list of all labels with their IDs, names, and types.
     """
-    tool_name = "list_gmail_labels"
-    logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}'")
-
-    try:
-        service, user_email = await get_authenticated_google_service(
-            service_name="gmail",
-            version="v1",
-            tool_name=tool_name,
-            user_google_email=user_google_email,
-            required_scopes=[GMAIL_READONLY_SCOPE],
-        )
-    except GoogleAuthenticationError as e:
-        raise Exception(str(e))
+    logger.info(f"[list_gmail_labels] Invoked. Email: '{user_google_email}'")
 
     try:
         response = await asyncio.to_thread(
@@ -754,15 +666,17 @@ async def list_gmail_labels(
         return "\n".join(lines)
 
     except HttpError as e:
-        logger.error(f"[{tool_name}] Gmail API error listing labels: {e}", exc_info=True)
+        logger.error(f"[list_gmail_labels] Gmail API error listing labels: {e}", exc_info=True)
         raise Exception(f"Gmail API error: {e}")
     except Exception as e:
-        logger.exception(f"[{tool_name}] Unexpected error listing Gmail labels: {e}")
+        logger.exception(f"[list_gmail_labels] Unexpected error listing Gmail labels: {e}")
         raise Exception(f"Unexpected error: {e}")
 
 
 @server.tool()
+@require_google_service("gmail", GMAIL_LABELS_SCOPE)
 async def manage_gmail_label(
+    service,
     user_google_email: str,
     action: Literal["create", "update", "delete"],
     name: Optional[str] = None,
@@ -784,25 +698,13 @@ async def manage_gmail_label(
     Returns:
         str: Confirmation message of the label operation.
     """
-    tool_name = "manage_gmail_label"
-    logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}', Action: '{action}'")
+    logger.info(f"[manage_gmail_label] Invoked. Email: '{user_google_email}', Action: '{action}'")
 
     if action == "create" and not name:
         raise Exception("Label name is required for create action.")
 
     if action in ["update", "delete"] and not label_id:
         raise Exception("Label ID is required for update and delete actions.")
-
-    try:
-        service, user_email = await get_authenticated_google_service(
-            service_name="gmail",
-            version="v1",
-            tool_name=tool_name,
-            user_google_email=user_google_email,
-            required_scopes=[GMAIL_LABELS_SCOPE],
-        )
-    except GoogleAuthenticationError as e:
-        raise Exception(str(e))
 
     try:
         if action == "create":
@@ -845,15 +747,17 @@ async def manage_gmail_label(
             return f"Label '{label_name}' (ID: {label_id}) deleted successfully!"
 
     except HttpError as e:
-        logger.error(f"[{tool_name}] Gmail API error: {e}", exc_info=True)
+        logger.error(f"[manage_gmail_label] Gmail API error: {e}", exc_info=True)
         raise Exception(f"Gmail API error: {e}")
     except Exception as e:
-        logger.exception(f"[{tool_name}] Unexpected error: {e}")
+        logger.exception(f"[manage_gmail_label] Unexpected error: {e}")
         raise Exception(f"Unexpected error: {e}")
 
 
 @server.tool()
+@require_google_service("gmail", GMAIL_MODIFY_SCOPE)
 async def modify_gmail_message_labels(
+    service,
     user_google_email: str,
     message_id: str,
     add_label_ids: Optional[List[str]] = None,
@@ -871,22 +775,10 @@ async def modify_gmail_message_labels(
     Returns:
         str: Confirmation message of the label changes applied to the message.
     """
-    tool_name = "modify_gmail_message_labels"
-    logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}', Message ID: '{message_id}'")
+    logger.info(f"[modify_gmail_message_labels] Invoked. Email: '{user_google_email}', Message ID: '{message_id}'")
 
     if not add_label_ids and not remove_label_ids:
         raise Exception("At least one of add_label_ids or remove_label_ids must be provided.")
-
-    try:
-        service, user_email = await get_authenticated_google_service(
-            service_name="gmail",
-            version="v1",
-            tool_name=tool_name,
-            user_google_email=user_google_email,
-            required_scopes=[GMAIL_MODIFY_SCOPE],
-        )
-    except GoogleAuthenticationError as e:
-        raise Exception(str(e))
 
     try:
         body = {}
@@ -908,8 +800,8 @@ async def modify_gmail_message_labels(
         return f"Message labels updated successfully!\nMessage ID: {message_id}\n{'; '.join(actions)}"
 
     except HttpError as e:
-        logger.error(f"[{tool_name}] Gmail API error modifying message labels: {e}", exc_info=True)
+        logger.error(f"[modify_gmail_message_labels] Gmail API error modifying message labels: {e}", exc_info=True)
         raise Exception(f"Gmail API error: {e}")
     except Exception as e:
-        logger.exception(f"[{tool_name}] Unexpected error modifying Gmail message labels: {e}")
+        logger.exception(f"[modify_gmail_message_labels] Unexpected error modifying Gmail message labels: {e}")
         raise Exception(f"Unexpected error: {e}")
