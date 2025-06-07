@@ -77,8 +77,11 @@ uv run main.py
 ### Start the Server
 
 ```bash
-# HTTP mode (recommended)
+# Default (stdio mode for MCP clients)
 uv run main.py
+
+# HTTP mode (for web interfaces and debugging)
+uv run main.py --transport streamable-http
 
 # Single-user mode (simplified authentication)
 uv run main.py --single-user
@@ -90,13 +93,16 @@ uv run main.py --single-user --tools gmail  # Can combine with other flags
 
 # Docker
 docker build -t google-workspace-mcp .
-docker run -p 8000:8000 -v $(pwd):/app google-workspace-mcp
+docker run -p 8000:8000 -v $(pwd):/app google-workspace-mcp --transport streamable-http
 ```
 
 **Available Tools for `--tools` flag**: `gmail`, `drive`, `calendar`, `docs`, `sheets`, `chat`
 
 ### Connect to Claude Desktop
 
+The server supports two transport modes:
+
+#### Stdio Mode (Default - Recommended for Claude Desktop)
 **Option 1: Auto-install (Recommended)**
 ```bash
 python install_claude.py
@@ -113,12 +119,29 @@ python install_claude.py
 {
   "mcpServers": {
     "google_workspace": {
+      "command": "uv",
+      "args": ["run", "main.py"],
+      "cwd": "/path/to/google_workspace_mcp"
+    }
+  }
+}
+```
+
+#### HTTP Mode (For debugging or web interfaces)
+If you need to use HTTP mode with Claude Desktop:
+
+```json
+{
+  "mcpServers": {
+    "google_workspace": {
       "command": "npx",
       "args": ["mcp-remote", "http://localhost:8000/mcp"]
     }
   }
 }
 ```
+
+*Note: Make sure to start the server with `--transport streamable-http` when using HTTP mode.*
 
 ### First-Time Authentication
 
