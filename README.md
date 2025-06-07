@@ -3,10 +3,11 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![UV](https://img.shields.io/badge/Package%20Installer-UV-blueviolet)](https://github.com/astral-sh/uv)
+[![Website](https://img.shields.io/badge/Website-workspacemcp.com-green.svg)](https://workspacemcp.com)
 
 **The world's most feature-complete Google Workspace MCP server**
 
-*Connect AI assistants to Google Calendar, Drive, Gmail, Docs, Sheets, and Chat through the Model Context Protocol*
+*Connect MCP Clients, AI assistants and developer tools to Google Calendar, Drive, Gmail, Docs, Sheets, and Chat through the Model Context Protocol*
 
 **See it in action:**
 <div align="center">
@@ -63,6 +64,11 @@ uv run main.py
    ```bash
    export OAUTHLIB_INSECURE_TRANSPORT=1  # Development only
    ```
+
+3. **Server Configuration**:
+   The server's base URL and port can be customized using environment variables:
+   - `WORKSPACE_MCP_BASE_URI`: Sets the base URI for the server (default: http://localhost). This affects the server_url used for Gemini native function calling and the OAUTH_REDIRECT_URI.
+   - `WORKSPACE_MCP_PORT`: Sets the port the server listens on (default: 8000). This affects the server_url, port, and OAUTH_REDIRECT_URI.
 
 ### Start the Server
 
@@ -226,6 +232,46 @@ async def your_new_tool(service, param1: str, param2: int = 10):
 - **Production**: Use HTTPS for callback URIs and configure accordingly
 - **Network Exposure**: Consider authentication when using `mcpo` over networks
 - **Scope Minimization**: Tools request only necessary permissions
+
+---
+
+## 🌐 Integration with Open WebUI
+
+To use this server as a tool provider within Open WebUI:
+
+### 1. Create MCPO Configuration
+
+Create a file named `config.json` with the following structure to have `mcpo` make the streamable HTTP endpoint available as an OpenAPI spec tool:
+
+```json
+{
+  "mcpServers": {
+    "google_workspace": {
+      "type": "streamablehttp",
+      "url": "http://localhost:8000/mcp"
+    }
+  }
+}
+```
+
+### 2. Start the MCPO Server
+
+```bash
+mcpo --port 8001 --config config.json --api-key "your-optional-secret-key"
+```
+
+This command starts the `mcpo` proxy, serving your active (assuming port 8000) Google Workspace MCP on port 8001.
+
+### 3. Configure Open WebUI
+
+1. Navigate to your Open WebUI settings
+2. Go to **"Connections"** → **"Tools"**
+3. Click **"Add Tool"**
+4. Enter the **Server URL**: `http://localhost:8001/google_workspace` (matching the mcpo base URL and server name from config.json)
+5. If you used an `--api-key` with mcpo, enter it as the **API Key**
+6. Save the configuration
+
+The Google Workspace tools should now be available when interacting with models in Open WebUI.
 
 ---
 
