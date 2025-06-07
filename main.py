@@ -40,18 +40,18 @@ def main():
     parser = argparse.ArgumentParser(description='Google Workspace MCP Server')
     parser.add_argument('--single-user', action='store_true',
                         help='Run in single-user mode - bypass session mapping and use any credentials from ./credentials directory')
-    parser.add_argument('--tools', nargs='*', 
+    parser.add_argument('--tools', nargs='*',
                         choices=['gmail', 'drive', 'calendar', 'docs', 'sheets', 'chat'],
                         help='Specify which tools to register. If not provided, all tools are registered.')
     args = parser.parse_args()
 
     print("🔧 Google Workspace MCP Server")
     print("=" * 35)
-    
+
     # Import tool modules to register them with the MCP server via decorators
     tool_imports = {
         'gmail': lambda: __import__('gmail.gmail_tools'),
-        'drive': lambda: __import__('gdrive.drive_tools'), 
+        'drive': lambda: __import__('gdrive.drive_tools'),
         'calendar': lambda: __import__('gcalendar.calendar_tools'),
         'docs': lambda: __import__('gdocs.docs_tools'),
         'sheets': lambda: __import__('gsheets.sheets_tools'),
@@ -60,7 +60,7 @@ def main():
 
     tool_icons = {
         'gmail': '📧',
-        'drive': '📁', 
+        'drive': '📁',
         'calendar': '📅',
         'docs': '📄',
         'sheets': '📊',
@@ -86,6 +86,7 @@ def main():
         print("   Ready for MCP connections!")
         print()
         # The server is already configured with port and server_url in core/server.py
+        server.run()
         server.run(transport="streamable-http")
     except KeyboardInterrupt:
         print("\n👋 Server shutdown requested")
