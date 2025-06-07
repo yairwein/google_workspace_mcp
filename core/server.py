@@ -11,6 +11,7 @@ from mcp.server.fastmcp import FastMCP
 from starlette.requests import Request
 
 from auth.google_auth import handle_auth_callback, start_auth_flow, CONFIG_CLIENT_SECRETS_PATH
+from auth.oauth_callback_server import get_oauth_redirect_uri, ensure_oauth_callback_available
 
 # Import shared configuration
 from config.google_config import (
@@ -49,6 +50,9 @@ logger = logging.getLogger(__name__)
 WORKSPACE_MCP_PORT = int(os.getenv("WORKSPACE_MCP_PORT", 8000))
 WORKSPACE_MCP_BASE_URI = os.getenv("WORKSPACE_MCP_BASE_URI", "http://localhost")
 
+# Transport mode detection (will be set by main.py)
+_current_transport_mode = "stdio"  # Default to stdio
+
 # Basic MCP server instance
 server = FastMCP(
     name="google_workspace",
@@ -56,8 +60,15 @@ server = FastMCP(
     port=WORKSPACE_MCP_PORT
 )
 
-# Configure OAuth redirect URI to use the MCP server's base uri and port
-OAUTH_REDIRECT_URI = f"{WORKSPACE_MCP_BASE_URI}:{WORKSPACE_MCP_PORT}/oauth2callback"
+def set_transport_mode(mode: str):
+    """Set the current transport mode for OAuth callback handling."""
+    global _current_transport_mode
+    _current_transport_mode = mode
+    logger.info(f"Transport mode set to: {mode}")
+
+def get_oauth_redirect_uri_for_current_mode() -> str:
+    """Get OAuth redirect URI based on current transport mode."""
+    return get_oauth_redirect_uri(_current_transport_mode, WORKSPACE_MCP_PORT)
 
 # Register OAuth callback as a custom route
 @server.custom_route("/oauth2callback", methods=["GET"])
@@ -112,7 +123,7 @@ async def oauth2_callback(request: Request) -> HTMLResponse:
             client_secrets_path=client_secrets_path,
             scopes=SCOPES, # Ensure all necessary scopes are requested
             authorization_response=str(request.url),
-            redirect_uri=OAUTH_REDIRECT_URI,
+            redirect_uri=get_oauth_redirect_uri_for_current_mode(),
             session_id=mcp_session_id # Pass session_id if available
         )
 
@@ -206,12 +217,18 @@ async def start_google_auth(
         raise Exception(error_msg)
 
     logger.info(f"Tool 'start_google_auth' invoked for user_google_email: '{user_google_email}', service: '{service_name}', session: '{mcp_session_id}'.")
+    
+    # Ensure OAuth callback is available for current transport mode
+    redirect_uri = get_oauth_redirect_uri_for_current_mode()
+    if not ensure_oauth_callback_available(_current_transport_mode, WORKSPACE_MCP_PORT):
+        raise Exception("Failed to start OAuth callback server. Please try again.")
+    
     # Use the centralized start_auth_flow from auth.google_auth
     auth_result = await start_auth_flow(
         mcp_session_id=mcp_session_id,
         user_google_email=user_google_email,
         service_name=service_name,
-        redirect_uri=OAUTH_REDIRECT_URI
+        redirect_uri=redirect_uri
     )
     
     # Extract content from CallToolResult and raise exception if error
