@@ -4,8 +4,15 @@ runtime: "container"
 build:
   dockerfile: "Dockerfile"
   dockerBuildPath: "."
+  buildArgs: {}
+  platform: "linux/amd64"
 startCommand:
   type: "http"
+  port: 8000
+  healthCheck:
+    path: "/health"
+    intervalSeconds: 30
+    timeoutSeconds: 10
   configSchema:
     type: "object"
     properties:
@@ -15,3 +22,6 @@ startCommand:
     required: ["clientSecretsPath"]
   exampleConfig:
     clientSecretsPath: "/app/client_secrets.json"
+resources:
+  memory: "1Gi"
+  cpu: "0.5"
