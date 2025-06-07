@@ -189,9 +189,5 @@ async def start_google_auth(
         redirect_uri=redirect_uri
     )
 
-    # Extract content from CallToolResult and raise exception if error
-    if auth_result.isError:
-        error_text = auth_result.content[0].text if auth_result.content else "Authentication flow failed"
-        raise Exception(error_text)
-    else:
-        return auth_result.content[0].text if auth_result.content else "Authentication initiated"
+    # auth_result is now a plain string, not a CallToolResult
+    return auth_result

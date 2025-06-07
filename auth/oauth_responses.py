@@ -12,11 +12,11 @@ from typing import Optional
 def create_error_response(error_message: str, status_code: int = 400) -> HTMLResponse:
     """
     Create a standardized error response for OAuth failures.
-    
+
     Args:
         error_message: The error message to display
         status_code: HTTP status code (default 400)
-        
+
     Returns:
         HTMLResponse with error page
     """
@@ -37,16 +37,16 @@ def create_error_response(error_message: str, status_code: int = 400) -> HTMLRes
 def create_success_response(verified_user_id: Optional[str] = None) -> HTMLResponse:
     """
     Create a standardized success response for OAuth authentication.
-    
+
     Args:
         verified_user_id: The authenticated user's email (optional)
-        
+
     Returns:
         HTMLResponse with success page
     """
     # Handle the case where no user ID is provided
     user_display = verified_user_id if verified_user_id else "Google User"
-    
+
     content = f"""<html>
 <head>
     <title>Authentication Successful</title>
@@ -56,10 +56,10 @@ def create_success_response(verified_user_id: Optional[str] = None) -> HTMLRespo
             padding: 0;
             box-sizing: border-box;
         }}
-        
+
         body {{
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg,#0f172a,#1e293b,#334155);
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -68,7 +68,7 @@ def create_success_response(verified_user_id: Optional[str] = None) -> HTMLRespo
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
         }}
-        
+
         .container {{
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
@@ -81,7 +81,7 @@ def create_success_response(verified_user_id: Optional[str] = None) -> HTMLRespo
             transform: translateY(-20px);
             animation: slideUp 0.6s ease-out;
         }}
-        
+
         @keyframes slideUp {{
             from {{
                 opacity: 0;
@@ -92,7 +92,7 @@ def create_success_response(verified_user_id: Optional[str] = None) -> HTMLRespo
                 transform: translateY(-20px);
             }}
         }}
-        
+
         .icon {{
             width: 80px;
             height: 80px;
@@ -106,7 +106,7 @@ def create_success_response(verified_user_id: Optional[str] = None) -> HTMLRespo
             color: white;
             animation: pulse 2s ease-in-out infinite;
         }}
-        
+
         @keyframes pulse {{
             0%, 100% {{
                 transform: scale(1);
@@ -115,7 +115,7 @@ def create_success_response(verified_user_id: Optional[str] = None) -> HTMLRespo
                 transform: scale(1.05);
             }}
         }}
-        
+
         h1 {{
             font-size: 28px;
             font-weight: 600;
@@ -125,14 +125,14 @@ def create_success_response(verified_user_id: Optional[str] = None) -> HTMLRespo
             -webkit-text-fill-color: transparent;
             background-clip: text;
         }}
-        
+
         .message {{
             font-size: 16px;
             line-height: 1.6;
             color: #4a5568;
             margin-bottom: 20px;
         }}
-        
+
         .user-id {{
             font-weight: 600;
             color: #667eea;
@@ -142,7 +142,7 @@ def create_success_response(verified_user_id: Optional[str] = None) -> HTMLRespo
             display: inline-block;
             margin: 0 4px;
         }}
-        
+
         .button {{
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -158,16 +158,16 @@ def create_success_response(verified_user_id: Optional[str] = None) -> HTMLRespo
             text-decoration: none;
             box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
         }}
-        
+
         .button:hover {{
             transform: translateY(-2px);
             box-shadow: 0 7px 20px rgba(102, 126, 234, 0.4);
         }}
-        
+
         .button:active {{
             transform: translateY(0);
         }}
-        
+
         .auto-close {{
             font-size: 13px;
             color: #a0aec0;
@@ -202,10 +202,10 @@ def create_success_response(verified_user_id: Optional[str] = None) -> HTMLRespo
 def create_server_error_response(error_detail: str) -> HTMLResponse:
     """
     Create a standardized server error response for OAuth processing failures.
-    
+
     Args:
         error_detail: The detailed error message
-        
+
     Returns:
         HTMLResponse with server error page
     """
