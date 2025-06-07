@@ -199,12 +199,28 @@ async def get_drive_file_content(
 
         file_content_bytes = fh.getvalue()
 
-        # Attempt Office XML extraction
-        office_text = extract_office_xml_text(file_content_bytes, mime_type)
-        if office_text:
-            body_text = office_text
+        # Attempt Office XML extraction only for actual Office XML files
+        office_mime_types = {
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation", 
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        }
+        
+        if mime_type in office_mime_types:
+            office_text = extract_office_xml_text(file_content_bytes, mime_type)
+            if office_text:
+                body_text = office_text
+            else:
+                # Fallback: try UTF-8; otherwise flag binary
+                try:
+                    body_text = file_content_bytes.decode("utf-8")
+                except UnicodeDecodeError:
+                    body_text = (
+                        f"[Binary or unsupported text encoding for mimeType '{mime_type}' - "
+                        f"{len(file_content_bytes)} bytes]"
+                    )
         else:
-            # Fallback: try UTF-8; otherwise flag binary
+            # For non-Office files (including Google native files), try UTF-8 decode directly
             try:
                 body_text = file_content_bytes.decode("utf-8")
             except UnicodeDecodeError:
