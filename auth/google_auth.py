@@ -487,7 +487,6 @@ async def get_authenticated_google_service(
 
         # Import here to avoid circular import
         from core.server import get_oauth_redirect_uri_for_current_mode
-        from auth.oauth_callback_server import ensure_oauth_callback_available
 
         # Ensure OAuth callback is available
         redirect_uri = get_oauth_redirect_uri_for_current_mode()
