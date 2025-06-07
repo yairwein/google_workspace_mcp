@@ -431,9 +431,7 @@ async def modify_event(
 
 @server.tool()
 @require_google_service("calendar", "calendar_events")
-async def delete_event(
-    service, user_google_email: str, event_id: str, calendar_id: str = "primary"
-) -> str:
+async def delete_event(service, user_google_email: str, event_id: str, calendar_id: str = "primary") -> str:
     """
     Deletes an existing event.
 
