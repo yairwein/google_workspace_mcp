@@ -13,42 +13,27 @@ from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaIoBaseDownload
 
 # Auth & server utilities
-from auth.google_auth import get_authenticated_google_service, GoogleAuthenticationError
+from auth.service_decorator import require_google_service, require_multiple_services
 from core.utils import extract_office_xml_text
-from core.server import (
-    server,
-    DRIVE_READONLY_SCOPE,
-    DOCS_READONLY_SCOPE,
-    DOCS_WRITE_SCOPE,
-)
+from core.server import server
 
 logger = logging.getLogger(__name__)
 
 @server.tool()
+@require_google_service("drive", "drive_read")
 async def search_docs(
+    service,
     user_google_email: str,
     query: str,
     page_size: int = 10,
 ) -> str:
     """
     Searches for Google Docs by name using Drive API (mimeType filter).
-    
+
     Returns:
         str: A formatted list of Google Docs matching the search query.
     """
-    tool_name = "search_docs"
-    logger.info(f"[{tool_name}] Email={user_google_email}, Query='{query}'")
-
-    try:
-        service, user_email = await get_authenticated_google_service(
-            service_name="drive",
-            version="v3",
-            tool_name=tool_name,
-            user_google_email=user_google_email,
-            required_scopes=[DRIVE_READONLY_SCOPE],
-        )
-    except GoogleAuthenticationError as e:
-        raise Exception(str(e))
+    logger.info(f"[search_docs] Email={user_google_email}, Query='{query}'")
 
     try:
         escaped_query = query.replace("'", "\\'")
@@ -76,7 +61,13 @@ async def search_docs(
         raise Exception(f"API error: {e}")
 
 @server.tool()
+@require_multiple_services([
+    {"service_type": "drive", "scopes": "drive_read", "param_name": "drive_service"},
+    {"service_type": "docs", "scopes": "docs_read", "param_name": "docs_service"}
+])
 async def get_doc_content(
+    drive_service,
+    docs_service,
     user_google_email: str,
     document_id: str,
 ) -> str:
@@ -84,24 +75,11 @@ async def get_doc_content(
     Retrieves content of a Google Doc or a Drive file (like .docx) identified by document_id.
     - Native Google Docs: Fetches content via Docs API.
     - Office files (.docx, etc.) stored in Drive: Downloads via Drive API and extracts text.
-    
+
     Returns:
         str: The document content with metadata header.
     """
-    tool_name = "get_doc_content"
-    logger.info(f"[{tool_name}] Invoked. Document/File ID: '{document_id}' for user '{user_google_email}'")
-
-    # Step 1: Authenticate with Drive API to get metadata
-    try:
-        drive_service, user_email = await get_authenticated_google_service(
-            service_name="drive",
-            version="v3",
-            tool_name=tool_name,
-            user_google_email=user_google_email,
-            required_scopes=[DRIVE_READONLY_SCOPE],
-        ) # user_email will be consistent
-    except GoogleAuthenticationError as e:
-        raise Exception(str(e))
+    logger.info(f"[get_doc_content] Invoked. Document/File ID: '{document_id}' for user '{user_google_email}'")
 
     try:
         # Step 2: Get file metadata from Drive
@@ -114,24 +92,13 @@ async def get_doc_content(
         file_name = file_metadata.get("name", "Unknown File")
         web_view_link = file_metadata.get("webViewLink", "#")
 
-        logger.info(f"[{tool_name}] File '{file_name}' (ID: {document_id}) has mimeType: '{mime_type}'")
+        logger.info(f"[get_doc_content] File '{file_name}' (ID: {document_id}) has mimeType: '{mime_type}'")
 
         body_text = "" # Initialize body_text
 
         # Step 3: Process based on mimeType
         if mime_type == "application/vnd.google-apps.document":
-            logger.info(f"[{tool_name}] Processing as native Google Doc.")
-            try:
-                docs_service, _ = await get_authenticated_google_service(
-                    service_name="docs",
-                    version="v1",
-                    tool_name=tool_name,
-                    user_google_email=user_google_email,
-                    required_scopes=[DOCS_READONLY_SCOPE],
-                ) # user_email already obtained from drive_auth
-            except GoogleAuthenticationError as e:
-                raise Exception(str(e))
-
+            logger.info(f"[get_doc_content] Processing as native Google Doc.")
             doc_data = await asyncio.to_thread(
                 docs_service.documents().get(documentId=document_id).execute
             )
@@ -151,7 +118,7 @@ async def get_doc_content(
                          processed_text_lines.append(current_line_text)
             body_text = "".join(processed_text_lines)
         else:
-            logger.info(f"[{tool_name}] Processing as Drive file (e.g., .docx, other). MimeType: {mime_type}")
+            logger.info(f"[get_doc_content] Processing as Drive file (e.g., .docx, other). MimeType: {mime_type}")
 
             export_mime_type_map = {
                  # Example: "application/vnd.google-apps.spreadsheet"z: "text/csv",
@@ -195,43 +162,33 @@ async def get_doc_content(
 
     except HttpError as error:
         logger.error(
-            f"[{tool_name}] API error for ID {document_id}: {error}",
+            f"[get_doc_content] API error for ID {document_id}: {error}",
             exc_info=True,
         )
         raise Exception(f"API error processing document/file ID {document_id}: {error}")
     except Exception as e:
-        logger.exception(f"[{tool_name}] Unexpected error for ID {document_id}: {e}")
+        logger.exception(f"[get_doc_content] Unexpected error for ID {document_id}: {e}")
         raise Exception(f"Unexpected error processing document/file ID {document_id}: {e}")
 
 @server.tool()
+@require_google_service("drive", "drive_read")
 async def list_docs_in_folder(
+    service,
     user_google_email: str,
     folder_id: str = 'root',
     page_size: int = 100
 ) -> str:
     """
     Lists Google Docs within a specific Drive folder.
-    
+
     Returns:
         str: A formatted list of Google Docs in the specified folder.
     """
-    tool_name = "list_docs_in_folder"
-    logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}', Folder ID: '{folder_id}'")
-
-    try:
-        drive_service, user_email = await get_authenticated_google_service(
-            service_name="drive",
-            version="v3",
-            tool_name=tool_name,
-            user_google_email=user_google_email,
-            required_scopes=[DRIVE_READONLY_SCOPE],
-        ) # user_email will be consistent
-    except GoogleAuthenticationError as e:
-        raise Exception(str(e))
+    logger.info(f"[list_docs_in_folder] Invoked. Email: '{user_google_email}', Folder ID: '{folder_id}'")
 
     try:
         rsp = await asyncio.to_thread(
-            drive_service.files().list(
+            service.files().list(
                 q=f"'{folder_id}' in parents and mimeType='application/vnd.google-apps.document' and trashed=false",
                 pageSize=page_size,
                 fields="files(id, name, modifiedTime, webViewLink)"
@@ -246,52 +203,42 @@ async def list_docs_in_folder(
         return "\n".join(out)
 
     except HttpError as e:
-        logger.error(f"API error in {tool_name}: {e}", exc_info=True)
+        logger.error(f"API error in list_docs_in_folder: {e}", exc_info=True)
         raise Exception(f"API error: {e}")
     except Exception as e:
-        logger.exception(f"Unexpected error in {tool_name}: {e}")
+        logger.exception(f"Unexpected error in list_docs_in_folder: {e}")
         raise Exception(f"Unexpected error: {e}")
 
 @server.tool()
+@require_google_service("docs", "docs_write")
 async def create_doc(
+    service,
     user_google_email: str, # Made user_google_email required
     title: str,
     content: str = '',
 ) -> str:
     """
     Creates a new Google Doc and optionally inserts initial content.
-    
+
     Returns:
         str: Confirmation message with document ID and link.
     """
-    tool_name = "create_doc"
-    logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}', Title='{title}'")
+    logger.info(f"[create_doc] Invoked. Email: '{user_google_email}', Title='{title}'")
 
     try:
-        docs_service, user_email = await get_authenticated_google_service(
-            service_name="docs",
-            version="v1",
-            tool_name=tool_name,
-            user_google_email=user_google_email,
-            required_scopes=[DOCS_WRITE_SCOPE],
-        )
-    except GoogleAuthenticationError as e:
-        raise Exception(str(e))
-
-    try:
-        doc = await asyncio.to_thread(docs_service.documents().create(body={'title': title}).execute)
+        doc = await asyncio.to_thread(service.documents().create(body={'title': title}).execute)
         doc_id = doc.get('documentId')
         if content:
             requests = [{'insertText': {'location': {'index': 1}, 'text': content}}]
-            await asyncio.to_thread(docs_service.documents().batchUpdate(documentId=doc_id, body={'requests': requests}).execute)
+            await asyncio.to_thread(service.documents().batchUpdate(documentId=doc_id, body={'requests': requests}).execute)
         link = f"https://docs.google.com/document/d/{doc_id}/edit"
-        msg = f"Created Google Doc '{title}' (ID: {doc_id}) for {user_email}. Link: {link}"
-        logger.info(f"Successfully created Google Doc '{title}' (ID: {doc_id}) for {user_email}. Link: {link}")
+        msg = f"Created Google Doc '{title}' (ID: {doc_id}) for {user_google_email}. Link: {link}"
+        logger.info(f"Successfully created Google Doc '{title}' (ID: {doc_id}) for {user_google_email}. Link: {link}")
         return msg
 
     except HttpError as e:
-        logger.error(f"API error in {tool_name}: {e}", exc_info=True)
+        logger.error(f"API error in create_doc: {e}", exc_info=True)
         raise Exception(f"API error: {e}")
     except Exception as e:
-        logger.exception(f"Unexpected error in {tool_name}: {e}")
+        logger.exception(f"Unexpected error in create_doc: {e}")
         raise Exception(f"Unexpected error: {e}")
