@@ -14,13 +14,9 @@ from typing import List, Optional, Dict, Any
 from mcp import types
 from googleapiclient.errors import HttpError
 
-from auth.google_auth import get_authenticated_google_service
+from auth.service_decorator import require_google_service
 
-from core.server import (
-    server,
-    CALENDAR_READONLY_SCOPE,
-    CALENDAR_EVENTS_SCOPE,
-)
+from core.server import server
 
 
 # Configure module logger
@@ -83,15 +79,9 @@ def _correct_time_format_for_api(
     return time_str
 
 
-# --- Helper for Authentication and Service Initialization ---
-
-
-# --- Tool Implementations ---
-
 @server.tool()
-async def list_calendars(
-    user_google_email: str,
-) -> types.CallToolResult:
+@require_google_service("calendar", "calendar_read")
+async def list_calendars(service, user_google_email: str) -> str:
     """
     Retrieves a list of calendars accessible to the authenticated user.
 
@@ -99,25 +89,9 @@ async def list_calendars(
         user_google_email (str): The user's Google email address. Required.
 
     Returns:
-        types.CallToolResult: Contains a list of the user's calendars (summary, ID, primary status),
-                               an error message if the API call fails,
-                               or an authentication guidance message if credentials are required.
+        str: A formatted list of the user's calendars (summary, ID, primary status).
     """
-    tool_name = "list_calendars"
-    logger.info(
-        f"[{tool_name}] Invoked. Email: '{user_google_email}'"
-    )
-
-    auth_result = await get_authenticated_google_service(
-        service_name="calendar",
-        version="v3",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[CALENDAR_READONLY_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+    logger.info(f"[list_calendars] Invoked. Email: '{user_google_email}'")
 
     try:
         calendar_list_response = await asyncio.to_thread(
@@ -125,48 +99,38 @@ async def list_calendars(
         )
         items = calendar_list_response.get("items", [])
         if not items:
-            return types.CallToolResult(
-                content=[
-                    types.TextContent(
-                        type="text", text=f"No calendars found for {user_email}."
-                    )
-                ]
-            )
+            return f"No calendars found for {user_google_email}."
 
         calendars_summary_list = [
             f"- \"{cal.get('summary', 'No Summary')}\"{' (Primary)' if cal.get('primary') else ''} (ID: {cal['id']})"
             for cal in items
         ]
         text_output = (
-            f"Successfully listed {len(items)} calendars for {user_email}:\n"
+            f"Successfully listed {len(items)} calendars for {user_google_email}:\n"
             + "\n".join(calendars_summary_list)
         )
-        logger.info(f"Successfully listed {len(items)} calendars for {user_email}.")
-        return types.CallToolResult(
-            content=[types.TextContent(type="text", text=text_output)]
-        )
+        logger.info(f"Successfully listed {len(items)} calendars for {user_google_email}.")
+        return text_output
     except HttpError as error:
         message = f"API error listing calendars: {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with user's email and service_name='Google Calendar'."
         logger.error(message, exc_info=True)
-        return types.CallToolResult(
-            isError=True, content=[types.TextContent(type="text", text=message)]
-        )
+        raise Exception(message)
     except Exception as e:
         message = f"Unexpected error listing calendars: {e}."
         logger.exception(message)
-        return types.CallToolResult(
-            isError=True, content=[types.TextContent(type="text", text=message)]
-        )
+        raise Exception(message)
 
 
 @server.tool()
+@require_google_service("calendar", "calendar_read")
 async def get_events(
+    service,
     user_google_email: str,
     calendar_id: str = "primary",
     time_min: Optional[str] = None,
     time_max: Optional[str] = None,
     max_results: int = 25,
-) -> types.CallToolResult:
+) -> str:
     """
     Retrieves a list of events from a specified Google Calendar within a given time range.
 
@@ -178,24 +142,8 @@ async def get_events(
         max_results (int): The maximum number of events to return. Defaults to 25.
 
     Returns:
-        types.CallToolResult: Contains a list of events (summary, start time, link) within the specified range,
-                               an error message if the API call fails,
-                               or an authentication guidance message if credentials are required.
+        str: A formatted list of events (summary, start time, link) within the specified range.
     """
-    tool_name = "get_events"
-
-    auth_result = await get_authenticated_google_service(
-        service_name="calendar",
-        version="v3",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[CALENDAR_READONLY_SCOPE],
-    )
-
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
-
     try:
         logger.info(
             f"[get_events] Raw time parameters - time_min: '{time_min}', time_max: '{time_max}'"
@@ -240,14 +188,7 @@ async def get_events(
         )
         items = events_result.get("items", [])
         if not items:
-            return types.CallToolResult(
-                content=[
-                    types.TextContent(
-                        type="text",
-                        text=f"No events found in calendar '{calendar_id}' for {user_email} for the specified time range.",
-                    )
-                ]
-            )
+            return f"No events found in calendar '{calendar_id}' for {user_google_email} for the specified time range."
 
         event_details_list = []
         for item in items:
@@ -261,29 +202,25 @@ async def get_events(
             )
 
         text_output = (
-            f"Successfully retrieved {len(items)} events from calendar '{calendar_id}' for {user_email}:\n"
+            f"Successfully retrieved {len(items)} events from calendar '{calendar_id}' for {user_google_email}:\n"
             + "\n".join(event_details_list)
         )
-        logger.info(f"Successfully retrieved {len(items)} events for {user_email}.")
-        return types.CallToolResult(
-            content=[types.TextContent(type="text", text=text_output)]
-        )
+        logger.info(f"Successfully retrieved {len(items)} events for {user_google_email}.")
+        return text_output
     except HttpError as error:
         message = f"API error getting events: {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with user's email and service_name='Google Calendar'."
         logger.error(message, exc_info=True)
-        return types.CallToolResult(
-            isError=True, content=[types.TextContent(type="text", text=message)]
-        )
+        raise Exception(message)
     except Exception as e:
         message = f"Unexpected error getting events: {e}."
         logger.exception(message)
-        return types.CallToolResult(
-            isError=True, content=[types.TextContent(type="text", text=message)]
-        )
+        raise Exception(message)
 
 
 @server.tool()
+@require_google_service("calendar", "calendar_events")
 async def create_event(
+    service,
     user_google_email: str,
     summary: str,
     start_time: str,
@@ -293,7 +230,7 @@ async def create_event(
     location: Optional[str] = None,
     attendees: Optional[List[str]] = None,
     timezone: Optional[str] = None,
-) -> types.CallToolResult:
+) -> str:
     """
     Creates a new event.
 
@@ -309,26 +246,13 @@ async def create_event(
         timezone (Optional[str]): Timezone (e.g., "America/New_York").
 
     Returns:
-        A CallToolResult confirming creation or an error/auth guidance message.
+        str: Confirmation message of the successful event creation with event link.
     """
-    tool_name = "create_event"
     logger.info(
-        f"[{tool_name}] Invoked. Email: '{user_google_email}', Summary: {summary}"
+        f"[create_event] Invoked. Email: '{user_google_email}', Summary: {summary}"
     )
-
-    auth_result = await get_authenticated_google_service(
-        service_name="calendar",
-        version="v3",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[CALENDAR_EVENTS_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
 
     try:
-
         event_body: Dict[str, Any] = {
             "summary": summary,
             "start": (
@@ -357,33 +281,25 @@ async def create_event(
         )
 
         link = created_event.get("htmlLink", "No link available")
-        # Corrected confirmation_message to use user_email
-        confirmation_message = f"Successfully created event '{created_event.get('summary', summary)}' for {user_email}. Link: {link}"
-        # Corrected logger to use user_email and include event ID
+        confirmation_message = f"Successfully created event '{created_event.get('summary', summary)}' for {user_google_email}. Link: {link}"
         logger.info(
-            f"Event created successfully for {user_email}. ID: {created_event.get('id')}, Link: {link}"
+            f"Event created successfully for {user_google_email}. ID: {created_event.get('id')}, Link: {link}"
         )
-        return types.CallToolResult(
-            content=[types.TextContent(type="text", text=confirmation_message)]
-        )
+        return confirmation_message
     except HttpError as error:
-        # Corrected error message to use user_email and provide better guidance
-        # user_email_for_error is now user_email from the helper or the original user_google_email
-        message = f"API error creating event: {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with the user's email ({user_email if user_email != 'Unknown' else 'target Google account'}) and service_name='Google Calendar'."
+        message = f"API error creating event: {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with the user's email ({user_google_email}) and service_name='Google Calendar'."
         logger.error(message, exc_info=True)
-        return types.CallToolResult(
-            isError=True, content=[types.TextContent(type="text", text=message)]
-        )
+        raise Exception(message)
     except Exception as e:
         message = f"Unexpected error creating event: {e}."
         logger.exception(message)
-        return types.CallToolResult(
-            isError=True, content=[types.TextContent(type="text", text=message)]
-        )
+        raise Exception(message)
 
 
 @server.tool()
+@require_google_service("calendar", "calendar_events")
 async def modify_event(
+    service,
     user_google_email: str,
     event_id: str,
     calendar_id: str = "primary",
@@ -394,7 +310,7 @@ async def modify_event(
     location: Optional[str] = None,
     attendees: Optional[List[str]] = None,
     timezone: Optional[str] = None,
-) -> types.CallToolResult:
+) -> str:
     """
     Modifies an existing event.
 
@@ -411,26 +327,13 @@ async def modify_event(
         timezone (Optional[str]): New timezone (e.g., "America/New_York").
 
     Returns:
-        A CallToolResult confirming modification or an error/auth guidance message.
+        str: Confirmation message of the successful event modification with event link.
     """
-    tool_name = "modify_event"
     logger.info(
-        f"[{tool_name}] Invoked. Email: '{user_google_email}', Event ID: {event_id}"
+        f"[modify_event] Invoked. Email: '{user_google_email}', Event ID: {event_id}"
     )
-
-    auth_result = await get_authenticated_google_service(
-        service_name="calendar",
-        version="v3",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[CALENDAR_EVENTS_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
 
     try:
-
         # Build the event body with only the fields that are provided
         event_body: Dict[str, Any] = {}
         if summary is not None:
@@ -471,9 +374,7 @@ async def modify_event(
         if not event_body:
             message = "No fields provided to modify the event."
             logger.warning(f"[modify_event] {message}")
-            return types.CallToolResult(
-                isError=True, content=[types.TextContent(type="text", text=message)]
-            )
+            raise Exception(message)
 
         # Log the event ID for debugging
         logger.info(
@@ -494,9 +395,7 @@ async def modify_event(
                     f"[modify_event] Event not found during pre-update verification: {get_error}"
                 )
                 message = f"Event not found during verification. The event with ID '{event_id}' could not be found in calendar '{calendar_id}'. This may be due to incorrect ID format or the event no longer exists."
-                return types.CallToolResult(
-                    isError=True, content=[types.TextContent(type="text", text=message)]
-                )
+                raise Exception(message)
             else:
                 logger.warning(
                     f"[modify_event] Error during pre-update verification, but proceeding with update: {get_error}"
@@ -510,38 +409,29 @@ async def modify_event(
         )
 
         link = updated_event.get("htmlLink", "No link available")
-        confirmation_message = f"Successfully modified event '{updated_event.get('summary', summary)}' (ID: {event_id}) for {user_email}. Link: {link}"
+        confirmation_message = f"Successfully modified event '{updated_event.get('summary', summary)}' (ID: {event_id}) for {user_google_email}. Link: {link}"
         logger.info(
-            f"Event modified successfully for {user_email}. ID: {updated_event.get('id')}, Link: {link}"
+            f"Event modified successfully for {user_google_email}. ID: {updated_event.get('id')}, Link: {link}"
         )
-        return types.CallToolResult(
-            content=[types.TextContent(type="text", text=confirmation_message)]
-        )
+        return confirmation_message
     except HttpError as error:
         # Check for 404 Not Found error specifically
         if error.resp.status == 404:
             message = f"Event not found. The event with ID '{event_id}' could not be found in calendar '{calendar_id}'. LLM: The event may have been deleted, or the event ID might be incorrect. Verify the event exists using 'get_events' before attempting to modify it."
             logger.error(f"[modify_event] {message}")
         else:
-            message = f"API error modifying event (ID: {event_id}): {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with the user's email ({user_email if user_email != 'Unknown' else 'target Google account'}) and service_name='Google Calendar'."
+            message = f"API error modifying event (ID: {event_id}): {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with the user's email ({user_google_email}) and service_name='Google Calendar'."
             logger.error(message, exc_info=True)
-        return types.CallToolResult(
-            isError=True, content=[types.TextContent(type="text", text=message)]
-        )
+        raise Exception(message)
     except Exception as e:
         message = f"Unexpected error modifying event (ID: {event_id}): {e}."
         logger.exception(message)
-        return types.CallToolResult(
-            isError=True, content=[types.TextContent(type="text", text=message)]
-        )
+        raise Exception(message)
 
 
 @server.tool()
-async def delete_event(
-    user_google_email: str,
-    event_id: str,
-    calendar_id: str = "primary",
-) -> types.CallToolResult:
+@require_google_service("calendar", "calendar_events")
+async def delete_event(service, user_google_email: str, event_id: str, calendar_id: str = "primary") -> str:
     """
     Deletes an existing event.
 
@@ -551,26 +441,13 @@ async def delete_event(
         calendar_id (str): Calendar ID (default: 'primary').
 
     Returns:
-        A CallToolResult confirming deletion or an error/auth guidance message.
+        str: Confirmation message of the successful event deletion.
     """
-    tool_name = "delete_event"
     logger.info(
-        f"[{tool_name}] Invoked. Email: '{user_google_email}', Event ID: {event_id}"
+        f"[delete_event] Invoked. Email: '{user_google_email}', Event ID: {event_id}"
     )
-
-    auth_result = await get_authenticated_google_service(
-        service_name="calendar",
-        version="v3",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[CALENDAR_EVENTS_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
 
     try:
-
         # Log the event ID for debugging
         logger.info(
             f"[delete_event] Attempting to delete event with ID: '{event_id}' in calendar '{calendar_id}'"
@@ -590,9 +467,7 @@ async def delete_event(
                     f"[delete_event] Event not found during pre-delete verification: {get_error}"
                 )
                 message = f"Event not found during verification. The event with ID '{event_id}' could not be found in calendar '{calendar_id}'. This may be due to incorrect ID format or the event no longer exists."
-                return types.CallToolResult(
-                    isError=True, content=[types.TextContent(type="text", text=message)]
-                )
+                raise Exception(message)
             else:
                 logger.warning(
                     f"[delete_event] Error during pre-delete verification, but proceeding with deletion: {get_error}"
@@ -603,25 +478,19 @@ async def delete_event(
             service.events().delete(calendarId=calendar_id, eventId=event_id).execute
         )
 
-        confirmation_message = f"Successfully deleted event (ID: {event_id}) from calendar '{calendar_id}' for {user_email}."
-        logger.info(f"Event deleted successfully for {user_email}. ID: {event_id}")
-        return types.CallToolResult(
-            content=[types.TextContent(type="text", text=confirmation_message)]
-        )
+        confirmation_message = f"Successfully deleted event (ID: {event_id}) from calendar '{calendar_id}' for {user_google_email}."
+        logger.info(f"Event deleted successfully for {user_google_email}. ID: {event_id}")
+        return confirmation_message
     except HttpError as error:
         # Check for 404 Not Found error specifically
         if error.resp.status == 404:
             message = f"Event not found. The event with ID '{event_id}' could not be found in calendar '{calendar_id}'. LLM: The event may have been deleted already, or the event ID might be incorrect."
             logger.error(f"[delete_event] {message}")
         else:
-            message = f"API error deleting event (ID: {event_id}): {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with the user's email ({user_email if user_email != 'Unknown' else 'target Google account'}) and service_name='Google Calendar'."
+            message = f"API error deleting event (ID: {event_id}): {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with the user's email ({user_google_email}) and service_name='Google Calendar'."
             logger.error(message, exc_info=True)
-        return types.CallToolResult(
-            isError=True, content=[types.TextContent(type="text", text=message)]
-        )
+        raise Exception(message)
     except Exception as e:
         message = f"Unexpected error deleting event (ID: {event_id}): {e}."
         logger.exception(message)
-        return types.CallToolResult(
-            isError=True, content=[types.TextContent(type="text", text=message)]
-        )
+        raise Exception(message)

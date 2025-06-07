@@ -11,38 +11,26 @@ from mcp import types
 from googleapiclient.errors import HttpError
 
 # Auth & server utilities
-from auth.google_auth import get_authenticated_google_service
+from auth.service_decorator import require_google_service
 from core.server import server
-from config.google_config import (
-    CHAT_READONLY_SCOPE,
-    CHAT_WRITE_SCOPE,
-    CHAT_SPACES_SCOPE,
-)
 
 logger = logging.getLogger(__name__)
 
 @server.tool()
+@require_google_service("chat", "chat_read")
 async def list_spaces(
+    service,
     user_google_email: str,
     page_size: int = 100,
     space_type: str = "all"  # "all", "room", "dm"
-) -> types.CallToolResult:
+) -> str:
     """
     Lists Google Chat spaces (rooms and direct messages) accessible to the user.
-    """
-    tool_name = "list_spaces"
-    logger.info(f"[{tool_name}] Email={user_google_email}, Type={space_type}")
 
-    auth_result = await get_authenticated_google_service(
-        service_name="chat",
-        version="v1",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[CHAT_READONLY_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+    Returns:
+        str: A formatted list of Google Chat spaces accessible to the user.
+    """
+    logger.info(f"[list_spaces] Email={user_google_email}, Type={space_type}")
 
     try:
         # Build filter based on space_type
@@ -62,8 +50,7 @@ async def list_spaces(
 
         spaces = response.get('spaces', [])
         if not spaces:
-            return types.CallToolResult(content=[types.TextContent(type="text",
-                text=f"No Chat spaces found for type '{space_type}'.")])
+            return f"No Chat spaces found for type '{space_type}'."
 
         output = [f"Found {len(spaces)} Chat spaces (type: {space_type}):"]
         for space in spaces:
@@ -72,38 +59,31 @@ async def list_spaces(
             space_type_actual = space.get('spaceType', 'UNKNOWN')
             output.append(f"- {space_name} (ID: {space_id}, Type: {space_type_actual})")
 
-        return types.CallToolResult(content=[types.TextContent(type="text", text="\n".join(output))])
+        return "\n".join(output)
 
     except HttpError as e:
-        logger.error(f"API error in {tool_name}: {e}", exc_info=True)
-        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=f"API error: {e}")])
+        logger.error(f"API error in list_spaces: {e}", exc_info=True)
+        raise Exception(f"API error: {e}")
     except Exception as e:
-        logger.exception(f"Unexpected error in {tool_name}: {e}")
-        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=f"Unexpected error: {e}")])
+        logger.exception(f"Unexpected error in list_spaces: {e}")
+        raise Exception(f"Unexpected error: {e}")
 
 @server.tool()
+@require_google_service("chat", "chat_read")
 async def get_messages(
+    service,
     user_google_email: str,
     space_id: str,
     page_size: int = 50,
     order_by: str = "createTime desc"
-) -> types.CallToolResult:
+) -> str:
     """
     Retrieves messages from a Google Chat space.
-    """
-    tool_name = "get_messages"
-    logger.info(f"[{tool_name}] Space ID: '{space_id}' for user '{user_google_email}'")
 
-    auth_result = await get_authenticated_google_service(
-        service_name="chat",
-        version="v1",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[CHAT_READONLY_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+    Returns:
+        str: Formatted messages from the specified space.
+    """
+    logger.info(f"[get_messages] Space ID: '{space_id}' for user '{user_google_email}'")
 
     try:
         # Get space info first
@@ -123,8 +103,7 @@ async def get_messages(
 
         messages = response.get('messages', [])
         if not messages:
-            return types.CallToolResult(content=[types.TextContent(type="text",
-                text=f"No messages found in space '{space_name}' (ID: {space_id}).")])
+            return f"No messages found in space '{space_name}' (ID: {space_id})."
 
         output = [f"Messages from '{space_name}' (ID: {space_id}):\n"]
         for msg in messages:
@@ -137,46 +116,31 @@ async def get_messages(
             output.append(f"  {text_content}")
             output.append(f"  (Message ID: {msg_name})\n")
 
-        return types.CallToolResult(
-            content=[types.TextContent(type="text", text="\n".join(output))]
-        )
+        return "\n".join(output)
 
     except HttpError as error:
-        logger.error(f"[{tool_name}] API error for space {space_id}: {error}", exc_info=True)
-        return types.CallToolResult(
-            isError=True,
-            content=[types.TextContent(type="text", text=f"API error accessing space {space_id}: {error}")],
-        )
+        logger.error(f"[get_messages] API error for space {space_id}: {error}", exc_info=True)
+        raise Exception(f"API error accessing space {space_id}: {error}")
     except Exception as e:
-        logger.exception(f"[{tool_name}] Unexpected error for space {space_id}: {e}")
-        return types.CallToolResult(
-            isError=True,
-            content=[types.TextContent(type="text", text=f"Unexpected error accessing space {space_id}: {e}")],
-        )
+        logger.exception(f"[get_messages] Unexpected error for space {space_id}: {e}")
+        raise Exception(f"Unexpected error accessing space {space_id}: {e}")
 
 @server.tool()
+@require_google_service("chat", "chat_write")
 async def send_message(
+    service,
     user_google_email: str,
     space_id: str,
     message_text: str,
     thread_key: Optional[str] = None
-) -> types.CallToolResult:
+) -> str:
     """
     Sends a message to a Google Chat space.
-    """
-    tool_name = "send_message"
-    logger.info(f"[{tool_name}] Email: '{user_google_email}', Space: '{space_id}'")
 
-    auth_result = await get_authenticated_google_service(
-        service_name="chat",
-        version="v1",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[CHAT_WRITE_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+    Returns:
+        str: Confirmation message with sent message details.
+    """
+    logger.info(f"[send_message] Email: '{user_google_email}', Space: '{space_id}'")
 
     try:
         message_body = {
@@ -198,40 +162,33 @@ async def send_message(
         message_name = message.get('name', '')
         create_time = message.get('createTime', '')
 
-        msg = f"Message sent to space '{space_id}' by {user_email}. Message ID: {message_name}, Time: {create_time}"
-        logger.info(f"Successfully sent message to space '{space_id}' by {user_email}")
-        return types.CallToolResult(content=[types.TextContent(type="text", text=msg)])
+        msg = f"Message sent to space '{space_id}' by {user_google_email}. Message ID: {message_name}, Time: {create_time}"
+        logger.info(f"Successfully sent message to space '{space_id}' by {user_google_email}")
+        return msg
 
     except HttpError as e:
-        logger.error(f"API error in {tool_name}: {e}", exc_info=True)
-        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=f"API error: {e}")])
+        logger.error(f"API error in send_message: {e}", exc_info=True)
+        raise Exception(f"API error: {e}")
     except Exception as e:
-        logger.exception(f"Unexpected error in {tool_name}: {e}")
-        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=f"Unexpected error: {e}")])
+        logger.exception(f"Unexpected error in send_message: {e}")
+        raise Exception(f"Unexpected error: {e}")
 
 @server.tool()
+@require_google_service("chat", "chat_read")
 async def search_messages(
+    service,
     user_google_email: str,
     query: str,
     space_id: Optional[str] = None,
     page_size: int = 25
-) -> types.CallToolResult:
+) -> str:
     """
     Searches for messages in Google Chat spaces by text content.
-    """
-    tool_name = "search_messages"
-    logger.info(f"[{tool_name}] Email={user_google_email}, Query='{query}'")
 
-    auth_result = await get_authenticated_google_service(
-        service_name="chat",
-        version="v1",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[CHAT_READONLY_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+    Returns:
+        str: A formatted list of messages matching the search query.
+    """
+    logger.info(f"[search_messages] Email={user_google_email}, Query='{query}'")
 
     try:
         # If specific space provided, search within that space
@@ -272,8 +229,7 @@ async def search_messages(
             context = "all accessible spaces"
 
         if not messages:
-            return types.CallToolResult(content=[types.TextContent(type="text",
-                text=f"No messages found matching '{query}' in {context}.")])
+            return f"No messages found matching '{query}' in {context}."
 
         output = [f"Found {len(messages)} messages matching '{query}' in {context}:"]
         for msg in messages:
@@ -288,11 +244,11 @@ async def search_messages(
 
             output.append(f"- [{create_time}] {sender} in '{space_name}': {text_content}")
 
-        return types.CallToolResult(content=[types.TextContent(type="text", text="\n".join(output))])
+        return "\n".join(output)
 
     except HttpError as e:
-        logger.error(f"API error in {tool_name}: {e}", exc_info=True)
-        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=f"API error: {e}")])
+        logger.error(f"API error in search_messages: {e}", exc_info=True)
+        raise Exception(f"API error: {e}")
     except Exception as e:
-        logger.exception(f"Unexpected error in {tool_name}: {e}")
-        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=f"Unexpected error: {e}")])
+        logger.exception(f"Unexpected error in search_messages: {e}")
+        raise Exception(f"Unexpected error: {e}")

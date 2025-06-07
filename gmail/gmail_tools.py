@@ -15,7 +15,7 @@ from mcp import types
 from fastapi import Body
 from googleapiclient.errors import HttpError
 
-from auth.google_auth import get_authenticated_google_service
+from auth.service_decorator import require_google_service
 
 from core.server import (
     GMAIL_READONLY_SCOPE,
@@ -132,11 +132,10 @@ def _format_gmail_results_plain(messages: list, query: str) -> str:
 
 
 @server.tool()
+@require_google_service("gmail", "gmail_read")
 async def search_gmail_messages(
-    query: str,
-    user_google_email: str,
-    page_size: int = 10,
-) -> types.CallToolResult:
+    service, query: str, user_google_email: str, page_size: int = 10
+) -> str:
     """
     Searches messages in a user's Gmail account based on a query.
     Returns both Message IDs and Thread IDs for each found message, along with Gmail web interface links for manual verification.
@@ -147,26 +146,11 @@ async def search_gmail_messages(
         page_size (int): The maximum number of messages to return. Defaults to 10.
 
     Returns:
-        types.CallToolResult: Contains LLM-friendly structured results with Message IDs, Thread IDs, and clickable Gmail web interface URLs for each found message, or an error/auth guidance message.
+        str: LLM-friendly structured results with Message IDs, Thread IDs, and clickable Gmail web interface URLs for each found message.
     """
-    tool_name = "search_gmail_messages"
-    logger.info(
-        f"[{tool_name}] Invoked. Email: '{user_google_email}', Query: '{query}'"
-    )
-
-    auth_result = await get_authenticated_google_service(
-        service_name="gmail",
-        version="v1",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[GMAIL_READONLY_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+    logger.info(f"[search_gmail_messages] Email: '{user_google_email}', Query: '{query}'")
 
     try:
-
         response = await asyncio.to_thread(
             service.users()
             .messages()
@@ -174,36 +158,26 @@ async def search_gmail_messages(
             .execute
         )
         messages = response.get("messages", [])
-
         formatted_output = _format_gmail_results_plain(messages, query)
 
-        return types.CallToolResult(
-            content=[types.TextContent(type="text", text=formatted_output)]
-        )
+        logger.info(f"[search_gmail_messages] Found {len(messages)} messages")
+        return formatted_output
 
     except HttpError as e:
-        logger.error(
-            f"[{tool_name}] Gmail API error searching messages: {e}", exc_info=True
-        )
-        return types.CallToolResult(
-            isError=True,
-            content=[types.TextContent(type="text", text=f"Gmail API error: {e}")],
-        )
+        error_msg = f"Gmail API error: {e.reason}" if e.resp.status != 400 else f"Invalid query: '{query}'"
+        logger.error(f"[search_gmail_messages] {error_msg}")
+        raise Exception(error_msg)
     except Exception as e:
-        logger.exception(
-            f"[{tool_name}] Unexpected error searching Gmail messages: {e}"
-        )
-        return types.CallToolResult(
-            isError=True,
-            content=[types.TextContent(type="text", text=f"Unexpected error: {e}")],
-        )
+        error_msg = f"Error searching Gmail: {str(e)}"
+        logger.error(f"[search_gmail_messages] {error_msg}")
+        raise Exception(error_msg)
 
 
 @server.tool()
+@require_google_service("gmail", "gmail_read")
 async def get_gmail_message_content(
-    message_id: str,
-    user_google_email: str,
-) -> types.CallToolResult:
+    service, message_id: str, user_google_email: str
+) -> str:
     """
     Retrieves the full content (subject, sender, plain text body) of a specific Gmail message.
 
@@ -212,26 +186,14 @@ async def get_gmail_message_content(
         user_google_email (str): The user's Google email address. Required.
 
     Returns:
-        types.CallToolResult: Contains the message details or an error/auth guidance message.
+        str: The message details including subject, sender, and body content.
     """
-    tool_name = "get_gmail_message_content"
     logger.info(
-        f"[{tool_name}] Invoked. Message ID: '{message_id}', Email: '{user_google_email}'"
+        f"[get_gmail_message_content] Invoked. Message ID: '{message_id}', Email: '{user_google_email}'"
     )
-
-    auth_result = await get_authenticated_google_service(
-        service_name="gmail",
-        version="v1",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[GMAIL_READONLY_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
 
     try:
-        logger.info(f"[{tool_name}] Using service for: {user_google_email}")
+        logger.info(f"[get_gmail_message_content] Using service for: {user_google_email}")
 
         # Fetch message metadata first to get headers
         message_metadata = await asyncio.to_thread(
@@ -276,34 +238,28 @@ async def get_gmail_message_content(
                 f"\n--- BODY ---\n{body_data or '[No text/plain body found]'}",
             ]
         )
-        return types.CallToolResult(
-            content=[types.TextContent(type="text", text=content_text)]
-        )
+        return content_text
 
     except HttpError as e:
         logger.error(
-            f"[{tool_name}] Gmail API error getting message content: {e}", exc_info=True
+            f"[get_gmail_message_content] Gmail API error getting message content: {e}", exc_info=True
         )
-        return types.CallToolResult(
-            isError=True,
-            content=[types.TextContent(type="text", text=f"Gmail API error: {e}")],
-        )
+        raise Exception(f"Gmail API error: {e}")
     except Exception as e:
         logger.exception(
-            f"[{tool_name}] Unexpected error getting Gmail message content: {e}"
+            f"[get_gmail_message_content] Unexpected error getting Gmail message content: {e}"
         )
-        return types.CallToolResult(
-            isError=True,
-            content=[types.TextContent(type="text", text=f"Unexpected error: {e}")],
-        )
+        raise Exception(f"Unexpected error: {e}")
 
 
 @server.tool()
+@require_google_service("gmail", "gmail_read")
 async def get_gmail_messages_content_batch(
+    service,
     message_ids: List[str],
     user_google_email: str,
     format: Literal["full", "metadata"] = "full",
-) -> types.CallToolResult:
+) -> str:
     """
     Retrieves the content of multiple Gmail messages in a single batch request.
     Supports up to 100 messages per request using Google's batch API.
@@ -314,28 +270,14 @@ async def get_gmail_messages_content_batch(
         format (Literal["full", "metadata"]): Message format. "full" includes body, "metadata" only headers.
 
     Returns:
-        types.CallToolResult: Contains a list of message contents or error details.
+        str: A formatted list of message contents with separators.
     """
-    tool_name = "get_gmail_messages_content_batch"
     logger.info(
-        f"[{tool_name}] Invoked. Message count: {len(message_ids)}, Email: '{user_google_email}'"
+        f"[get_gmail_messages_content_batch] Invoked. Message count: {len(message_ids)}, Email: '{user_google_email}'"
     )
 
     if not message_ids:
-        return types.CallToolResult(
-            content=[types.TextContent(type="text", text="No message IDs provided")]
-        )
-
-    auth_result = await get_authenticated_google_service(
-        service_name="gmail",
-        version="v1",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[GMAIL_READONLY_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+        raise Exception("No message IDs provided")
 
     try:
         output_messages = []
@@ -375,7 +317,7 @@ async def get_gmail_messages_content_batch(
             except Exception as batch_error:
                 # Fallback to asyncio.gather if batch API fails
                 logger.warning(
-                    f"[{tool_name}] Batch API failed, falling back to asyncio.gather: {batch_error}"
+                    f"[get_gmail_messages_content_batch] Batch API failed, falling back to asyncio.gather: {batch_error}"
                 )
 
                 async def fetch_message(mid: str):
@@ -460,35 +402,29 @@ async def get_gmail_messages_content_batch(
         final_output = f"Retrieved {len(message_ids)} messages:\n\n"
         final_output += "\n---\n\n".join(output_messages)
 
-        return types.CallToolResult(
-            content=[types.TextContent(type="text", text=final_output)]
-        )
+        return final_output
 
     except HttpError as e:
         logger.error(
-            f"[{tool_name}] Gmail API error in batch retrieval: {e}", exc_info=True
+            f"[get_gmail_messages_content_batch] Gmail API error in batch retrieval: {e}", exc_info=True
         )
-        return types.CallToolResult(
-            isError=True,
-            content=[types.TextContent(type="text", text=f"Gmail API error: {e}")],
-        )
+        raise Exception(f"Gmail API error: {e}")
     except Exception as e:
         logger.exception(
-            f"[{tool_name}] Unexpected error in batch retrieval: {e}"
+            f"[get_gmail_messages_content_batch] Unexpected error in batch retrieval: {e}"
         )
-        return types.CallToolResult(
-            isError=True,
-            content=[types.TextContent(type="text", text=f"Unexpected error: {e}")],
-        )
+        raise Exception(f"Unexpected error: {e}")
 
 
 @server.tool()
+@require_google_service("gmail", GMAIL_SEND_SCOPE)
 async def send_gmail_message(
+    service,
     user_google_email: str,
     to: str = Body(..., description="Recipient email address."),
     subject: str = Body(..., description="Email subject."),
     body: str = Body(..., description="Email body (plain text)."),
-) -> types.CallToolResult:
+) -> str:
     """
     Sends an email using the user's Gmail account.
 
@@ -499,23 +435,9 @@ async def send_gmail_message(
         user_google_email (str): The user's Google email address. Required.
 
     Returns:
-        types.CallToolResult: Contains the message ID of the sent email, or an error/auth guidance message.
+        str: Confirmation message with the sent email's message ID.
     """
-    tool_name = "send_gmail_message"
-
-    auth_result = await get_authenticated_google_service(
-        service_name="gmail",
-        version="v1",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[GMAIL_SEND_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
-
     try:
-
         # Prepare the email
         message = MIMEText(body)
         message["to"] = to
@@ -528,37 +450,27 @@ async def send_gmail_message(
             service.users().messages().send(userId="me", body=send_body).execute
         )
         message_id = sent_message.get("id")
-        return types.CallToolResult(
-            content=[
-                types.TextContent(
-                    type="text", text=f"Email sent! Message ID: {message_id}"
-                )
-            ]
-        )
+        return f"Email sent! Message ID: {message_id}"
 
     except HttpError as e:
         logger.error(
-            f"[{tool_name}] Gmail API error sending message: {e}", exc_info=True
+            f"[send_gmail_message] Gmail API error sending message: {e}", exc_info=True
         )
-        return types.CallToolResult(
-            isError=True,
-            content=[types.TextContent(type="text", text=f"Gmail API error: {e}")],
-        )
+        raise Exception(f"Gmail API error: {e}")
     except Exception as e:
-        logger.exception(f"[{tool_name}] Unexpected error sending Gmail message: {e}")
-        return types.CallToolResult(
-            isError=True,
-            content=[types.TextContent(type="text", text=f"Unexpected error: {e}")],
-        )
+        logger.exception(f"[send_gmail_message] Unexpected error sending Gmail message: {e}")
+        raise Exception(f"Unexpected error: {e}")
 
 
 @server.tool()
+@require_google_service("gmail", GMAIL_COMPOSE_SCOPE)
 async def draft_gmail_message(
+    service,
     user_google_email: str,
     subject: str = Body(..., description="Email subject."),
     body: str = Body(..., description="Email body (plain text)."),
     to: Optional[str] = Body(None, description="Optional recipient email address."),
-) -> types.CallToolResult:
+) -> str:
     """
     Creates a draft email in the user's Gmail account.
 
@@ -569,26 +481,13 @@ async def draft_gmail_message(
         to (Optional[str]): Optional recipient email address. Can be left empty for drafts.
 
     Returns:
-        types.CallToolResult: Contains the draft ID of the created email, or an error/auth guidance message.
+        str: Confirmation message with the created draft's ID.
     """
-    tool_name = "draft_gmail_message"
     logger.info(
-        f"[{tool_name}] Invoked. Email: '{user_google_email}', Subject: '{subject}'"
+        f"[draft_gmail_message] Invoked. Email: '{user_google_email}', Subject: '{subject}'"
     )
-
-    auth_result = await get_authenticated_google_service(
-        service_name="gmail",
-        version="v1",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[GMAIL_COMPOSE_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
 
     try:
-
         # Prepare the email
         message = MIMEText(body)
         message["subject"] = subject
@@ -607,35 +506,23 @@ async def draft_gmail_message(
             service.users().drafts().create(userId="me", body=draft_body).execute
         )
         draft_id = created_draft.get("id")
-        return types.CallToolResult(
-            content=[
-                types.TextContent(
-                    type="text", text=f"Draft created! Draft ID: {draft_id}"
-                )
-            ]
-        )
+        return f"Draft created! Draft ID: {draft_id}"
 
     except HttpError as e:
         logger.error(
-            f"[{tool_name}] Gmail API error creating draft: {e}", exc_info=True
+            f"[draft_gmail_message] Gmail API error creating draft: {e}", exc_info=True
         )
-        return types.CallToolResult(
-            isError=True,
-            content=[types.TextContent(type="text", text=f"Gmail API error: {e}")],
-        )
+        raise Exception(f"Gmail API error: {e}")
     except Exception as e:
-        logger.exception(f"[{tool_name}] Unexpected error creating Gmail draft: {e}")
-        return types.CallToolResult(
-            isError=True,
-            content=[types.TextContent(type="text", text=f"Unexpected error: {e}")],
-        )
+        logger.exception(f"[draft_gmail_message] Unexpected error creating Gmail draft: {e}")
+        raise Exception(f"Unexpected error: {e}")
 
 
 @server.tool()
+@require_google_service("gmail", "gmail_read")
 async def get_gmail_thread_content(
-    thread_id: str,
-    user_google_email: str,
-) -> types.CallToolResult:
+    service, thread_id: str, user_google_email: str
+) -> str:
     """
     Retrieves the complete content of a Gmail conversation thread, including all messages.
 
@@ -644,23 +531,11 @@ async def get_gmail_thread_content(
         user_google_email (str): The user's Google email address. Required.
 
     Returns:
-        types.CallToolResult: Contains the complete thread content with all messages or an error/auth guidance message.
+        str: The complete thread content with all messages formatted for reading.
     """
-    tool_name = "get_gmail_thread_content"
     logger.info(
-        f"[{tool_name}] Invoked. Thread ID: '{thread_id}', Email: '{user_google_email}'"
+        f"[get_gmail_thread_content] Invoked. Thread ID: '{thread_id}', Email: '{user_google_email}'"
     )
-
-    auth_result = await get_authenticated_google_service(
-        service_name="gmail",
-        version="v1",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[GMAIL_READONLY_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
 
     try:
         # Fetch the complete thread with all messages
@@ -673,13 +548,7 @@ async def get_gmail_thread_content(
 
         messages = thread_response.get("messages", [])
         if not messages:
-            return types.CallToolResult(
-                content=[
-                    types.TextContent(
-                        type="text", text=f"No messages found in thread '{thread_id}'."
-                    )
-                ]
-            )
+            return f"No messages found in thread '{thread_id}'."
 
         # Extract thread subject from the first message
         first_message = messages[0]
@@ -735,32 +604,23 @@ async def get_gmail_thread_content(
             )
 
         content_text = "\n".join(content_lines)
-        return types.CallToolResult(
-            content=[types.TextContent(type="text", text=content_text)]
-        )
+        return content_text
 
     except HttpError as e:
         logger.error(
-            f"[{tool_name}] Gmail API error getting thread content: {e}", exc_info=True
+            f"[get_gmail_thread_content] Gmail API error getting thread content: {e}", exc_info=True
         )
-        return types.CallToolResult(
-            isError=True,
-            content=[types.TextContent(type="text", text=f"Gmail API error: {e}")],
-        )
+        raise Exception(f"Gmail API error: {e}")
     except Exception as e:
         logger.exception(
-            f"[{tool_name}] Unexpected error getting Gmail thread content: {e}"
+            f"[get_gmail_thread_content] Unexpected error getting Gmail thread content: {e}"
         )
-        return types.CallToolResult(
-            isError=True,
-            content=[types.TextContent(type="text", text=f"Unexpected error: {e}")],
-        )
+        raise Exception(f"Unexpected error: {e}")
 
 
 @server.tool()
-async def list_gmail_labels(
-    user_google_email: str,
-) -> types.CallToolResult:
+@require_google_service("gmail", "gmail_read")
+async def list_gmail_labels(service, user_google_email: str) -> str:
     """
     Lists all labels in the user's Gmail account.
 
@@ -768,21 +628,9 @@ async def list_gmail_labels(
         user_google_email (str): The user's Google email address. Required.
 
     Returns:
-        types.CallToolResult: Contains a list of all labels with their IDs, names, and types, or an error message.
+        str: A formatted list of all labels with their IDs, names, and types.
     """
-    tool_name = "list_gmail_labels"
-    logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}'")
-
-    auth_result = await get_authenticated_google_service(
-        service_name="gmail",
-        version="v1",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[GMAIL_READONLY_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+    logger.info(f"[list_gmail_labels] Invoked. Email: '{user_google_email}'")
 
     try:
         response = await asyncio.to_thread(
@@ -791,9 +639,7 @@ async def list_gmail_labels(
         labels = response.get("labels", [])
 
         if not labels:
-            return types.CallToolResult(
-                content=[types.TextContent(type="text", text="No labels found.")]
-            )
+            return "No labels found."
 
         lines = [f"Found {len(labels)} labels:", ""]
 
@@ -817,33 +663,27 @@ async def list_gmail_labels(
             for label in user_labels:
                 lines.append(f"  • {label['name']} (ID: {label['id']})")
 
-        return types.CallToolResult(
-            content=[types.TextContent(type="text", text="\n".join(lines))]
-        )
+        return "\n".join(lines)
 
     except HttpError as e:
-        logger.error(f"[{tool_name}] Gmail API error listing labels: {e}", exc_info=True)
-        return types.CallToolResult(
-            isError=True,
-            content=[types.TextContent(type="text", text=f"Gmail API error: {e}")],
-        )
+        logger.error(f"[list_gmail_labels] Gmail API error listing labels: {e}", exc_info=True)
+        raise Exception(f"Gmail API error: {e}")
     except Exception as e:
-        logger.exception(f"[{tool_name}] Unexpected error listing Gmail labels: {e}")
-        return types.CallToolResult(
-            isError=True,
-            content=[types.TextContent(type="text", text=f"Unexpected error: {e}")],
-        )
+        logger.exception(f"[list_gmail_labels] Unexpected error listing Gmail labels: {e}")
+        raise Exception(f"Unexpected error: {e}")
 
 
 @server.tool()
+@require_google_service("gmail", GMAIL_LABELS_SCOPE)
 async def manage_gmail_label(
+    service,
     user_google_email: str,
     action: Literal["create", "update", "delete"],
     name: Optional[str] = None,
     label_id: Optional[str] = None,
     label_list_visibility: Literal["labelShow", "labelHide"] = "labelShow",
     message_list_visibility: Literal["show", "hide"] = "show",
-) -> types.CallToolResult:
+) -> str:
     """
     Manages Gmail labels: create, update, or delete labels.
 
@@ -856,33 +696,15 @@ async def manage_gmail_label(
         message_list_visibility (Literal["show", "hide"]): Whether the label is shown in the message list.
 
     Returns:
-        types.CallToolResult: Result of the label operation or an error message.
+        str: Confirmation message of the label operation.
     """
-    tool_name = "manage_gmail_label"
-    logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}', Action: '{action}'")
+    logger.info(f"[manage_gmail_label] Invoked. Email: '{user_google_email}', Action: '{action}'")
 
     if action == "create" and not name:
-        return types.CallToolResult(
-            isError=True,
-            content=[types.TextContent(type="text", text="Label name is required for create action.")],
-        )
+        raise Exception("Label name is required for create action.")
 
     if action in ["update", "delete"] and not label_id:
-        return types.CallToolResult(
-            isError=True,
-            content=[types.TextContent(type="text", text="Label ID is required for update and delete actions.")],
-        )
-
-    auth_result = await get_authenticated_google_service(
-        service_name="gmail",
-        version="v1",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[GMAIL_LABELS_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+        raise Exception("Label ID is required for update and delete actions.")
 
     try:
         if action == "create":
@@ -894,14 +716,7 @@ async def manage_gmail_label(
             created_label = await asyncio.to_thread(
                 service.users().labels().create(userId="me", body=label_object).execute
             )
-            return types.CallToolResult(
-                content=[
-                    types.TextContent(
-                        type="text",
-                        text=f"Label created successfully!\nName: {created_label['name']}\nID: {created_label['id']}"
-                    )
-                ]
-            )
+            return f"Label created successfully!\nName: {created_label['name']}\nID: {created_label['id']}"
 
         elif action == "update":
             current_label = await asyncio.to_thread(
@@ -918,14 +733,7 @@ async def manage_gmail_label(
             updated_label = await asyncio.to_thread(
                 service.users().labels().update(userId="me", id=label_id, body=label_object).execute
             )
-            return types.CallToolResult(
-                content=[
-                    types.TextContent(
-                        type="text",
-                        text=f"Label updated successfully!\nName: {updated_label['name']}\nID: {updated_label['id']}"
-                    )
-                ]
-            )
+            return f"Label updated successfully!\nName: {updated_label['name']}\nID: {updated_label['id']}"
 
         elif action == "delete":
             label = await asyncio.to_thread(
@@ -936,36 +744,25 @@ async def manage_gmail_label(
             await asyncio.to_thread(
                 service.users().labels().delete(userId="me", id=label_id).execute
             )
-            return types.CallToolResult(
-                content=[
-                    types.TextContent(
-                        type="text",
-                        text=f"Label '{label_name}' (ID: {label_id}) deleted successfully!"
-                    )
-                ]
-            )
+            return f"Label '{label_name}' (ID: {label_id}) deleted successfully!"
 
     except HttpError as e:
-        logger.error(f"[{tool_name}] Gmail API error: {e}", exc_info=True)
-        return types.CallToolResult(
-            isError=True,
-            content=[types.TextContent(type="text", text=f"Gmail API error: {e}")],
-        )
+        logger.error(f"[manage_gmail_label] Gmail API error: {e}", exc_info=True)
+        raise Exception(f"Gmail API error: {e}")
     except Exception as e:
-        logger.exception(f"[{tool_name}] Unexpected error: {e}")
-        return types.CallToolResult(
-            isError=True,
-            content=[types.TextContent(type="text", text=f"Unexpected error: {e}")],
-        )
+        logger.exception(f"[manage_gmail_label] Unexpected error: {e}")
+        raise Exception(f"Unexpected error: {e}")
 
 
 @server.tool()
+@require_google_service("gmail", GMAIL_MODIFY_SCOPE)
 async def modify_gmail_message_labels(
+    service,
     user_google_email: str,
     message_id: str,
     add_label_ids: Optional[List[str]] = None,
     remove_label_ids: Optional[List[str]] = None,
-) -> types.CallToolResult:
+) -> str:
     """
     Adds or removes labels from a Gmail message.
 
@@ -976,27 +773,12 @@ async def modify_gmail_message_labels(
         remove_label_ids (Optional[List[str]]): List of label IDs to remove from the message.
 
     Returns:
-        types.CallToolResult: Confirmation of label changes or an error message.
+        str: Confirmation message of the label changes applied to the message.
     """
-    tool_name = "modify_gmail_message_labels"
-    logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}', Message ID: '{message_id}'")
+    logger.info(f"[modify_gmail_message_labels] Invoked. Email: '{user_google_email}', Message ID: '{message_id}'")
 
     if not add_label_ids and not remove_label_ids:
-        return types.CallToolResult(
-            isError=True,
-            content=[types.TextContent(type="text", text="At least one of add_label_ids or remove_label_ids must be provided.")],
-        )
-
-    auth_result = await get_authenticated_google_service(
-        service_name="gmail",
-        version="v1",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[GMAIL_MODIFY_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+        raise Exception("At least one of add_label_ids or remove_label_ids must be provided.")
 
     try:
         body = {}
@@ -1015,24 +797,11 @@ async def modify_gmail_message_labels(
         if remove_label_ids:
             actions.append(f"Removed labels: {', '.join(remove_label_ids)}")
 
-        return types.CallToolResult(
-            content=[
-                types.TextContent(
-                    type="text",
-                    text=f"Message labels updated successfully!\nMessage ID: {message_id}\n{'; '.join(actions)}"
-                )
-            ]
-        )
+        return f"Message labels updated successfully!\nMessage ID: {message_id}\n{'; '.join(actions)}"
 
     except HttpError as e:
-        logger.error(f"[{tool_name}] Gmail API error modifying message labels: {e}", exc_info=True)
-        return types.CallToolResult(
-            isError=True,
-            content=[types.TextContent(type="text", text=f"Gmail API error: {e}")],
-        )
+        logger.error(f"[modify_gmail_message_labels] Gmail API error modifying message labels: {e}", exc_info=True)
+        raise Exception(f"Gmail API error: {e}")
     except Exception as e:
-        logger.exception(f"[{tool_name}] Unexpected error modifying Gmail message labels: {e}")
-        return types.CallToolResult(
-            isError=True,
-            content=[types.TextContent(type="text", text=f"Unexpected error: {e}")],
-        )
+        logger.exception(f"[modify_gmail_message_labels] Unexpected error modifying Gmail message labels: {e}")
+        raise Exception(f"Unexpected error: {e}")

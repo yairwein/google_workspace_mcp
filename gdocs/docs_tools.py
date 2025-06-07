@@ -13,39 +13,27 @@ from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaIoBaseDownload
 
 # Auth & server utilities
-from auth.google_auth import get_authenticated_google_service
+from auth.service_decorator import require_google_service, require_multiple_services
 from core.utils import extract_office_xml_text
-from core.server import (
-    server,
-    DRIVE_READONLY_SCOPE,
-    DOCS_READONLY_SCOPE,
-    DOCS_WRITE_SCOPE,
-)
+from core.server import server
 
 logger = logging.getLogger(__name__)
 
 @server.tool()
+@require_google_service("drive", "drive_read")
 async def search_docs(
+    service,
     user_google_email: str,
     query: str,
     page_size: int = 10,
-) -> types.CallToolResult:
+) -> str:
     """
     Searches for Google Docs by name using Drive API (mimeType filter).
-    """
-    tool_name = "search_docs"
-    logger.info(f"[{tool_name}] Email={user_google_email}, Query='{query}'")
 
-    auth_result = await get_authenticated_google_service(
-        service_name="drive",
-        version="v3",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[DRIVE_READONLY_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+    Returns:
+        str: A formatted list of Google Docs matching the search query.
+    """
+    logger.info(f"[search_docs] Email={user_google_email}, Query='{query}'")
 
     try:
         escaped_query = query.replace("'", "\\'")
@@ -59,44 +47,39 @@ async def search_docs(
         )
         files = response.get('files', [])
         if not files:
-            return types.CallToolResult(content=[types.TextContent(type="text",
-                text=f"No Google Docs found matching '{query}'.")])
+            return f"No Google Docs found matching '{query}'."
 
         output = [f"Found {len(files)} Google Docs matching '{query}':"]
         for f in files:
             output.append(
                 f"- {f['name']} (ID: {f['id']}) Modified: {f.get('modifiedTime')} Link: {f.get('webViewLink')}"
             )
-        return types.CallToolResult(content=[types.TextContent(type="text", text="\n".join(output))])
+        return "\n".join(output)
 
     except HttpError as e:
         logger.error(f"API error in search_docs: {e}", exc_info=True)
-        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=f"API error: {e}")])
+        raise Exception(f"API error: {e}")
 
 @server.tool()
+@require_multiple_services([
+    {"service_type": "drive", "scopes": "drive_read", "param_name": "drive_service"},
+    {"service_type": "docs", "scopes": "docs_read", "param_name": "docs_service"}
+])
 async def get_doc_content(
+    drive_service,
+    docs_service,
     user_google_email: str,
     document_id: str,
-) -> types.CallToolResult:
+) -> str:
     """
     Retrieves content of a Google Doc or a Drive file (like .docx) identified by document_id.
     - Native Google Docs: Fetches content via Docs API.
     - Office files (.docx, etc.) stored in Drive: Downloads via Drive API and extracts text.
-    """
-    tool_name = "get_doc_content"
-    logger.info(f"[{tool_name}] Invoked. Document/File ID: '{document_id}' for user '{user_google_email}'")
 
-    # Step 1: Authenticate with Drive API to get metadata
-    drive_auth_result = await get_authenticated_google_service(
-        service_name="drive",
-        version="v3",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[DRIVE_READONLY_SCOPE],
-    )
-    if isinstance(drive_auth_result, types.CallToolResult):
-        return drive_auth_result
-    drive_service, user_email = drive_auth_result # user_email will be consistent
+    Returns:
+        str: The document content with metadata header.
+    """
+    logger.info(f"[get_doc_content] Invoked. Document/File ID: '{document_id}' for user '{user_google_email}'")
 
     try:
         # Step 2: Get file metadata from Drive
@@ -109,24 +92,13 @@ async def get_doc_content(
         file_name = file_metadata.get("name", "Unknown File")
         web_view_link = file_metadata.get("webViewLink", "#")
 
-        logger.info(f"[{tool_name}] File '{file_name}' (ID: {document_id}) has mimeType: '{mime_type}'")
+        logger.info(f"[get_doc_content] File '{file_name}' (ID: {document_id}) has mimeType: '{mime_type}'")
 
         body_text = "" # Initialize body_text
 
         # Step 3: Process based on mimeType
         if mime_type == "application/vnd.google-apps.document":
-            logger.info(f"[{tool_name}] Processing as native Google Doc.")
-            docs_auth_result = await get_authenticated_google_service(
-                service_name="docs",
-                version="v1",
-                tool_name=tool_name,
-                user_google_email=user_google_email,
-                required_scopes=[DOCS_READONLY_SCOPE],
-            )
-            if isinstance(docs_auth_result, types.CallToolResult):
-                return docs_auth_result
-            docs_service, _ = docs_auth_result # user_email already obtained from drive_auth
-
+            logger.info(f"[get_doc_content] Processing as native Google Doc.")
             doc_data = await asyncio.to_thread(
                 docs_service.documents().get(documentId=document_id).execute
             )
@@ -146,7 +118,7 @@ async def get_doc_content(
                          processed_text_lines.append(current_line_text)
             body_text = "".join(processed_text_lines)
         else:
-            logger.info(f"[{tool_name}] Processing as Drive file (e.g., .docx, other). MimeType: {mime_type}")
+            logger.info(f"[get_doc_content] Processing as Drive file (e.g., .docx, other). MimeType: {mime_type}")
 
             export_mime_type_map = {
                  # Example: "application/vnd.google-apps.spreadsheet"z: "text/csv",
@@ -186,52 +158,37 @@ async def get_doc_content(
             f'File: "{file_name}" (ID: {document_id}, Type: {mime_type})\n'
             f'Link: {web_view_link}\n\n--- CONTENT ---\n'
         )
-        return types.CallToolResult(
-            content=[types.TextContent(type="text", text=header + body_text)]
-        )
+        return header + body_text
 
     except HttpError as error:
         logger.error(
-            f"[{tool_name}] API error for ID {document_id}: {error}",
+            f"[get_doc_content] API error for ID {document_id}: {error}",
             exc_info=True,
         )
-        return types.CallToolResult(
-            isError=True,
-            content=[types.TextContent(type="text", text=f"API error processing document/file ID {document_id}: {error}")],
-        )
+        raise Exception(f"API error processing document/file ID {document_id}: {error}")
     except Exception as e:
-        logger.exception(f"[{tool_name}] Unexpected error for ID {document_id}: {e}")
-        return types.CallToolResult(
-            isError=True,
-            content=[types.TextContent(type="text", text=f"Unexpected error processing document/file ID {document_id}: {e}")],
-        )
+        logger.exception(f"[get_doc_content] Unexpected error for ID {document_id}: {e}")
+        raise Exception(f"Unexpected error processing document/file ID {document_id}: {e}")
 
 @server.tool()
+@require_google_service("drive", "drive_read")
 async def list_docs_in_folder(
+    service,
     user_google_email: str,
     folder_id: str = 'root',
     page_size: int = 100
-) -> types.CallToolResult:
+) -> str:
     """
     Lists Google Docs within a specific Drive folder.
-    """
-    tool_name = "list_docs_in_folder"
-    logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}', Folder ID: '{folder_id}'")
 
-    auth_result = await get_authenticated_google_service(
-        service_name="drive",
-        version="v3",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[DRIVE_READONLY_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    drive_service, user_email = auth_result # user_email will be consistent
+    Returns:
+        str: A formatted list of Google Docs in the specified folder.
+    """
+    logger.info(f"[list_docs_in_folder] Invoked. Email: '{user_google_email}', Folder ID: '{folder_id}'")
 
     try:
         rsp = await asyncio.to_thread(
-            drive_service.files().list(
+            service.files().list(
                 q=f"'{folder_id}' in parents and mimeType='application/vnd.google-apps.document' and trashed=false",
                 pageSize=page_size,
                 fields="files(id, name, modifiedTime, webViewLink)"
@@ -239,57 +196,49 @@ async def list_docs_in_folder(
         )
         items = rsp.get('files', [])
         if not items:
-            return types.CallToolResult(content=[types.TextContent(type="text",
-                text=f"No Google Docs found in folder '{folder_id}'.")])
+            return f"No Google Docs found in folder '{folder_id}'."
         out = [f"Found {len(items)} Docs in folder '{folder_id}':"]
         for f in items:
             out.append(f"- {f['name']} (ID: {f['id']}) Modified: {f.get('modifiedTime')} Link: {f.get('webViewLink')}")
-        return types.CallToolResult(content=[types.TextContent(type="text", text="\n".join(out))])
+        return "\n".join(out)
 
     except HttpError as e:
-        logger.error(f"API error in {tool_name}: {e}", exc_info=True)
-        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=f"API error: {e}")])
+        logger.error(f"API error in list_docs_in_folder: {e}", exc_info=True)
+        raise Exception(f"API error: {e}")
     except Exception as e:
-        logger.exception(f"Unexpected error in {tool_name}: {e}")
-        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=f"Unexpected error: {e}")])
+        logger.exception(f"Unexpected error in list_docs_in_folder: {e}")
+        raise Exception(f"Unexpected error: {e}")
 
 @server.tool()
+@require_google_service("docs", "docs_write")
 async def create_doc(
+    service,
     user_google_email: str, # Made user_google_email required
     title: str,
     content: str = '',
-) -> types.CallToolResult:
+) -> str:
     """
     Creates a new Google Doc and optionally inserts initial content.
-    """
-    tool_name = "create_doc"
-    logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}', Title='{title}'")
 
-    auth_result = await get_authenticated_google_service(
-        service_name="docs",
-        version="v1",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[DOCS_WRITE_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    docs_service, user_email = auth_result
+    Returns:
+        str: Confirmation message with document ID and link.
+    """
+    logger.info(f"[create_doc] Invoked. Email: '{user_google_email}', Title='{title}'")
 
     try:
-        doc = await asyncio.to_thread(docs_service.documents().create(body={'title': title}).execute)
+        doc = await asyncio.to_thread(service.documents().create(body={'title': title}).execute)
         doc_id = doc.get('documentId')
         if content:
             requests = [{'insertText': {'location': {'index': 1}, 'text': content}}]
-            await asyncio.to_thread(docs_service.documents().batchUpdate(documentId=doc_id, body={'requests': requests}).execute)
+            await asyncio.to_thread(service.documents().batchUpdate(documentId=doc_id, body={'requests': requests}).execute)
         link = f"https://docs.google.com/document/d/{doc_id}/edit"
-        msg = f"Created Google Doc '{title}' (ID: {doc_id}) for {user_email}. Link: {link}"
-        logger.info(f"Successfully created Google Doc '{title}' (ID: {doc_id}) for {user_email}. Link: {link}")
-        return types.CallToolResult(content=[types.TextContent(type="text", text=msg)])
+        msg = f"Created Google Doc '{title}' (ID: {doc_id}) for {user_google_email}. Link: {link}"
+        logger.info(f"Successfully created Google Doc '{title}' (ID: {doc_id}) for {user_google_email}. Link: {link}")
+        return msg
 
     except HttpError as e:
-        logger.error(f"API error in {tool_name}: {e}", exc_info=True)
-        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=f"API error: {e}")])
+        logger.error(f"API error in create_doc: {e}", exc_info=True)
+        raise Exception(f"API error: {e}")
     except Exception as e:
-        logger.exception(f"Unexpected error in {tool_name}: {e}")
-        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=f"Unexpected error: {e}")])
+        logger.exception(f"Unexpected error in create_doc: {e}")
+        raise Exception(f"Unexpected error: {e}")

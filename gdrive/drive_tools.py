@@ -13,13 +13,9 @@ from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 import io
 
-from auth.google_auth import get_authenticated_google_service
+from auth.service_decorator import require_google_service
 from core.utils import extract_office_xml_text
 from core.server import server
-from core.server import (
-    DRIVE_READONLY_SCOPE,
-    DRIVE_FILE_SCOPE,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -79,14 +75,16 @@ def _build_drive_list_params(
     return list_params
 
 @server.tool()
+@require_google_service("drive", "drive_read")
 async def search_drive_files(
+    service,
     user_google_email: str,
     query: str,
     page_size: int = 10,
     drive_id: Optional[str] = None,
     include_items_from_all_drives: bool = True,
     corpora: Optional[str] = None,
-) -> types.CallToolResult:
+) -> str:
     """
     Searches for files and folders within a user's Google Drive, including shared drives.
 
@@ -101,23 +99,9 @@ async def search_drive_files(
                                  Otherwise, Drive API default behavior applies. Prefer 'user' or 'drive' over 'allDrives' for efficiency.
 
     Returns:
-        types.CallToolResult: Contains a list of found files/folders with their details (ID, name, type, size, modified time, link),
-                               an error message if the API call fails,
-                               or an authentication guidance message if credentials are required.
+        str: A formatted list of found files/folders with their details (ID, name, type, size, modified time, link).
     """
-    tool_name = "search_drive_files"
-    logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}', Query: '{query}'")
-
-    auth_result = await get_authenticated_google_service(
-        service_name="drive",
-        version="v3",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[DRIVE_READONLY_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+    logger.info(f"[search_drive_files] Invoked. Email: '{user_google_email}', Query: '{query}'")
 
     try:
         # Check if the query looks like a structured Drive query or free text
@@ -146,7 +130,7 @@ async def search_drive_files(
         )
         files = results.get('files', [])
         if not files:
-            return types.CallToolResult(content=[types.TextContent(type="text", text=f"No files found for '{query}'.")])
+            return f"No files found for '{query}'."
 
         formatted_files_text_parts = [f"Found {len(files)} files for {user_google_email} matching '{query}':"]
         for item in files:
@@ -155,19 +139,21 @@ async def search_drive_files(
                 f"- Name: \"{item['name']}\" (ID: {item['id']}, Type: {item['mimeType']}{size_str}, Modified: {item.get('modifiedTime', 'N/A')}) Link: {item.get('webViewLink', '#')}"
             )
         text_output = "\n".join(formatted_files_text_parts)
-        return types.CallToolResult(content=[types.TextContent(type="text", text=text_output)])
+        return text_output
     except HttpError as error:
         logger.error(f"API error searching Drive files: {error}", exc_info=True)
-        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=f"API error: {error}")])
+        raise Exception(f"API error: {error}")
     except Exception as e:
         logger.exception(f"Unexpected error searching Drive files: {e}")
-        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=f"Unexpected error: {e}")])
+        raise Exception(f"Unexpected error: {e}")
 
 @server.tool()
+@require_google_service("drive", "drive_read")
 async def get_drive_file_content(
+    service,
     user_google_email: str,
     file_id: str,
-) -> types.CallToolResult:
+) -> str:
     """
     Retrieves the content of a specific Google Drive file by ID, supporting files in shared drives.
 
@@ -181,21 +167,9 @@ async def get_drive_file_content(
         file_id: Drive file ID.
 
     Returns:
-        types.CallToolResult with plain-text content (or error info).
+        str: The file content as plain text with metadata header.
     """
-    tool_name = "get_drive_file_content"
-    logger.info(f"[{tool_name}] Invoked. File ID: '{file_id}'")
-
-    auth_result = await get_authenticated_google_service(
-        service_name="drive",
-        version="v3",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[DRIVE_READONLY_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, _ = auth_result
+    logger.info(f"[get_drive_file_content] Invoked. File ID: '{file_id}'")
 
     try:
         file_metadata = await asyncio.to_thread(
@@ -225,12 +199,28 @@ async def get_drive_file_content(
 
         file_content_bytes = fh.getvalue()
 
-        # Attempt Office XML extraction
-        office_text = extract_office_xml_text(file_content_bytes, mime_type)
-        if office_text:
-            body_text = office_text
+        # Attempt Office XML extraction only for actual Office XML files
+        office_mime_types = {
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation", 
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        }
+        
+        if mime_type in office_mime_types:
+            office_text = extract_office_xml_text(file_content_bytes, mime_type)
+            if office_text:
+                body_text = office_text
+            else:
+                # Fallback: try UTF-8; otherwise flag binary
+                try:
+                    body_text = file_content_bytes.decode("utf-8")
+                except UnicodeDecodeError:
+                    body_text = (
+                        f"[Binary or unsupported text encoding for mimeType '{mime_type}' - "
+                        f"{len(file_content_bytes)} bytes]"
+                    )
         else:
-            # Fallback: try UTF-8; otherwise flag binary
+            # For non-Office files (including Google native files), try UTF-8 decode directly
             try:
                 body_text = file_content_bytes.decode("utf-8")
             except UnicodeDecodeError:
@@ -244,36 +234,29 @@ async def get_drive_file_content(
             f'File: "{file_name}" (ID: {file_id}, Type: {mime_type})\n'
             f'Link: {file_metadata.get("webViewLink", "#")}\n\n--- CONTENT ---\n'
         )
-        return types.CallToolResult(
-            content=[types.TextContent(type="text", text=header + body_text)]
-        )
+        return header + body_text
 
     except HttpError as error:
         logger.error(
             f"API error getting Drive file content for {file_id}: {error}",
             exc_info=True,
         )
-        return types.CallToolResult(
-            isError=True,
-            content=[types.TextContent(type="text", text=f"API error: {error}")],
-        )
+        raise Exception(f"API error: {error}")
     except Exception as e:
         logger.exception(f"Unexpected error getting Drive file content for {file_id}: {e}")
-        return types.CallToolResult(
-            isError=True,
-            content=[types.TextContent(type="text", text=f"Unexpected error: {e}")],
-        )
+        raise Exception(f"Unexpected error: {e}")
 
 
-@server.tool()
+@require_google_service("drive", "drive_read")
 async def list_drive_items(
+    service,
     user_google_email: str,
     folder_id: str = 'root',
     page_size: int = 100,
     drive_id: Optional[str] = None,
     include_items_from_all_drives: bool = True,
     corpora: Optional[str] = None,
-) -> types.CallToolResult:
+) -> str:
     """
     Lists files and folders, supporting shared drives.
     If `drive_id` is specified, lists items within that shared drive. `folder_id` is then relative to that drive (or use drive_id as folder_id for root).
@@ -288,21 +271,9 @@ async def list_drive_items(
         corpora (Optional[str]): Corpus to query ('user', 'drive', 'allDrives'). If `drive_id` is set and `corpora` is None, 'drive' is used. If None and no `drive_id`, API defaults apply.
 
     Returns:
-        types.CallToolResult: Contains a list of files/folders or an error.
+        str: A formatted list of files/folders in the specified folder.
     """
-    tool_name = "list_drive_items"
-    logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}', Folder ID: '{folder_id}'")
-
-    auth_result = await get_authenticated_google_service(
-        service_name="drive",
-        version="v3",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[DRIVE_READONLY_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+    logger.info(f"[list_drive_items] Invoked. Email: '{user_google_email}', Folder ID: '{folder_id}'")
 
     try:
         final_query = f"'{folder_id}' in parents and trashed=false"
@@ -320,7 +291,7 @@ async def list_drive_items(
         )
         files = results.get('files', [])
         if not files:
-            return types.CallToolResult(content=[types.TextContent(type="text", text=f"No items found in folder '{folder_id}'.")])
+            return f"No items found in folder '{folder_id}'."
 
         formatted_items_text_parts = [f"Found {len(files)} items in folder '{folder_id}' for {user_google_email}:"]
         for item in files:
@@ -329,22 +300,23 @@ async def list_drive_items(
                 f"- Name: \"{item['name']}\" (ID: {item['id']}, Type: {item['mimeType']}{size_str}, Modified: {item.get('modifiedTime', 'N/A')}) Link: {item.get('webViewLink', '#')}"
             )
         text_output = "\n".join(formatted_items_text_parts)
-        return types.CallToolResult(content=[types.TextContent(type="text", text=text_output)])
+        return text_output
     except HttpError as error:
         logger.error(f"API error listing Drive items in folder {folder_id}: {error}", exc_info=True)
-        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=f"API error: {error}")])
+        raise Exception(f"API error: {error}")
     except Exception as e:
         logger.exception(f"Unexpected error listing Drive items in folder {folder_id}: {e}")
-        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=f"Unexpected error: {e}")])
+        raise Exception(f"Unexpected error: {e}")
 
-@server.tool()
+@require_google_service("drive", "drive_file")
 async def create_drive_file(
+    service,
     user_google_email: str,
     file_name: str,
     content: str,
     folder_id: str = 'root',
     mime_type: str = 'text/plain',
-) -> types.CallToolResult:
+) -> str:
     """
     Creates a new file in Google Drive, supporting creation within shared drives.
 
@@ -356,21 +328,9 @@ async def create_drive_file(
         mime_type (str): The MIME type of the file. Defaults to 'text/plain'.
 
     Returns:
-        A CallToolResult confirming creation or an error/auth guidance message.
+        str: Confirmation message of the successful file creation with file link.
     """
-    tool_name = "create_drive_file"
-    logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}', File Name: {file_name}, Folder ID: {folder_id}")
-
-    auth_result = await get_authenticated_google_service(
-        service_name="drive",
-        version="v3",
-        tool_name=tool_name,
-        user_google_email=user_google_email,
-        required_scopes=[DRIVE_FILE_SCOPE],
-    )
-    if isinstance(auth_result, types.CallToolResult):
-        return auth_result
-    service, user_email = auth_result
+    logger.info(f"[create_drive_file] Invoked. Email: '{user_google_email}', File Name: {file_name}, Folder ID: {folder_id}")
 
     try:
         file_metadata = {
@@ -390,13 +350,13 @@ async def create_drive_file(
         )
 
         link = created_file.get('webViewLink', 'No link available')
-        confirmation_message = f"Successfully created file '{created_file.get('name', file_name)}' (ID: {created_file.get('id', 'N/A')}) in folder '{folder_id}' for {user_email}. Link: {link}"
+        confirmation_message = f"Successfully created file '{created_file.get('name', file_name)}' (ID: {created_file.get('id', 'N/A')}) in folder '{folder_id}' for {user_google_email}. Link: {link}"
         logger.info(f"Successfully created file. Link: {link}")
-        return types.CallToolResult(content=[types.TextContent(type="text", text=confirmation_message)])
+        return confirmation_message
 
     except HttpError as error:
         logger.error(f"API error creating Drive file '{file_name}': {error}", exc_info=True)
-        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=f"API error: {error}")])
+        raise Exception(f"API error: {error}")
     except Exception as e:
         logger.exception(f"Unexpected error creating Drive file '{file_name}': {e}")
-        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=f"Unexpected error: {e}")])
+        raise Exception(f"Unexpected error: {e}")

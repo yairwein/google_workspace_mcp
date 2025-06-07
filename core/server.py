@@ -169,7 +169,7 @@ async def start_google_auth(
     user_google_email: str,
     service_name: str,
     mcp_session_id: Optional[str] = Header(None, alias="Mcp-Session-Id")
-) -> types.CallToolResult:
+) -> str:
     """
     Initiates the Google OAuth 2.0 authentication flow for the specified user email and service.
     This is the primary method to establish credentials when no valid session exists or when targeting a specific account for a particular service.
@@ -193,26 +193,30 @@ async def start_google_auth(
         mcp_session_id (Optional[str]): The active MCP session ID (automatically injected by FastMCP from the Mcp-Session-Id header). Links the OAuth flow state to the session.
 
     Returns:
-        types.CallToolResult: An error result (`isError=True`) containing:
-                               - A detailed message for the LLM with the authorization URL and instructions to guide the user through the authentication process.
-                               - An error message if `user_google_email` or `service_name` is invalid or missing.
-                               - An error message if the OAuth flow initiation fails.
+        str: A detailed message for the LLM with the authorization URL and instructions to guide the user through the authentication process.
     """
     if not user_google_email or not isinstance(user_google_email, str) or '@' not in user_google_email:
         error_msg = "Invalid or missing 'user_google_email'. This parameter is required and must be a valid email address. LLM, please ask the user for their Google email address."
         logger.error(f"[start_google_auth] {error_msg}")
-        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=error_msg)])
+        raise Exception(error_msg)
 
     if not service_name or not isinstance(service_name, str):
         error_msg = "Invalid or missing 'service_name'. This parameter is required (e.g., 'Google Calendar', 'Google Docs'). LLM, please specify the service name."
         logger.error(f"[start_google_auth] {error_msg}")
-        return types.CallToolResult(isError=True, content=[types.TextContent(type="text", text=error_msg)])
+        raise Exception(error_msg)
 
     logger.info(f"Tool 'start_google_auth' invoked for user_google_email: '{user_google_email}', service: '{service_name}', session: '{mcp_session_id}'.")
     # Use the centralized start_auth_flow from auth.google_auth
-    return await start_auth_flow(
+    auth_result = await start_auth_flow(
         mcp_session_id=mcp_session_id,
         user_google_email=user_google_email,
         service_name=service_name,
         redirect_uri=OAUTH_REDIRECT_URI
     )
+    
+    # Extract content from CallToolResult and raise exception if error
+    if auth_result.isError:
+        error_text = auth_result.content[0].text if auth_result.content else "Authentication flow failed"
+        raise Exception(error_text)
+    else:
+        return auth_result.content[0].text if auth_result.content else "Authentication initiated"
