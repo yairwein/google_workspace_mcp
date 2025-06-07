@@ -1,16 +1,12 @@
-<div align="center">
-
-# Google Workspace MCP Server
+# Google Workspace MCP Server <img src="https://github.com/user-attachments/assets/b89524e4-6e6e-49e6-ba77-00d6df0c6e5c" width="80" align="right" />
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![UV](https://img.shields.io/badge/Package%20Installer-UV-blueviolet)](https://github.com/astral-sh/uv)
 
-<img src="https://github.com/user-attachments/assets/b89524e4-6e6e-49e6-ba77-00d6df0c6e5c" width="200" />
+**The world's most feature-complete Google Workspace MCP server**
 
-**Connect MCP Clients, AI Assistants and more to Google Workspace services through the Model Context Protocol**
-
-</div>
+*Connect AI assistants to Google Calendar, Drive, Gmail, Docs, Sheets, and Chat through the Model Context Protocol*
 
 **See it in action:**
 <div align="center">
@@ -19,61 +15,28 @@
 
 ---
 
-## 📑 Table of Contents
-
-- [Google Workspace MCP Server](#google-workspace-mcp-server)
-  - [📑 Table of Contents](#-table-of-contents)
-  - [🌐 Overview](#-overview)
-  - [✨ Features](#-features)
-  - [🚀 Quick Start](#-quick-start)
-    - [Prerequisites](#prerequisites)
-    - [Installation](#installation)
-    - [Manual Installation](#manual-installation)
-    - [Configuration](#configuration)
-    - [Server Configuration](#server-configuration)
-    - [Environment Setup](#environment-setup)
-    - [Start the Server](#start-the-server)
-      - [Important Ports](#important-ports)
-    - [Connecting to the Server](#connecting-to-the-server)
-    - [Integration with Open WebUI](#integration-with-open-webui)
-    - [First-time Authentication](#first-time-authentication)
-  - [🧰 Available Tools](#-available-tools)
-    - [📅 Google Calendar](#-google-calendar)
-    - [📁 Google Drive](#-google-drive)
-    - [📧 Gmail](#-gmail)
-    - [📝 Google Docs](#-google-docs)
-    - [📊 Google Sheets](#-google-sheets)
-    - [💬 Google Chat](#-google-chat)
-  - [🛠️ Development](#️-development)
-    - [Project Structure](#project-structure)
-    - [Port Handling for OAuth](#port-handling-for-oauth)
-    - [Debugging](#debugging)
-    - [Adding New Tools](#adding-new-tools)
-  - [🔒 Security Notes](#-security-notes)
-  - [Screenshots:](#screenshots)
-  - [📄 License](#-license)
-
----
-
 ## 🌐 Overview
 
-The Google Workspace MCP Server integrates Google Workspace services (Calendar, Drive, Gmail, Docs, Sheets, and Chat) with AI assistants and other applications using the Model Context Protocol (MCP). This allows AI systems to access and interact with user data from Google Workspace applications securely and efficiently.
+A production-ready MCP server that integrates all major Google Workspace services with AI assistants. Built with FastMCP for optimal performance, featuring advanced authentication handling, service caching, and streamlined development patterns.
+
+**Recent Improvements:**
+- 🔧 **Authentication Decorator System**: Eliminated 87% of boilerplate code with centralized `@require_google_service()` decorators and 30-minute service caching
+- ⚡ **FastMCP Native Responses**: Simplified architecture with native Python return values instead of manual `CallToolResult` construction
 
 ---
 
 ## ✨ Features
 
-- **🔐 OAuth 2.0 Authentication**: Securely connects to Google APIs using user-authorized credentials with automatic token refresh and centralized authentication flow
-- **📅 Google Calendar Integration**: Full calendar management - list calendars, fetch events, create/modify/delete events with support for all-day and timed events
-- **📁 Google Drive Integration**: Search files, list folder contents, read file content, and create new files. Supports extraction and retrieval of .docx, .xlsx and other Microsoft Office formats natively! 
-- **📧 Gmail Integration**: Complete email management - search messages, retrieve content, send emails, and create drafts with full support for all query syntax
-- **📄 Google Docs Integration**: Search for documents, read document content, list documents in folders, and create new documents right from your chat!
-- **📊 Google Sheets Integration**: Complete spreadsheet management - list spreadsheets, read/write/clear cell values, create spreadsheets and sheets, with flexible value modification
-- **🔄 Multiple Transport Options**: Streamable HTTP + SSE fallback
-- **🔌 `mcpo` Compatibility**: Easily expose the server as an OpenAPI endpoint for integration with tools like Open WebUI
-- **🧩 Extensible Design**: Simple structure for adding support for more Google Workspace APIs and tools
-- **🔄 Integrated OAuth Callback**: Handles the OAuth redirect directly within the server on port 8000
-- **⚡ Thread-Safe Session Management**: Robust session handling with thread-safe architecture for improved reliability
+- **🔐 Advanced OAuth 2.0**: Secure authentication with automatic token refresh, session management, and service-specific scope handling
+- **📅 Google Calendar**: Full calendar management with event CRUD operations
+- **📁 Google Drive**: File operations with native Microsoft Office format support (.docx, .xlsx)
+- **📧 Gmail**: Complete email management with search, send, and draft capabilities
+- **📄 Google Docs**: Document operations including content extraction and creation
+- **📊 Google Sheets**: Comprehensive spreadsheet management with flexible cell operations
+- **💬 Google Chat**: Space management and messaging capabilities
+- **🔄 Multiple Transports**: HTTP with SSE fallback, OpenAPI compatibility via `mcpo`
+- **⚡ High Performance**: Service caching, thread-safe sessions, FastMCP integration
+- **🧩 Developer Friendly**: Minimal boilerplate, automatic service injection, centralized configuration
 
 ---
 
@@ -82,307 +45,139 @@ The Google Workspace MCP Server integrates Google Workspace services (Calendar, 
 ### Prerequisites
 
 - **Python 3.11+**
-- **[uv](https://github.com/astral-sh/uv)** package installer (or pip)
-- **Google Cloud Project** with OAuth 2.0 credentials enabled for required APIs (Calendar, Drive, Gmail, Docs, Sheets, Chat)
+- **[uv](https://github.com/astral-sh/uv)** (recommended) or pip
+- **Google Cloud Project** with OAuth 2.0 credentials
 
 ### Installation
 
-### Manual Installation
 ```bash
-# Clone the repository (replace with your fork URL if different)
 git clone https://github.com/taylorwilsdon/google_workspace_mcp.git
 cd google_workspace_mcp
-
-# Create a virtual environment and install dependencies
-uv venv
-source .venv/bin/activate  # On Windows use `.venv\Scripts\activate`
-uv pip install -e .
+# That's it! uv handles everything automatically
 ```
 
 ### Configuration
 
-1. Create **OAuth 2.0 Credentials** (web application type) in the [Google Cloud Console](https://console.cloud.google.com/).
-2. Enable the **Google Calendar API**, **Google Drive API**, **Gmail API**, **Google Docs API**, and **Google Sheets API** for your project.
-3. Download the OAuth client credentials as `client_secret.json` and place it in the project's root directory.
-4. Add the following redirect URI to your OAuth client configuration in the Google Cloud Console. Note that `http://localhost:8000` is the default base URI and port, which can be customized via environment variables (`WORKSPACE_MCP_BASE_URI` and `WORKSPACE_MCP_PORT`). If you change these, you must update the redirect URI in the Google Cloud Console accordingly.
+1. **Google Cloud Setup**:
+   - Create OAuth 2.0 credentials (web application) in [Google Cloud Console](https://console.cloud.google.com/)
+   - Enable APIs: Calendar, Drive, Gmail, Docs, Sheets, Chat
+   - Download credentials as `client_secret.json` in project root
+   - Add redirect URI: `http://localhost:8000/oauth2callback`
+
+2. **Environment**:
+   ```bash
+   export OAUTHLIB_INSECURE_TRANSPORT=1  # Development only
    ```
-   http://localhost:8000/oauth2callback
-   ```
-5. **⚠️ Important**: Ensure `client_secret.json` is added to your `.gitignore` file and never committed to version control.
-
-### Server Configuration
-
-The server's base URL and port can be customized using environment variables:
-
-- `WORKSPACE_MCP_BASE_URI`: Sets the base URI for the server (default: `http://localhost`). This affects the `server_url` used for Gemini native function calling and the `OAUTH_REDIRECT_URI`.
-- `WORKSPACE_MCP_PORT`: Sets the port the server listens on (default: `8000`). This affects the `server_url`, `port`, and `OAUTH_REDIRECT_URI`.
-
-Example usage:
-
-```bash
-export WORKSPACE_MCP_BASE_URI="https://my-custom-domain.com"
-export WORKSPACE_MCP_PORT="9000"
-uv run main.py
-```
-
-### Environment Setup
-
-The server uses HTTP for localhost OAuth callbacks during development. Set this environment variable before running the server:
-
-```bash
-# Allow HTTP for localhost OAuth callbacks (development only!)
-export OAUTHLIB_INSECURE_TRANSPORT=1
-```
-
-Without this, you might encounter an "OAuth 2 MUST utilize HTTPS" error during the authentication flow.
 
 ### Start the Server
 
-Choose one of the following methods to run the server:
-
-<details>
-<summary><b>HTTP Server Mode</b></summary>
-
 ```bash
-python main.py
-# or using uv
+# HTTP mode (recommended)
 uv run main.py
-```
 
-Runs the server with an HTTP transport layer on port 8000.
-</details>
-
-<details>
-<summary><b>Single-User Mode</b></summary>
-
-Multi-user MCP is kind of a mess, so right now now everything runs best as 1:1 mapping between client snd server. That will change as soon as Claude can permform OAuth 2.1 flows, so this MCP was built eith a flag for simplified single-user environments. You can run the server in single-user mode, which bypasses session-to-OAuth mapping and uses any available credentials from the `.credentials` directory:
-
-```bash
-python main.py --single-user
-# or using uv
+# Single-user mode (simplified authentication)
 uv run main.py --single-user
-```
 
-In single-user mode:
-- The server automatically finds and uses any valid credentials in the `.credentials` directory
-- No session mapping is required - the server uses the first valid credential file found
-- Useful for development, testing, or single-user deployments
-- Still requires initial OAuth authentication to create credential files
-
-This mode is particularly helpful when you don't need multi-user session management and want simplified credential handling.
-</details>
-
-<details>
-<summary><b>Using Docker</b></summary>
-
-You can build and run the server using the provided [`Dockerfile`](Dockerfile).
-
-```bash
-# Build the Docker image
+# Docker
 docker build -t google-workspace-mcp .
-
-# Run the Docker container
-# The -p flag maps the container port 8000 to the host port 8000
-# The -v flag mounts the current directory to /app inside the container
-# This is useful for development to pick up code changes without rebuilding
 docker run -p 8000:8000 -v $(pwd):/app google-workspace-mcp
 ```
 
-The `smithery.yaml` file is configured to start the server correctly within the Docker container.
-</details>
+### Connect to Claude Desktop
 
-#### Important Ports
+**Option 1: Auto-install (Recommended)**
+```bash
+python install_claude.py
+```
 
-The default ports are `8000`, but can be changed via the `WORKSPACE_MCP_PORT` environment variable.
+**Option 2: Manual Configuration**
+1. Open Claude Desktop Settings → Developer → Edit Config
+2. This creates/opens the config file at:
+   - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+   - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+3. Add the server configuration:
 
-| Service | Default Port | Description |
-|---------|------|-------------|
-| OAuth Callback | `8000` | Handled internally by the server via the `/oauth2callback` route |
-| HTTP Mode Server | `8000` | Default when using HTTP transport |
-
-### Connecting to the Server
-
-The server supports multiple connection methods:
-
-**Claude Desktop:**
-> Can run anywhere and be used via `mcp-remote` or invoked locally  with `uv run main.py` and using `mcp-remote` with localhost. Claude Desktop lacks native support for streamable HTTP or SSE.
-
-**config.json:**
 ```json
 {
   "mcpServers": {
-    "Google workspace": {
+    "google_workspace": {
       "command": "npx",
-      "args": [
-        "mcp-remote",
-        "http://localhost:8000/mcp”
-      ]
+      "args": ["mcp-remote", "http://localhost:8000/mcp"]
     }
   }
 }
 ```
 
-<summary><b>Using mcpo (Recommended for OpenAPI Spec Access)</b></summary>
-With config.json (for multi-mcp mcpo usage):
+### First-Time Authentication
 
-1. Install `mcpo`: `uv pip install mcpo` or `pip install mcpo`
-2. Create a `config.json` (see [Integration with Open WebUI](#integration-with-open-webui))
-3. Run `mcpo` pointing to your config: `uvx mcpo --config config.json --port 8001`
-4. The MCP server API will be available at: `http://localhost:8001/google_workspace` (or the name defined in `config.json`)
-5. OpenAPI documentation (Swagger UI) available at: `http://localhost:8001/google_workspace/docs`
-
-With startup command (for single-mcp mcpo usage):
-1. Install `mcpo`: `uv pip install mcpo` or `pip install mcpo`
-2. Start with `uvx mcpo --port 8001 --api-key "top-secret" --server-type "streamablehttp" -- http://localhost:8000/mcp`
-3. The MCP server API will be available at: `http://localhost:8001/openapi.json` (or the name defined in `config.json`)
-4. OpenAPI documentation (Swagger UI) available at: `http://localhost:8001/docs`
-
-<summary><b>HTTP Mode</b></summary>
-
-1. Start the server in HTTP mode (see [Start the Server](#start-the-server))
-2. Send MCP JSON requests directly to `http://localhost:8000`
-3. Useful for testing with tools like `curl` or custom HTTP clients
-4. Can be used to serve  Claude Desktop & other MCP clients yet to integrate the new Streamable HTTP transport via mcp-remote:
-5. You can also serve in SSE fallback mode if preferred.
-
-### Integration with Open WebUI
-
-To use this server as a tool provider within Open WebUI:
-
-1. **Create `mcpo` Configuration**:
-   Create a file named `config.json` with the following structure to have mcpo make the streamable HTTP endpoint available as an OpenAPI spec tool.
-
-   ```json
-     {
-      "mcpServers": {
-          "google_workspace": {
-              "type": "streamablehttp",
-              "url": "http://localhost:8000/mcp"
-          }
-      }
-   }
-   ```
-
-2. **Start the `mcpo` Server**:
-   ```bash
-   mcpo --port 8001 --config config.json --api-key "your-optional-secret-key"
-   ```
-   This command starts the `mcpo` proxy, serving your active (assuming port 8000) Google Workspace MCP on port 8001. 
-
-3. **Configure Open WebUI**:
-   - Navigate to your Open WebUI settings
-   - Go to "Connections" -> "Tools"
-   - Click "Add Tool"
-   - Enter the Server URL: `http://localhost:8001/google_workspace` (matching the `mcpo` base URL and server name from `config.json`)
-   - If you used an `--api-key` with `mcpo`, enter it as the API Key
-   - Save the configuration
-   - The Google Workspace tools should now be available when interacting with models in Open WebUI
-
-### First-time Authentication
-
-When a tool requiring Google API access is called:
-
-- **If `user_google_email` is provided to the tool and credentials are missing/invalid**: The server automatically initiates the OAuth 2.0 flow. An authorization URL will be returned in the MCP response (or printed to the console).
-- **If `user_google_email` is NOT provided and credentials are missing/invalid**: The tool will return an error message guiding the LLM to use the centralized `start_google_auth` tool. The LLM should then call `start_google_auth` with the user's email and the appropriate `service_name` (e.g., "Google Calendar", "Google Docs", "Gmail", "Google Drive"). This will also return an authorization URL.
-
-**Steps for the User (once an authorization URL is obtained):**
-
-1. Open the provided authorization URL in a web browser.
-2. Log in to the Google account and grant the requested permissions for the specified service.
-3. After authorization, Google will redirect the browser to `http://localhost:8000/oauth2callback` (or your configured redirect URI).
-4. The MCP server handles this callback, exchanges the authorization code for tokens, and securely stores the credentials.
-5. The LLM can then retry the original request. Subsequent calls for the same user and service should work without re-authentication until the refresh token expires or is revoked.
+When calling a tool:
+1. Server returns authorization URL
+2. Open URL in browser and authorize
+3. Server handles OAuth callback automatically
+4. Retry the original request
 
 ---
 
 ## 🧰 Available Tools
 
-> **Note**: The first use of any tool for a specific Google service may trigger the OAuth authentication flow if valid credentials are not already stored and `user_google_email` is provided to the tool. If authentication is required and `user_google_email` is not provided to the tool, the LLM should use the centralized `start_google_auth` tool (defined in `core/server.py`) with the user's email and the appropriate `service_name`.
+> **Note**: All tools support automatic authentication via `@require_google_service()` decorators with 30-minute service caching.
 
-### 📅 Google Calendar
+### 📅 Google Calendar ([`calendar_tools.py`](gcalendar/calendar_tools.py))
 
-Source: [`gcalendar/calendar_tools.py`](gcalendar/calendar_tools.py)
+| Tool | Description |
+|------|-------------|
+| `list_calendars` | List accessible calendars |
+| `get_events` | Retrieve events with time range filtering |
+| `create_event` | Create events (all-day or timed) |
+| `modify_event` | Update existing events |
+| `delete_event` | Remove events |
 
-| Tool | Description | Parameters |
-|------|-------------|------------|
-| `start_google_auth` | (Centralized in `core/server.py`) Initiates the OAuth 2.0 authentication flow for a specific Google account and service. Use this when no valid credentials are available or if a tool fails due to missing authentication and an email was not provided to it. | • `user_google_email` (required): The user's Google email address<br>• `service_name` (required): The Google service name (e.g., "Google Calendar", "Google Docs", "Gmail", "Google Drive") |
-| `list_calendars` | Lists all calendars accessible to the authenticated user. | • `user_google_email` (optional): Used if session is not authenticated<br>• `mcp_session_id` (injected automatically) |
-| `get_events` | Retrieves upcoming events from a specified calendar within a time range. | • `calendar_id` (optional): Calendar ID (default: `primary`)<br>• `time_min` (optional): Start time (RFC3339 or `YYYY-MM-DD`)<br>• `time_max` (optional): End time (RFC3339 or `YYYY-MM-DD`)<br>• `max_results` (optional): Max number of events (default: 25)<br>• `user_google_email` (optional)<br>• `mcp_session_id` (injected automatically) |
-| `create_event` | Creates a new calendar event. Supports all-day and timed events. | • `summary` (required): Event title<br>• `start_time` (required): Start time (RFC3339 or `YYYY-MM-DD`)<br>• `end_time` (required): End time (RFC3339 or `YYYY-MM-DD`)<br>• `calendar_id` (optional): Calendar ID (default: `primary`)<br>• `description`, `location`, `attendees`, `timezone` (optional)<br>• `user_google_email` (optional)<br>• `mcp_session_id` (injected automatically) |
-| `modify_event` | Updates an existing event by ID. Only provided fields will be modified. | • `event_id` (required): ID of the event to modify<br>• `calendar_id` (optional): Calendar ID (default: `primary`)<br>• `summary`, `start_time`, `end_time`, `description`, `location`, `attendees`, `timezone` (optional)<br>• `user_google_email` (optional)<br>• `mcp_session_id` (injected automatically) |
-| `delete_event` | Deletes an event by ID. | • `event_id` (required): ID of the event to delete<br>• `calendar_id` (optional): Calendar ID (default: `primary`)<br>• `user_google_email` (optional)<br>• `mcp_session_id` (injected automatically) |
+### 📁 Google Drive ([`drive_tools.py`](gdrive/drive_tools.py))
 
-> ℹ️ All Calendar tools support authentication via the current MCP session (`mcp_session_id`) or fallback to `user_google_email`. If neither is available and authentication is required, the tool will return an error prompting the LLM to use the centralized `start_google_auth` tool with the user's email and `service_name="Google Calendar"`.
+| Tool | Description |
+|------|-------------|
+| `search_drive_files` | Search files with query syntax |
+| `get_drive_file_content` | Read file content (supports Office formats) |
+| `list_drive_items` | List folder contents |
+| `create_drive_file` | Create new files |
 
-> 🕒 Date/Time Parameters: Tools accept both full RFC3339 timestamps (e.g., 2024-05-12T10:00:00Z) and simple dates (e.g., 2024-05-12). The server automatically formats them as needed.
+### 📧 Gmail ([`gmail_tools.py`](gmail/gmail_tools.py))
 
-### 📁 Google Drive
+| Tool | Description |
+|------|-------------|
+| `search_gmail_messages` | Search with Gmail operators |
+| `get_gmail_message_content` | Retrieve message content |
+| `send_gmail_message` | Send emails |
+| `draft_gmail_message` | Create drafts |
 
-Source: [`gdrive/drive_tools.py`](gdrive/drive_tools.py)
+### 📝 Google Docs ([`docs_tools.py`](gdocs/docs_tools.py))
 
-| Tool | Description | Parameters |
-|------|-------------|------------|
-| `search_drive_files` | Searches for files and folders across the user's Drive | • `query` (required): Search query string (e.g., `name contains 'report'`)<br>• `max_results` (optional): Maximum number of files to return |
-| `get_drive_file_content` | Retrieves the content of a specific file | • `file_id` (required): The ID of the file<br>• `mime_type` (optional): Specify the desired export format |
-| `list_drive_items` | Lists files and folders within a specific folder or the root | • `folder_id` (optional): The ID of the folder to list (defaults to root)<br>• `max_results` (optional): Maximum number of items to return |
-| `create_drive_file` | Creates a new file in Google Drive | • `name` (required): The desired name for the new file<br>• `content` (required): The text content to write into the file<br>• `folder_id` (optional): The ID of the parent folder<br>• `mime_type` (optional): The MIME type of the file (defaults to `text/plain`) |
+| Tool | Description |
+|------|-------------|
+| `search_docs` | Find documents by name |
+| `get_doc_content` | Extract document text |
+| `list_docs_in_folder` | List docs in folder |
+| `create_doc` | Create new documents |
 
-> **Query Syntax**: For Google Drive search queries, see [Drive Search Query Syntax](https://developers.google.com/drive/api/guides/search-files)
+### 📊 Google Sheets ([`sheets_tools.py`](gsheets/sheets_tools.py))
 
-### 📧 Gmail
+| Tool | Description |
+|------|-------------|
+| `list_spreadsheets` | List accessible spreadsheets |
+| `get_spreadsheet_info` | Get spreadsheet metadata |
+| `read_sheet_values` | Read cell ranges |
+| `modify_sheet_values` | Write/update/clear cells |
+| `create_spreadsheet` | Create new spreadsheets |
+| `create_sheet` | Add sheets to existing files |
 
-Source: [`gmail/gmail_tools.py`](gmail/gmail_tools.py)
+### 💬 Google Chat ([`chat_tools.py`](gchat/chat_tools.py))
 
-| Tool                      | Description                                                                      | Parameters |
-|---------------------------|----------------------------------------------------------------------------------|------------|
-| `search_gmail_messages`   | Search email messages using standard Gmail search operators (from, subject, etc). | • `query` (required): Search string (e.g., `"from:foo subject:bar is:unread"`)<br>• `user_google_email` (optional)<br>• `page_size` (optional, default: 10)<br>• `mcp_session_id` (injected automatically) |
-| `get_gmail_message_content`| Get subject, sender, and *plain text* body of an email by message ID.            | • `message_id` (required)<br>• `user_google_email` (optional)<br>• `mcp_session_id` (injected automatically) |
-| `send_gmail_message`      | Send a plain text email using the user's Gmail account.                           | • `to` (required): Recipient email address<br>• `subject` (required)<br>• `body` (required)<br>• `user_google_email` (optional)<br>• `mcp_session_id` (injected automatically) |
-| `draft_gmail_message`     | Create a draft email in the user's Gmail account.                                 | • `subject` (required): Email subject<br>• `body` (required): Email body (plain text)<br>• `to` (optional): Recipient email address<br>• `user_google_email` (optional)<br>• `mcp_session_id` (injected automatically) |
-
-
-> **Query Syntax**: For Gmail search queries, see [Gmail Search Query Syntax](https://support.google.com/mail/answer/7190)
-
-### 📝 Google Docs
-
-Source: [`gdocs/docs_tools.py`](gdocs/docs_tools.py)
-
-| Tool                 | Description                                                                         | Parameters |
-|----------------------|-------------------------------------------------------------------------------------|------------|
-| `search_docs`        | Search for Google Docs by name (using Drive API).                                   | • `query` (required): Text to search for in Doc names<br>• `user_google_email` (optional)<br>• `page_size` (optional, default: 10)<br>• `mcp_session_id` (injected automatically) |
-| `get_doc_content`    | Retrieve the plain text content of a Google Doc by its document ID.                 | • `document_id` (required)<br>• `user_google_email` (optional)<br>• `mcp_session_id` (injected automatically) |
-| `list_docs_in_folder`| List all Google Docs inside a given Drive folder (by folder ID, default = `root`).  | • `folder_id` (optional, default: `'root'`)<br>• `user_google_email` (optional)<br>• `page_size` (optional, default: 100)<br>• `mcp_session_id` (injected automatically) |
-| `create_doc`         | Create a new Google Doc, optionally with initial content.                           | • `title` (required): Name for the doc<br>• `content` (optional, default: empty)<br>• `user_google_email` (optional)<br>• `mcp_session_id` (injected automatically) |
-
-### 📊 Google Sheets
-
-Source: [`gsheets/sheets_tools.py`](gsheets/sheets_tools.py)
-
-| Tool | Description | Parameters |
-|------|-------------|------------|
-| `list_spreadsheets` | Lists spreadsheets from Google Drive that the user has access to. | • `user_google_email` (required): The user's Google email address<br>• `max_results` (optional, default: 25): Maximum number of spreadsheets to return |
-| `get_spreadsheet_info` | Gets information about a specific spreadsheet including its sheets. | • `user_google_email` (required): The user's Google email address<br>• `spreadsheet_id` (required): The ID of the spreadsheet to get info for |
-| `read_sheet_values` | Reads values from a specific range in a Google Sheet. | • `user_google_email` (required): The user's Google email address<br>• `spreadsheet_id` (required): The ID of the spreadsheet<br>• `range_name` (optional, default: "A1:Z1000"): The range to read (e.g., "Sheet1!A1:D10", "A1:D10") |
-| `modify_sheet_values` | Modifies values in a specific range of a Google Sheet - can write, update, or clear values. | • `user_google_email` (required): The user's Google email address<br>• `spreadsheet_id` (required): The ID of the spreadsheet<br>• `range_name` (required): The range to modify<br>• `values` (optional): 2D array of values to write/update. Required unless clear_values=True<br>• `value_input_option` (optional, default: "USER_ENTERED"): How to interpret input values ("RAW" or "USER_ENTERED")<br>• `clear_values` (optional, default: False): If True, clears the range instead of writing values |
-| `create_spreadsheet` | Creates a new Google Spreadsheet. | • `user_google_email` (required): The user's Google email address<br>• `title` (required): The title of the new spreadsheet<br>• `sheet_names` (optional): List of sheet names to create. If not provided, creates one sheet with default name |
-| `create_sheet` | Creates a new sheet within an existing spreadsheet. | • `user_google_email` (required): The user's Google email address<br>• `spreadsheet_id` (required): The ID of the spreadsheet<br>• `sheet_name` (required): The name of the new sheet |
-
-> ℹ️ All Sheets tools require `user_google_email` for authentication. If authentication fails or is required, the tool will return an error prompting the LLM to use the centralized `start_google_auth` tool with the user's email and `service_name="Google Sheets"`.
-
-> 📊 **Sheet Operations**: The `modify_sheet_values` tool consolidates write, update, and clear operations into a single flexible function. Use `clear_values=True` to clear a range, or provide `values` to write/update data.
-
-### 💬 Google Chat
-
-Source: [`gchat/chat_tools.py`](gchat/chat_tools.py)
-
-| Tool             | Description                                                                 | Parameters |
-|------------------|-----------------------------------------------------------------------------|------------|
-| `list_spaces`    | Lists Google Chat spaces (rooms and DMs) accessible to the user.            | • `user_google_email` (required)<br>• `page_size` (optional, default: 100)<br>• `space_type` (optional, default: "all", can be "room" or "dm") |
-| `get_messages`   | Retrieves messages from a specific Google Chat space.                       | • `user_google_email` (required)<br>• `space_id` (required)<br>• `page_size` (optional, default: 50)<br>• `order_by` (optional, default: "createTime desc") |
-| `send_message`   | Sends a message to a Google Chat space.                                     | • `user_google_email` (required)<br>• `space_id` (required)<br>• `message_text` (required)<br>• `thread_key` (optional): To reply in a thread |
-| `search_messages`| Searches for messages across Chat spaces by text content.                   | • `user_google_email` (required)<br>• `query` (required): Text to search for<br>• `space_id` (optional): If provided, searches only in this space<br>• `page_size` (optional, default: 25) |
-
-> ℹ️ All Chat tools require `user_google_email` for authentication. If authentication fails or is required, the tool will return an error prompting the LLM to use the centralized `start_google_auth` tool with the user's email and `service_name="Google Chat"`.
+| Tool | Description |
+|------|-------------|
+| `list_spaces` | List chat spaces/rooms |
+| `get_messages` | Retrieve space messages |
+| `send_message` | Send messages to spaces |
+| `search_messages` | Search across chat history |
 
 ---
 
@@ -392,116 +187,54 @@ Source: [`gchat/chat_tools.py`](gchat/chat_tools.py)
 
 ```
 google_workspace_mcp/
-├── .venv/             # Virtual environment (created by uv)
-├── auth/              # OAuth handling logic (google_auth.py, oauth_manager.py)
-├── core/              # Core MCP server logic (server.py)
-├── gcalendar/         # Google Calendar tools (calendar_tools.py)
-├── gdocs/             # Google Docs tools (docs_tools.py)
-├── gdrive/            # Google Drive tools (drive_tools.py)
-├── gmail/             # Gmail tools (gmail_tools.py)
-├── gsheets/           # Google Sheets tools (sheets_tools.py)
-├── .gitignore         # Git ignore file
-├── client_secret.json # Google OAuth Credentials (DO NOT COMMIT)
-├── config.json        # Example mcpo configuration
-├── main.py            # Main server entry point (imports tools)
-├── mcp_server_debug.log # Log file for debugging
-├── pyproject.toml     # Project metadata and dependencies (for uv/pip)
-├── README.md          # This file
-├── uv.lock            # uv lock file
+├── auth/              # Authentication system with decorators
+├── core/              # MCP server and utilities
+├── g{service}/        # Service-specific tools
+├── main.py            # Server entry point
+├── client_secret.json # OAuth credentials (not committed)
+└── pyproject.toml     # Dependencies
 ```
-
-### Port Handling for OAuth
-
-The server cleverly handles the OAuth 2.0 redirect URI (`/oauth2callback`) without needing a separate web server framework:
-
-- It utilizes the built-in HTTP server capabilities of the underlying MCP library when run in HTTP mode or via `mcpo`
-- A custom MCP route is registered specifically for `/oauth2callback` on port `8000`
-- When Google redirects the user back after authorization, the MCP server intercepts the request on this route
-- The `auth` module extracts the authorization code and completes the token exchange
-- This requires `OAUTHLIB_INSECURE_TRANSPORT=1` to be set when running locally, as the callback uses `http://localhost`
-
-### Debugging
-
-<details>
-<summary><b>Log File</b></summary>
-
-Check `mcp_server_debug.log` for detailed logs, including authentication steps and API calls. Enable debug logging if needed.
-</details>
-
-<details>
-<summary><b>OAuth Issues</b></summary>
-
-- Verify `client_secret.json` is correct and present
-- Ensure the correct redirect URI (`http://localhost:8000/oauth2callback`) is configured in Google Cloud Console
-- Confirm the necessary APIs (Calendar, Drive, Gmail) are enabled in your Google Cloud project
-- Check that `OAUTHLIB_INSECURE_TRANSPORT=1` is set in the environment where the server process runs
-- Look for specific error messages during the browser-based OAuth flow
-</details>
-
-<details>
-<summary><b>Tool Errors</b></summary>
-
-Check the server logs for tracebacks or error messages returned from the Google APIs.
-</details>
 
 ### Adding New Tools
 
-1. Choose or create the appropriate module (e.g., `gdocs/gdocs_tools.py`)
-2. Import necessary libraries (Google API client library, etc.)
-3. Define an `async` function for your tool logic. Use type hints for parameters
-4. Decorate the function with `@server.tool("your_tool_name")`
-5. Inside the function, get authenticated credentials:
-
 ```python
-from auth.google_auth import get_credentials, CONFIG_CLIENT_SECRETS_PATH
-# ...
-credentials = await asyncio.to_thread(
-    get_credentials,
-    user_google_email=your_user_email_variable, # Optional, can be None if session_id is primary
-    required_scopes=YOUR_SPECIFIC_SCOPES_LIST,  # e.g., [CALENDAR_READONLY_SCOPE]
-    client_secrets_path=CONFIG_CLIENT_SECRETS_PATH,
-    session_id=your_mcp_session_id_variable    # Usually injected via Header
-)
-if not credentials or not credentials.valid:
-    # Handle missing/invalid credentials, possibly by calling start_auth_flow
-    # from auth.google_auth (which is what service-specific start_auth tools do)
-    pass
+from auth.service_decorator import require_google_service
+
+@require_google_service("drive", "drive_read")  # Service + scope group
+async def your_new_tool(service, param1: str, param2: int = 10):
+    """Tool description"""
+    # service is automatically injected and cached
+    result = service.files().list().execute()
+    return result  # Return native Python objects
 ```
 
-6. Build the Google API service client: `service = build('drive', 'v3', credentials=credentials)`
-7. Implement the logic to call the Google API
-8. Handle potential errors gracefully
-9. Return the results as a JSON-serializable dictionary or list
-10. Import the tool function in [`main.py`](main.py) so it gets registered with the server
-11. Define necessary service-specific scope constants in your tool's module
-12. Update `pyproject.toml` if new dependencies are required
+### Architecture Highlights
 
-> **Scope Management**: The global `SCOPES` list in [`config/google_config.py`](config/google_config.py) is used for the initial OAuth consent screen. Individual tools should request the minimal `required_scopes` they need when calling `get_credentials`.
+- **Service Caching**: 30-minute TTL reduces authentication overhead
+- **Scope Management**: Centralized in `SCOPE_GROUPS` for easy maintenance
+- **Error Handling**: Native exceptions instead of manual error construction
+- **Multi-Service Support**: `@require_multiple_services()` for complex tools
 
 ---
 
-## 🔒 Security Notes
+## 🔒 Security
 
-- **`client_secret.json`**: This file contains sensitive credentials. **NEVER** commit it to version control. Ensure it's listed in your `.gitignore` file. Store it securely.
-
-- **User Tokens**: Authenticated user credentials (refresh tokens) are stored locally in files like `credentials-<user_id_hash>.json`. Protect these files as they grant access to the user's Google account data. Ensure they are also in `.gitignore`.
-
-- **OAuth Callback Security**: The use of `http://localhost` for the OAuth callback is standard for installed applications during development but requires `OAUTHLIB_INSECURE_TRANSPORT=1`. For production deployments outside of localhost, you **MUST** use HTTPS for the callback URI and configure it accordingly in Google Cloud Console.
-
-- **`mcpo` Security**: If using `mcpo` to expose the server over the network, consider:
-  - Using the `--api-key` option for basic authentication
-  - Running `mcpo` behind a reverse proxy (like Nginx or Caddy) to handle HTTPS termination, proper logging, and more robust authentication
-  - Binding `mcpo` only to trusted network interfaces if exposing it beyond localhost
-
-- **Scope Management**: The server requests specific OAuth scopes (permissions) for Calendar, Drive, Gmail, Docs, Sheets, and Chat. Users grant access based on these scopes during the initial authentication. Do not request broader scopes than necessary for the implemented tools.
+- **Credentials**: Never commit `client_secret.json` or `.credentials/` directory
+- **OAuth Callback**: Uses `http://localhost` for development (requires `OAUTHLIB_INSECURE_TRANSPORT=1`)
+- **Production**: Use HTTPS for callback URIs and configure accordingly
+- **Network Exposure**: Consider authentication when using `mcpo` over networks
+- **Scope Minimization**: Tools request only necessary permissions
 
 ---
-
-## Screenshots:
-<img width="810" alt="image" src="https://github.com/user-attachments/assets/656cea40-1f66-40c1-b94c-5a2c900c969d" />
-<img width="810" src="https://github.com/user-attachments/assets/d3c2a834-fcca-4dc5-8990-6d6dc1d96048" />
-<img width="810" alt="image" src="https://github.com/user-attachments/assets/7f91aa4e-6763-4dc8-8368-05049aa5c2c7" />
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the `LICENSE` file for details.
+MIT License - see `LICENSE` file for details.
+
+---
+
+<div align="center">
+<img width="810" alt="Gmail Integration" src="https://github.com/user-attachments/assets/656cea40-1f66-40c1-b94c-5a2c900c969d" />
+<img width="810" alt="Calendar Management" src="https://github.com/user-attachments/assets/d3c2a834-fcca-4dc5-8990-6d6dc1d96048" />
+<img width="810" alt="Drive Operations" src="https://github.com/user-attachments/assets/7f91aa4e-6763-4dc8-8368-05049aa5c2c7" />
+</div>
