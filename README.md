@@ -19,11 +19,6 @@
 
 A production-ready MCP server that integrates all major Google Workspace services with AI assistants. Built with FastMCP for optimal performance, featuring advanced authentication handling, service caching, and streamlined development patterns.
 
-**Recent Improvements:**
-- 🔧 **Authentication Decorator System**: Eliminated 87% of boilerplate code with centralized `@require_google_service()` decorators and 30-minute service caching
-- ⚡ **FastMCP Native Responses**: Simplified architecture with native Python return values instead of manual `CallToolResult` construction
-
----
 
 ## ✨ Features
 
@@ -53,7 +48,7 @@ A production-ready MCP server that integrates all major Google Workspace service
 ```bash
 git clone https://github.com/taylorwilsdon/google_workspace_mcp.git
 cd google_workspace_mcp
-# That's it! uv handles everything automatically
+uv run main.py
 ```
 
 ### Configuration
