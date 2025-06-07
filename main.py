@@ -43,6 +43,8 @@ def main():
     parser.add_argument('--tools', nargs='*',
                         choices=['gmail', 'drive', 'calendar', 'docs', 'sheets', 'chat'],
                         help='Specify which tools to register. If not provided, all tools are registered.')
+    parser.add_argument('--transport', choices=['stdio', 'streamable-http'], default='stdio',
+                        help='Transport mode: stdio (default) or streamable-http')
     args = parser.parse_args()
 
     print("🔧 Google Workspace MCP Server")
@@ -82,12 +84,17 @@ def main():
         print()
 
     try:
-        print("🚀 Starting server on http://localhost:8000")
-        print("   Ready for MCP connections!")
-        print()
-        # The server is already configured with port and server_url in core/server.py
-        server.run()
-        server.run(transport="streamable-http")
+        if args.transport == 'streamable-http':
+            print("🚀 Starting server on http://localhost:8000")
+            print("   Ready for MCP connections!")
+            print()
+            # The server is already configured with port and server_url in core/server.py
+            server.run(transport="streamable-http")
+        else:
+            print("🚀 Starting server in stdio mode")
+            print("   Ready for MCP connections!")
+            print()
+            server.run()
     except KeyboardInterrupt:
         print("\n👋 Server shutdown requested")
         sys.exit(0)
