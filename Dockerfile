@@ -13,11 +13,17 @@ RUN pip install --no-cache-dir uv
 # Copy dependency files
 COPY pyproject.toml uv.lock ./
 
-# Install Python dependencies using uv
-RUN uv pip install --system --no-cache -e .
-
-# Install additional MCP dependencies
-RUN uv pip install --system --no-cache "mcp[cli]>=1.6.0" sse-starlette>=2.3.3 uvicorn>=0.34.2
+# Install Python dependencies from pyproject.toml
+RUN uv pip install --system --no-cache \
+    fastapi>=0.115.12 \
+    fastmcp>=2.3.3 \
+    google-api-python-client>=2.168.0 \
+    google-auth-httplib2>=0.2.0 \
+    google-auth-oauthlib>=1.2.2 \
+    httpx>=0.28.1 \
+    "mcp[cli]>=1.6.0" \
+    sse-starlette>=2.3.3 \
+    uvicorn>=0.34.2
 
 # Copy application code
 COPY . .

@@ -5,8 +5,7 @@ build-backend = "setuptools.build_meta"
 name = "google-workspace-mcp"
 version = "0.1.1"
 description = "Comprehensive, highly performant Google Workspace Streamable HTTP & SSE MCP Server for Calendar, Gmail, Docs, Sheets, Slides & Drive"
-readme = "README.md"
-license = { file = "LICENSE" }
+license = "MIT"
 authors = [{ name = "Taylor Wilsdon", email = "taylor@taylorwilsdon.com" }]
 keywords = [
     "mcp",
@@ -34,7 +33,6 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Console",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Natural Language :: English",
     "Operating System :: OS Independent",
     "Programming Language :: Python",
@@ -48,4 +46,4 @@ classifiers = [
 ]
 
 [tool.setuptools]
-packages = ["auth", "gcalendar", "core", "gdocs", "gdrive", "gmail", "config", "gchat"]
+packages = ["auth", "gcalendar", "core", "gdocs", "gdrive", "gmail", "config", "gchat", "gsheets"]
