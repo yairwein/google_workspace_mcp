@@ -12,6 +12,7 @@ from starlette.requests import Request
 
 from auth.google_auth import handle_auth_callback, start_auth_flow, CONFIG_CLIENT_SECRETS_PATH
 from auth.oauth_callback_server import get_oauth_redirect_uri, ensure_oauth_callback_available
+from auth.oauth_responses import create_error_response, create_success_response, create_server_error_response
 
 # Import shared configuration
 from config.google_config import (
@@ -87,19 +88,12 @@ async def oauth2_callback(request: Request) -> HTMLResponse:
     if error:
         error_message = f"Authentication failed: Google returned an error: {error}. State: {state}."
         logger.error(error_message)
-        return HTMLResponse(content=f"""
-            <html><head><title>Authentication Error</title></head>
-            <body><h2>Authentication Error</h2><p>{error_message}</p>
-            <p>Please ensure you grant the requested permissions. You can close this window and try again.</p></body></html>
-        """, status_code=400)
+        return create_error_response(error_message)
 
     if not code:
         error_message = "Authentication failed: No authorization code received from Google."
         logger.error(error_message)
-        return HTMLResponse(content=f"""
-            <html><head><title>Authentication Error</title></head>
-            <body><h2>Authentication Error</h2><p>{error_message}</p><p>You can close this window and try again.</p></body></html>
-        """, status_code=400)
+        return create_error_response(error_message)
 
     try:
         # Use the centralized CONFIG_CLIENT_SECRETS_PATH
@@ -130,50 +124,14 @@ async def oauth2_callback(request: Request) -> HTMLResponse:
         log_session_part = f" (linked to session: {mcp_session_id})" if mcp_session_id else ""
         logger.info(f"OAuth callback: Successfully authenticated user: {verified_user_id} (state: {state}){log_session_part}.")
 
-        # Return a more informative success page
-        success_page_content = f"""
-            <html>
-            <head>
-                <title>Authentication Successful</title>
-                <style>
-                    body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; text-align: center; color: #333; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
-                    .status {{ color: #4CAF50; font-size: 24px; margin-bottom: 15px; }}
-                    .message {{ margin-bottom: 20px; line-height: 1.6; }}
-                    .user-id {{ font-weight: bold; color: #2a2a2a; }}
-                    .button {{ background-color: #4CAF50; color: white; padding: 12px 25px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; text-decoration: none; display: inline-block; margin-top: 10px; }}
-                    .note {{ font-size: 0.9em; color: #555; margin-top: 25px; }}
-                </style>
-                <script> setTimeout(function() {{ window.close(); }}, 10000); </script>
-            </head>
-            <body>
-                <div class="status">✅ Authentication Successful</div>
-                <div class="message">
-                    You have successfully authenticated as <span class="user-id">{verified_user_id}</span>.
-                    Credentials have been saved.
-                </div>
-                <div class="message">
-                    You can now close this window and **retry your original command** in the application.
-                </div>
-                <button class="button" onclick="window.close()">Close Window</button>
-            </body>
-            </html>
-        """
-        return HTMLResponse(content=success_page_content)
+        # Return success page using shared template
+        return create_success_response(verified_user_id)
 
     except Exception as e:
         error_message_detail = f"Error processing OAuth callback (state: {state}): {str(e)}"
         logger.error(error_message_detail, exc_info=True)
         # Generic error page for any other issues during token exchange or credential saving
-        return HTMLResponse(content=f"""
-            <html>
-            <head><title>Authentication Processing Error</title></head>
-            <body>
-                <h2 style="color: #d32f2f;">Authentication Processing Error</h2>
-                <p>An unexpected error occurred while processing your authentication: {str(e)}</p>
-                <p>Please try again. You can close this window.</p>
-            </body>
-            </html>
-        """, status_code=500)
+        return create_server_error_response(str(e))
 
 @server.tool()
 async def start_google_auth(
@@ -217,12 +175,12 @@ async def start_google_auth(
         raise Exception(error_msg)
 
     logger.info(f"Tool 'start_google_auth' invoked for user_google_email: '{user_google_email}', service: '{service_name}', session: '{mcp_session_id}'.")
-    
+
     # Ensure OAuth callback is available for current transport mode
     redirect_uri = get_oauth_redirect_uri_for_current_mode()
     if not ensure_oauth_callback_available(_current_transport_mode, WORKSPACE_MCP_PORT):
         raise Exception("Failed to start OAuth callback server. Please try again.")
-    
+
     # Use the centralized start_auth_flow from auth.google_auth
     auth_result = await start_auth_flow(
         mcp_session_id=mcp_session_id,
@@ -230,7 +188,7 @@ async def start_google_auth(
         service_name=service_name,
         redirect_uri=redirect_uri
     )
-    
+
     # Extract content from CallToolResult and raise exception if error
     if auth_result.isError:
         error_text = auth_result.content[0].text if auth_result.content else "Authentication flow failed"

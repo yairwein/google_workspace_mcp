@@ -85,7 +85,7 @@ def main():
         tool_imports[tool]()
         print(f"   {tool_icons[tool]} {tool.title()} - Google {tool.title()} API integration")
     print()
-    
+
     print(f"📊 Configuration Summary:")
     print(f"   🔧 Tools Enabled: {len(tools_to_import)}/{len(tool_imports)}")
     print(f"   🔑 Auth Method: OAuth 2.0 with PKCE")
@@ -101,7 +101,7 @@ def main():
     try:
         # Set transport mode for OAuth callback handling
         set_transport_mode(args.transport)
-        
+
         if args.transport == 'streamable-http':
             print("🚀 Starting server on http://localhost:8000")
         else:
@@ -113,10 +113,10 @@ def main():
                 print(f"   OAuth callback server started on http://localhost:{port}/oauth2callback")
             else:
                 print("   ⚠️  Warning: Failed to start OAuth callback server")
-        
+
         print("   Ready for MCP connections!")
         print()
-        
+
         if args.transport == 'streamable-http':
             # The server is already configured with port and server_url in core/server.py
             server.run(transport="streamable-http")
