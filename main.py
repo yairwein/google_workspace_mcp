@@ -27,18 +27,9 @@ try:
     file_handler.setFormatter(file_formatter)
     root_logger.addHandler(file_handler)
 
-    logger.info(f"Detailed file logging configured to: {log_file_path}")
+    logger.debug(f"Detailed file logging configured to: {log_file_path}")
 except Exception as e:
     sys.stderr.write(f"CRITICAL: Failed to set up file logging to '{log_file_path}': {e}\n")
-
-# Import tool modules to register them with the MCP server via decorators
-import gcalendar.calendar_tools
-import gdrive.drive_tools
-import gmail.gmail_tools
-import gdocs.docs_tools
-import gchat.chat_tools
-import gsheets.sheets_tools
-
 
 def main():
     """
@@ -49,21 +40,58 @@ def main():
     parser = argparse.ArgumentParser(description='Google Workspace MCP Server')
     parser.add_argument('--single-user', action='store_true',
                         help='Run in single-user mode - bypass session mapping and use any credentials from ./credentials directory')
+    parser.add_argument('--tools', nargs='*', 
+                        choices=['gmail', 'drive', 'calendar', 'docs', 'sheets', 'chat'],
+                        help='Specify which tools to register. If not provided, all tools are registered.')
     args = parser.parse_args()
+
+    print("🔧 Google Workspace MCP Server")
+    print("=" * 35)
+    
+    # Import tool modules to register them with the MCP server via decorators
+    tool_imports = {
+        'gmail': lambda: __import__('gmail.gmail_tools'),
+        'drive': lambda: __import__('gdrive.drive_tools'), 
+        'calendar': lambda: __import__('gcalendar.calendar_tools'),
+        'docs': lambda: __import__('gdocs.docs_tools'),
+        'sheets': lambda: __import__('gsheets.sheets_tools'),
+        'chat': lambda: __import__('gchat.chat_tools')
+    }
+
+    tool_icons = {
+        'gmail': '📧',
+        'drive': '📁', 
+        'calendar': '📅',
+        'docs': '📄',
+        'sheets': '📊',
+        'chat': '💬'
+    }
+
+    # Import specified tools or all tools if none specified
+    tools_to_import = args.tools if args.tools is not None else tool_imports.keys()
+    print(f"📦 Loading {len(tools_to_import)} tool module{'s' if len(tools_to_import) != 1 else ''}:")
+    for tool in tools_to_import:
+        tool_imports[tool]()
+        print(f"   {tool_icons[tool]} {tool.title()}")
+    print()
 
     # Set global single-user mode flag
     if args.single_user:
         os.environ['MCP_SINGLE_USER_MODE'] = '1'
-        logger.info("Starting in single-user mode - bypassing session-to-OAuth mapping")
+        print("🔐 Single-user mode enabled")
+        print()
 
     try:
-        logger.info("Google Workspace MCP server starting...")
+        print("🚀 Starting server on http://localhost:8000")
+        print("   Ready for MCP connections!")
+        print()
         # The server is already configured with port and server_url in core/server.py
         server.run(transport="streamable-http")
     except KeyboardInterrupt:
-        logger.info("Server shutdown requested via keyboard interrupt")
+        print("\n👋 Server shutdown requested")
         sys.exit(0)
     except Exception as e:
+        print(f"\n❌ Server error: {e}")
         logger.error(f"Unexpected error running server: {e}", exc_info=True)
         sys.exit(1)
 
