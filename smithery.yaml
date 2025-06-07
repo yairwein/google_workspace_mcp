@@ -22,6 +22,3 @@ startCommand:
     required: ["clientSecretsPath"]
   exampleConfig:
     clientSecretsPath: "/app/client_secrets.json"
-resources:
-  memory: "1Gi"
-  cpu: "0.5"
