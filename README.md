@@ -318,5 +318,5 @@ MIT License - see `LICENSE` file for details.
 <div align="center">
 <img width="810" alt="Gmail Integration" src="https://github.com/user-attachments/assets/656cea40-1f66-40c1-b94c-5a2c900c969d" />
 <img width="810" alt="Calendar Management" src="https://github.com/user-attachments/assets/d3c2a834-fcca-4dc5-8990-6d6dc1d96048" />
-<img width="798" alt="image" src="https://github.com/user-attachments/assets/9cd44a76-82b4-4218-8b96-44c8fdebd869" />
+<img width="842" alt="Batch Emails" src="https://github.com/user-attachments/assets/0876c789-7bcc-4414-a144-6c3f0aaffc06" />
 </div>
