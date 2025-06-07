@@ -11,16 +11,17 @@ from typing import List, Optional
 from mcp import types
 from googleapiclient.errors import HttpError
 
-from auth.google_auth import get_authenticated_google_service, GoogleAuthenticationError
+from auth.service_decorator import require_google_service
 from core.server import server
-from config.google_config import SHEETS_READONLY_SCOPE, SHEETS_WRITE_SCOPE
 
 # Configure module logger
 logger = logging.getLogger(__name__)
 
 
 @server.tool()
+@require_google_service("drive", "drive_read")
 async def list_spreadsheets(
+    service,
     user_google_email: str,
     max_results: int = 25,
 ) -> str:
@@ -34,19 +35,7 @@ async def list_spreadsheets(
     Returns:
         str: A formatted list of spreadsheet files (name, ID, modified time).
     """
-    tool_name = "list_spreadsheets"
-    logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}'")
-
-    try:
-        service, user_email = await get_authenticated_google_service(
-            service_name="drive",
-            version="v3",
-            tool_name=tool_name,
-            user_google_email=user_google_email,
-            required_scopes=[SHEETS_READONLY_SCOPE],
-        )
-    except GoogleAuthenticationError as e:
-        raise Exception(str(e))
+    logger.info(f"[list_spreadsheets] Invoked. Email: '{user_google_email}'")
 
     try:
         files_response = await asyncio.to_thread(
@@ -62,7 +51,7 @@ async def list_spreadsheets(
 
         files = files_response.get("files", [])
         if not files:
-            return f"No spreadsheets found for {user_email}."
+            return f"No spreadsheets found for {user_google_email}."
 
         spreadsheets_list = [
             f"- \"{file['name']}\" (ID: {file['id']}) | Modified: {file.get('modifiedTime', 'Unknown')} | Link: {file.get('webViewLink', 'No link')}"
@@ -70,11 +59,11 @@ async def list_spreadsheets(
         ]
 
         text_output = (
-            f"Successfully listed {len(files)} spreadsheets for {user_email}:\n"
+            f"Successfully listed {len(files)} spreadsheets for {user_google_email}:\n"
             + "\n".join(spreadsheets_list)
         )
 
-        logger.info(f"Successfully listed {len(files)} spreadsheets for {user_email}.")
+        logger.info(f"Successfully listed {len(files)} spreadsheets for {user_google_email}.")
         return text_output
 
     except HttpError as error:
@@ -88,7 +77,9 @@ async def list_spreadsheets(
 
 
 @server.tool()
+@require_google_service("sheets", "sheets_read")
 async def get_spreadsheet_info(
+    service,
     user_google_email: str,
     spreadsheet_id: str,
 ) -> str:
@@ -102,19 +93,7 @@ async def get_spreadsheet_info(
     Returns:
         str: Formatted spreadsheet information including title and sheets list.
     """
-    tool_name = "get_spreadsheet_info"
-    logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}', Spreadsheet ID: {spreadsheet_id}")
-
-    try:
-        service, user_email = await get_authenticated_google_service(
-            service_name="sheets",
-            version="v4",
-            tool_name=tool_name,
-            user_google_email=user_google_email,
-            required_scopes=[SHEETS_READONLY_SCOPE],
-        )
-    except GoogleAuthenticationError as e:
-        raise Exception(str(e))
+    logger.info(f"[get_spreadsheet_info] Invoked. Email: '{user_google_email}', Spreadsheet ID: {spreadsheet_id}")
 
     try:
         spreadsheet = await asyncio.to_thread(
@@ -143,7 +122,7 @@ async def get_spreadsheet_info(
             + "\n".join(sheets_info) if sheets_info else "  No sheets found"
         )
 
-        logger.info(f"Successfully retrieved info for spreadsheet {spreadsheet_id} for {user_email}.")
+        logger.info(f"Successfully retrieved info for spreadsheet {spreadsheet_id} for {user_google_email}.")
         return text_output
 
     except HttpError as error:
@@ -157,7 +136,9 @@ async def get_spreadsheet_info(
 
 
 @server.tool()
+@require_google_service("sheets", "sheets_read")
 async def read_sheet_values(
+    service,
     user_google_email: str,
     spreadsheet_id: str,
     range_name: str = "A1:Z1000",
@@ -173,19 +154,7 @@ async def read_sheet_values(
     Returns:
         str: The formatted values from the specified range.
     """
-    tool_name = "read_sheet_values"
-    logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}', Spreadsheet: {spreadsheet_id}, Range: {range_name}")
-
-    try:
-        service, user_email = await get_authenticated_google_service(
-            service_name="sheets",
-            version="v4",
-            tool_name=tool_name,
-            user_google_email=user_google_email,
-            required_scopes=[SHEETS_READONLY_SCOPE],
-        )
-    except GoogleAuthenticationError as e:
-        raise Exception(str(e))
+    logger.info(f"[read_sheet_values] Invoked. Email: '{user_google_email}', Spreadsheet: {spreadsheet_id}, Range: {range_name}")
 
     try:
         result = await asyncio.to_thread(
@@ -197,7 +166,7 @@ async def read_sheet_values(
 
         values = result.get("values", [])
         if not values:
-            return f"No data found in range '{range_name}' for {user_email}."
+            return f"No data found in range '{range_name}' for {user_google_email}."
 
         # Format the output as a readable table
         formatted_rows = []
@@ -207,12 +176,12 @@ async def read_sheet_values(
             formatted_rows.append(f"Row {i:2d}: {padded_row}")
 
         text_output = (
-            f"Successfully read {len(values)} rows from range '{range_name}' in spreadsheet {spreadsheet_id} for {user_email}:\n"
+            f"Successfully read {len(values)} rows from range '{range_name}' in spreadsheet {spreadsheet_id} for {user_google_email}:\n"
             + "\n".join(formatted_rows[:50])  # Limit to first 50 rows for readability
             + (f"\n... and {len(values) - 50} more rows" if len(values) > 50 else "")
         )
 
-        logger.info(f"Successfully read {len(values)} rows for {user_email}.")
+        logger.info(f"Successfully read {len(values)} rows for {user_google_email}.")
         return text_output
 
     except HttpError as error:
@@ -226,7 +195,9 @@ async def read_sheet_values(
 
 
 @server.tool()
+@require_google_service("sheets", "sheets_write")
 async def modify_sheet_values(
+    service,
     user_google_email: str,
     spreadsheet_id: str,
     range_name: str,
@@ -248,23 +219,11 @@ async def modify_sheet_values(
     Returns:
         str: Confirmation message of the successful modification operation.
     """
-    tool_name = "modify_sheet_values"
     operation = "clear" if clear_values else "write"
-    logger.info(f"[{tool_name}] Invoked. Operation: {operation}, Email: '{user_google_email}', Spreadsheet: {spreadsheet_id}, Range: {range_name}")
+    logger.info(f"[modify_sheet_values] Invoked. Operation: {operation}, Email: '{user_google_email}', Spreadsheet: {spreadsheet_id}, Range: {range_name}")
 
     if not clear_values and not values:
         raise Exception("Either 'values' must be provided or 'clear_values' must be True.")
-
-    try:
-        service, user_email = await get_authenticated_google_service(
-            service_name="sheets",
-            version="v4",
-            tool_name=tool_name,
-            user_google_email=user_google_email,
-            required_scopes=[SHEETS_WRITE_SCOPE],
-        )
-    except GoogleAuthenticationError as e:
-        raise Exception(str(e))
 
     try:
         if clear_values:
@@ -276,8 +235,8 @@ async def modify_sheet_values(
             )
 
             cleared_range = result.get("clearedRange", range_name)
-            text_output = f"Successfully cleared range '{cleared_range}' in spreadsheet {spreadsheet_id} for {user_email}."
-            logger.info(f"Successfully cleared range '{cleared_range}' for {user_email}.")
+            text_output = f"Successfully cleared range '{cleared_range}' in spreadsheet {spreadsheet_id} for {user_google_email}."
+            logger.info(f"Successfully cleared range '{cleared_range}' for {user_google_email}.")
         else:
             body = {"values": values}
 
@@ -298,10 +257,10 @@ async def modify_sheet_values(
             updated_columns = result.get("updatedColumns", 0)
 
             text_output = (
-                f"Successfully updated range '{range_name}' in spreadsheet {spreadsheet_id} for {user_email}. "
+                f"Successfully updated range '{range_name}' in spreadsheet {spreadsheet_id} for {user_google_email}. "
                 f"Updated: {updated_cells} cells, {updated_rows} rows, {updated_columns} columns."
             )
-            logger.info(f"Successfully updated {updated_cells} cells for {user_email}.")
+            logger.info(f"Successfully updated {updated_cells} cells for {user_google_email}.")
 
         return text_output
 
@@ -316,7 +275,9 @@ async def modify_sheet_values(
 
 
 @server.tool()
+@require_google_service("sheets", "sheets_write")
 async def create_spreadsheet(
+    service,
     user_google_email: str,
     title: str,
     sheet_names: Optional[List[str]] = None,
@@ -332,19 +293,7 @@ async def create_spreadsheet(
     Returns:
         str: Information about the newly created spreadsheet including ID and URL.
     """
-    tool_name = "create_spreadsheet"
-    logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}', Title: {title}")
-
-    try:
-        service, user_email = await get_authenticated_google_service(
-            service_name="sheets",
-            version="v4",
-            tool_name=tool_name,
-            user_google_email=user_google_email,
-            required_scopes=[SHEETS_WRITE_SCOPE],
-        )
-    except GoogleAuthenticationError as e:
-        raise Exception(str(e))
+    logger.info(f"[create_spreadsheet] Invoked. Email: '{user_google_email}', Title: {title}")
 
     try:
         spreadsheet_body = {
@@ -366,11 +315,11 @@ async def create_spreadsheet(
         spreadsheet_url = spreadsheet.get("spreadsheetUrl")
 
         text_output = (
-            f"Successfully created spreadsheet '{title}' for {user_email}. "
+            f"Successfully created spreadsheet '{title}' for {user_google_email}. "
             f"ID: {spreadsheet_id} | URL: {spreadsheet_url}"
         )
 
-        logger.info(f"Successfully created spreadsheet for {user_email}. ID: {spreadsheet_id}")
+        logger.info(f"Successfully created spreadsheet for {user_google_email}. ID: {spreadsheet_id}")
         return text_output
 
     except HttpError as error:
@@ -384,7 +333,9 @@ async def create_spreadsheet(
 
 
 @server.tool()
+@require_google_service("sheets", "sheets_write")
 async def create_sheet(
+    service,
     user_google_email: str,
     spreadsheet_id: str,
     sheet_name: str,
@@ -400,19 +351,7 @@ async def create_sheet(
     Returns:
         str: Confirmation message of the successful sheet creation.
     """
-    tool_name = "create_sheet"
-    logger.info(f"[{tool_name}] Invoked. Email: '{user_google_email}', Spreadsheet: {spreadsheet_id}, Sheet: {sheet_name}")
-
-    try:
-        service, user_email = await get_authenticated_google_service(
-            service_name="sheets",
-            version="v4",
-            tool_name=tool_name,
-            user_google_email=user_google_email,
-            required_scopes=[SHEETS_WRITE_SCOPE],
-        )
-    except GoogleAuthenticationError as e:
-        raise Exception(str(e))
+    logger.info(f"[create_sheet] Invoked. Email: '{user_google_email}', Spreadsheet: {spreadsheet_id}, Sheet: {sheet_name}")
 
     try:
         request_body = {
@@ -436,10 +375,10 @@ async def create_sheet(
         sheet_id = response["replies"][0]["addSheet"]["properties"]["sheetId"]
 
         text_output = (
-            f"Successfully created sheet '{sheet_name}' (ID: {sheet_id}) in spreadsheet {spreadsheet_id} for {user_email}."
+            f"Successfully created sheet '{sheet_name}' (ID: {sheet_id}) in spreadsheet {spreadsheet_id} for {user_google_email}."
         )
 
-        logger.info(f"Successfully created sheet for {user_email}. Sheet ID: {sheet_id}")
+        logger.info(f"Successfully created sheet for {user_google_email}. Sheet ID: {sheet_id}")
         return text_output
 
     except HttpError as error:
