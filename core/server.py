@@ -48,7 +48,7 @@ from config.google_config import (
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-WORKSPACE_MCP_PORT = int(os.getenv("WORKSPACE_MCP_PORT", 8000))
+WORKSPACE_MCP_PORT = int(os.getenv("PORT", os.getenv("WORKSPACE_MCP_PORT", 8000)))
 WORKSPACE_MCP_BASE_URI = os.getenv("WORKSPACE_MCP_BASE_URI", "http://localhost")
 
 # Transport mode detection (will be set by main.py)

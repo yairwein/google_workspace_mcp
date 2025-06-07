@@ -1,13 +1,17 @@
 # Smithery configuration file: https://smithery.ai/docs/build/project-config
 
+runtime: "container"
+build:
+  dockerfile: "Dockerfile"
+  dockerBuildPath: "."
 startCommand:
-  type: http
+  type: "http"
   configSchema:
-    # JSON Schema defining the configuration options for the MCP.
-    type: object
-    required:
-      - clientSecretsPath
+    type: "object"
     properties:
       clientSecretsPath:
-        type: string
-        description: Path to your client_secrets.json file
+        type: "string"
+        description: "Path to your client_secrets.json file"
+    required: ["clientSecretsPath"]
+  exampleConfig:
+    clientSecretsPath: "/app/client_secrets.json"

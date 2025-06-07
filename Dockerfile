@@ -11,6 +11,8 @@ RUN pip install --no-cache-dir fastapi>=0.115.12 fastmcp>=2.3.3 google-api-pytho
 # Copy application code
 COPY . .
 
+# Expose the port that the app runs on
+EXPOSE $PORT
 
 # Command to run the application
-CMD ["python", "main.py"]
+CMD ["python", "main.py", "--transport", "streamable-http"]

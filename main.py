@@ -47,14 +47,17 @@ def main():
                         help='Transport mode: stdio (default) or streamable-http')
     args = parser.parse_args()
 
+    # Set port once for reuse throughout the function
+    port = int(os.getenv("PORT", os.getenv("WORKSPACE_MCP_PORT", 8000)))
+
     print("🔧 Google Workspace MCP Server")
     print("=" * 35)
     print("📋 Server Information:")
     print(f"   📦 Version: 0.1.1")
     print(f"   🌐 Transport: {args.transport}")
     if args.transport == 'streamable-http':
-        print(f"   🔗 URL: http://localhost:{os.getenv('WORKSPACE_MCP_PORT', 8000)}")
-        print(f"   🔐 OAuth Callback: http://localhost:{os.getenv('WORKSPACE_MCP_PORT', 8000)}/oauth2callback")
+        print(f"   🔗 URL: http://localhost:{port}")
+        print(f"   🔐 OAuth Callback: http://localhost:{port}/oauth2callback")
     print(f"   👤 Mode: {'Single-user' if args.single_user else 'Multi-user'}")
     print(f"   🐍 Python: {sys.version.split()[0]}")
     print()
@@ -103,12 +106,11 @@ def main():
         set_transport_mode(args.transport)
 
         if args.transport == 'streamable-http':
-            print("🚀 Starting server on http://localhost:8000")
+            print(f"🚀 Starting server on http://localhost:{port}")
         else:
             print("🚀 Starting server in stdio mode")
             # Start minimal OAuth callback server for stdio mode
             from auth.oauth_callback_server import ensure_oauth_callback_available
-            port = int(os.getenv('WORKSPACE_MCP_PORT', 8000))
             if ensure_oauth_callback_available('stdio', port):
                 print(f"   OAuth callback server started on http://localhost:{port}/oauth2callback")
             else:
