@@ -5,6 +5,7 @@ import sys
 
 # Local imports
 from core.server import server, set_transport_mode
+from core.utils import check_credentials_directory_permissions
 
 logging.basicConfig(
     level=logging.INFO,
@@ -100,6 +101,18 @@ def main():
         os.environ['MCP_SINGLE_USER_MODE'] = '1'
         print("🔐 Single-user mode enabled")
         print()
+
+    # Check credentials directory permissions before starting
+    try:
+        print("🔍 Checking credentials directory permissions...")
+        check_credentials_directory_permissions()
+        print("✅ Credentials directory permissions verified")
+        print()
+    except (PermissionError, OSError) as e:
+        print(f"❌ Credentials directory permission check failed: {e}")
+        print("   Please ensure the service has write permissions to create/access the .credentials directory")
+        logger.error(f"Failed credentials directory permission check: {e}")
+        sys.exit(1)
 
     try:
         # Set transport mode for OAuth callback handling
