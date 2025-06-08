@@ -91,7 +91,8 @@ def save_credentials_to_file(user_google_email: str, credentials: Credentials, b
         'token_uri': credentials.token_uri,
         'client_id': credentials.client_id,
         'client_secret': credentials.client_secret,
-        'scopes': credentials.scopes
+        'scopes': credentials.scopes,
+        'expiry': credentials.expiry.isoformat() if credentials.expiry else None
     }
     try:
         with open(creds_path, 'w') as f:
@@ -116,13 +117,24 @@ def load_credentials_from_file(user_google_email: str, base_dir: str = DEFAULT_C
     try:
         with open(creds_path, 'r') as f:
             creds_data = json.load(f)
+
+        # Parse expiry if present
+        expiry = None
+        if creds_data.get('expiry'):
+            try:
+                from datetime import datetime
+                expiry = datetime.fromisoformat(creds_data['expiry'])
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Could not parse expiry time for {user_google_email}: {e}")
+
         credentials = Credentials(
             token=creds_data.get('token'),
             refresh_token=creds_data.get('refresh_token'),
             token_uri=creds_data.get('token_uri'),
             client_id=creds_data.get('client_id'),
             client_secret=creds_data.get('client_secret'),
-            scopes=creds_data.get('scopes')
+            scopes=creds_data.get('scopes'),
+            expiry=expiry
         )
         logger.debug(f"Credentials loaded for user {user_google_email} from {creds_path}")
         return credentials
@@ -479,8 +491,9 @@ async def get_authenticated_google_service(
         user_google_email=user_google_email,
         required_scopes=required_scopes,
         client_secrets_path=CONFIG_CLIENT_SECRETS_PATH,
-        session_id=None,  # No longer using session-based auth
+        session_id=None,  # Session ID not available in service layer
     )
+
 
     if not credentials or not credentials.valid:
         logger.warning(
@@ -499,7 +512,7 @@ async def get_authenticated_google_service(
 
         # Generate auth URL and raise exception with it
         auth_response = await start_auth_flow(
-            mcp_session_id=None,  # No longer using session-based auth
+            mcp_session_id=None,  # Session ID not available in service layer
             user_google_email=user_google_email,
             service_name=f"Google {service_name.title()}",
             redirect_uri=redirect_uri,
