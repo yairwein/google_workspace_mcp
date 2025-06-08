@@ -27,8 +27,9 @@ class MinimalOAuthServer:
     Only starts when needed and uses the same port (8000) as streamable-http mode.
     """
 
-    def __init__(self, port: int = 8000):
+    def __init__(self, port: int = 8000, base_uri: str = "http://localhost"):
         self.port = port
+        self.base_uri = base_uri
         self.app = FastAPI()
         self.server = None
         self.server_thread = None
@@ -71,7 +72,7 @@ class MinimalOAuthServer:
                     client_secrets_path=CONFIG_CLIENT_SECRETS_PATH,
                     scopes=SCOPES,
                     authorization_response=str(request.url),
-                    redirect_uri=f"http://localhost:{self.port}/oauth2callback",
+                    redirect_uri=f"{self.base_uri}:{self.port}/oauth2callback",
                     session_id=mcp_session_id
                 )
 
@@ -98,11 +99,19 @@ class MinimalOAuthServer:
             return True
 
         # Check if port is available
+        # Extract hostname from base_uri (e.g., "http://localhost" -> "localhost")
+        try:
+            from urllib.parse import urlparse
+            parsed_uri = urlparse(self.base_uri)
+            hostname = parsed_uri.hostname or 'localhost'
+        except Exception:
+            hostname = 'localhost'
+            
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.bind(('localhost', self.port))
+                s.bind((hostname, self.port))
         except OSError:
-            logger.error(f"Port {self.port} is already in use. Cannot start minimal OAuth server.")
+            logger.error(f"Port {self.port} is already in use on {hostname}. Cannot start minimal OAuth server.")
             return False
 
         def run_server():
@@ -110,7 +119,7 @@ class MinimalOAuthServer:
             try:
                 config = uvicorn.Config(
                     self.app,
-                    host="localhost",
+                    host=hostname,
                     port=self.port,
                     log_level="warning",
                     access_log=False
@@ -131,16 +140,16 @@ class MinimalOAuthServer:
         while time.time() - start_time < max_wait:
             try:
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                    result = s.connect_ex(('localhost', self.port))
+                    result = s.connect_ex((hostname, self.port))
                     if result == 0:
                         self.is_running = True
-                        logger.info(f"Minimal OAuth server started on port {self.port}")
+                        logger.info(f"Minimal OAuth server started on {hostname}:{self.port}")
                         return True
             except Exception:
                 pass
             time.sleep(0.1)
 
-        logger.error(f"Failed to start minimal OAuth server on port {self.port}")
+        logger.error(f"Failed to start minimal OAuth server on {hostname}:{self.port}")
         return False
 
     def stop(self):
@@ -157,7 +166,7 @@ class MinimalOAuthServer:
                 self.server_thread.join(timeout=3.0)
 
             self.is_running = False
-            logger.info(f"Minimal OAuth server stopped (port {self.port})")
+            logger.info(f"Minimal OAuth server stopped")
 
         except Exception as e:
             logger.error(f"Error stopping minimal OAuth server: {e}", exc_info=True)
@@ -166,20 +175,21 @@ class MinimalOAuthServer:
 # Global instance for stdio mode
 _minimal_oauth_server: Optional[MinimalOAuthServer] = None
 
-def get_oauth_redirect_uri(transport_mode: str = "stdio", port: int = 8000) -> str:
+def get_oauth_redirect_uri(transport_mode: str = "stdio", port: int = 8000, base_uri: str = "http://localhost") -> str:
     """
     Get the appropriate OAuth redirect URI based on transport mode.
 
     Args:
         transport_mode: "stdio" or "streamable-http"
         port: Port number (default 8000)
+        base_uri: Base URI (default "http://localhost")
 
     Returns:
         OAuth redirect URI
     """
-    return f"http://localhost:{port}/oauth2callback"
+    return f"{base_uri}:{port}/oauth2callback"
 
-def ensure_oauth_callback_available(transport_mode: str = "stdio", port: int = 8000) -> bool:
+def ensure_oauth_callback_available(transport_mode: str = "stdio", port: int = 8000, base_uri: str = "http://localhost") -> bool:
     """
     Ensure OAuth callback endpoint is available for the given transport mode.
 
@@ -189,6 +199,7 @@ def ensure_oauth_callback_available(transport_mode: str = "stdio", port: int = 8
     Args:
         transport_mode: "stdio" or "streamable-http"
         port: Port number (default 8000)
+        base_uri: Base URI (default "http://localhost")
 
     Returns:
         True if callback endpoint is available, False otherwise
@@ -203,16 +214,16 @@ def ensure_oauth_callback_available(transport_mode: str = "stdio", port: int = 8
     elif transport_mode == "stdio":
         # In stdio mode, start minimal server if not already running
         if _minimal_oauth_server is None:
-            logger.info(f"Creating minimal OAuth server instance for port {port}")
-            _minimal_oauth_server = MinimalOAuthServer(port)
+            logger.info(f"Creating minimal OAuth server instance for {base_uri}:{port}")
+            _minimal_oauth_server = MinimalOAuthServer(port, base_uri)
 
         if not _minimal_oauth_server.is_running:
             logger.info("Starting minimal OAuth server for stdio mode")
             result = _minimal_oauth_server.start()
             if result:
-                logger.info(f"Minimal OAuth server successfully started on port {port}")
+                logger.info(f"Minimal OAuth server successfully started on {base_uri}:{port}")
             else:
-                logger.error(f"Failed to start minimal OAuth server on port {port}")
+                logger.error(f"Failed to start minimal OAuth server on {base_uri}:{port}")
             return result
         else:
             logger.info("Minimal OAuth server is already running")

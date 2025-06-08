@@ -69,7 +69,7 @@ def set_transport_mode(mode: str):
 
 def get_oauth_redirect_uri_for_current_mode() -> str:
     """Get OAuth redirect URI based on current transport mode."""
-    return get_oauth_redirect_uri(_current_transport_mode, WORKSPACE_MCP_PORT)
+    return get_oauth_redirect_uri(_current_transport_mode, WORKSPACE_MCP_PORT, WORKSPACE_MCP_BASE_URI)
 
 # Health check endpoint
 @server.custom_route("/health", methods=["GET"])
@@ -189,7 +189,7 @@ async def start_google_auth(
 
     # Ensure OAuth callback is available for current transport mode
     redirect_uri = get_oauth_redirect_uri_for_current_mode()
-    if not ensure_oauth_callback_available(_current_transport_mode, WORKSPACE_MCP_PORT):
+    if not ensure_oauth_callback_available(_current_transport_mode, WORKSPACE_MCP_PORT, WORKSPACE_MCP_BASE_URI):
         raise Exception("Failed to start OAuth callback server. Please try again.")
 
     # Use the centralized start_auth_flow from auth.google_auth

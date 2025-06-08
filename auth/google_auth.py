@@ -185,8 +185,8 @@ async def start_auth_flow(
     logger.info(f"[start_auth_flow] Initiating auth for {user_display_name} (session: {mcp_session_id}) with global SCOPES.")
 
     try:
-        if 'OAUTHLIB_INSECURE_TRANSPORT' not in os.environ and "localhost" in redirect_uri: # Use passed redirect_uri
-            logger.warning("OAUTHLIB_INSECURE_TRANSPORT not set. Setting it for localhost development.")
+        if 'OAUTHLIB_INSECURE_TRANSPORT' not in os.environ and ("localhost" in redirect_uri or "127.0.0.1" in redirect_uri): # Use passed redirect_uri
+            logger.warning("OAUTHLIB_INSECURE_TRANSPORT not set. Setting it for localhost/local development.")
             os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
         oauth_state = os.urandom(16).hex()
