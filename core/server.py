@@ -73,14 +73,15 @@ def get_oauth_redirect_uri_for_current_mode() -> str:
 
 # Health check endpoint
 @server.custom_route("/health", methods=["GET"])
-async def health_check() -> Dict[str, Any]:
+async def health_check(request: Request):
     """Health check endpoint for container orchestration."""
-    return {
+    from fastapi.responses import JSONResponse
+    return JSONResponse({
         "status": "healthy",
-        "service": "google-workspace-mcp",
+        "service": "google-workspace-mcp", 
         "version": "0.1.1",
         "transport": _current_transport_mode
-    }
+    })
 
 # Register OAuth callback as a custom route
 @server.custom_route("/oauth2callback", methods=["GET"])
