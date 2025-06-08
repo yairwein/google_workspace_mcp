@@ -10,6 +10,7 @@ import os
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow, InstalledAppFlow
 from google.auth.transport.requests import Request
+from google.auth.exceptions import RefreshError
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from config.google_config import OAUTH_STATE_TO_SESSION_ID_MAP, SCOPES
@@ -397,6 +398,10 @@ def get_credentials(
             if session_id: # Update session cache if it was the source or is active
                 save_credentials_to_session(session_id, credentials)
             return credentials
+        except RefreshError as e:
+            logger.warning(f"[get_credentials] RefreshError - token expired/revoked: {e}. User: '{user_google_email}', Session: '{session_id}'")
+            # For RefreshError, we should return None to trigger reauthentication
+            return None
         except Exception as e:
             logger.error(f"[get_credentials] Error refreshing credentials: {e}. User: '{user_google_email}', Session: '{session_id}'", exc_info=True)
             return None # Failed to refresh

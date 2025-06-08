@@ -4,6 +4,7 @@ from functools import wraps
 from typing import Dict, List, Optional, Any, Callable, Union
 from datetime import datetime, timedelta
 
+from google.auth.exceptions import RefreshError
 from auth.google_auth import get_authenticated_google_service, GoogleAuthenticationError
 
 logger = logging.getLogger(__name__)
@@ -102,6 +103,50 @@ def _resolve_scopes(scopes: Union[str, List[str]]) -> List[str]:
     return resolved
 
 
+def _handle_token_refresh_error(error: RefreshError, user_email: str, service_name: str) -> str:
+    """
+    Handle token refresh errors gracefully, particularly expired/revoked tokens.
+
+    Args:
+        error: The RefreshError that occurred
+        user_email: User's email address
+        service_name: Name of the Google service
+
+    Returns:
+        A user-friendly error message with instructions for reauthentication
+    """
+    error_str = str(error)
+
+    if 'invalid_grant' in error_str.lower() or 'expired or revoked' in error_str.lower():
+        logger.warning(f"Token expired or revoked for user {user_email} accessing {service_name}")
+
+        # Clear any cached service for this user to force fresh authentication
+        clear_service_cache(user_email)
+
+        service_display_name = f"Google {service_name.title()}"
+
+        return (
+            f"**Authentication Required: Token Expired/Revoked for {service_display_name}**\n\n"
+            f"Your Google authentication token for {user_email} has expired or been revoked. "
+            f"This commonly happens when:\n"
+            f"- The token has been unused for an extended period\n"
+            f"- You've changed your Google account password\n"
+            f"- You've revoked access to the application\n\n"
+            f"**To resolve this, please:**\n"
+            f"1. Run `start_google_auth` with your email ({user_email}) and service_name='{service_display_name}'\n"
+            f"2. Complete the authentication flow in your browser\n"
+            f"3. Retry your original command\n\n"
+            f"The application will automatically use the new credentials once authentication is complete."
+        )
+    else:
+        # Handle other types of refresh errors
+        logger.error(f"Unexpected refresh error for user {user_email}: {error}")
+        return (
+            f"Authentication error occurred for {user_email}. "
+            f"Please try running `start_google_auth` with your email and the appropriate service name to reauthenticate."
+        )
+
+
 def require_google_service(
     service_type: str,
     scopes: Union[str, List[str]],
@@ -194,8 +239,13 @@ def require_google_service(
                 # Insert service as first positional argument
                 args = (service,) + args
 
-            # Call the original function
-            return await func(*args, **kwargs)
+            # Call the original function with refresh error handling
+            try:
+                return await func(*args, **kwargs)
+            except RefreshError as e:
+                # Handle token refresh errors gracefully
+                error_message = _handle_token_refresh_error(e, actual_user_email, service_name)
+                raise Exception(error_message)
 
         return wrapper
     return decorator
@@ -272,7 +322,13 @@ def require_multiple_services(service_configs: List[Dict[str, Any]]):
                 except GoogleAuthenticationError as e:
                     raise Exception(str(e))
 
-            return await func(*args, **kwargs)
+            # Call the original function with refresh error handling
+            try:
+                return await func(*args, **kwargs)
+            except RefreshError as e:
+                # Handle token refresh errors gracefully
+                error_message = _handle_token_refresh_error(e, user_google_email, "Multiple Services")
+                raise Exception(error_message)
 
         return wrapper
     return decorator

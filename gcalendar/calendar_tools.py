@@ -212,7 +212,7 @@ async def get_events(
         logger.error(message, exc_info=True)
         raise Exception(message)
     except Exception as e:
-        message = f"Unexpected error getting events: {e}."
+        message = f"Unexpected error getting events: {e}"
         logger.exception(message)
         raise Exception(message)
 
