@@ -43,6 +43,11 @@ CHAT_SPACES_SCOPE = 'https://www.googleapis.com/auth/chat.spaces'
 SHEETS_READONLY_SCOPE = 'https://www.googleapis.com/auth/spreadsheets.readonly'
 SHEETS_WRITE_SCOPE = 'https://www.googleapis.com/auth/spreadsheets'
 
+# Google Forms API scopes
+FORMS_BODY_SCOPE = 'https://www.googleapis.com/auth/forms.body'
+FORMS_BODY_READONLY_SCOPE = 'https://www.googleapis.com/auth/forms.body.readonly'
+FORMS_RESPONSES_READONLY_SCOPE = 'https://www.googleapis.com/auth/forms.responses.readonly'
+
 # Base OAuth scopes required for user identification
 BASE_SCOPES = [
     USERINFO_EMAIL_SCOPE,
@@ -89,5 +94,12 @@ SHEETS_SCOPES = [
     SHEETS_WRITE_SCOPE
 ]
 
+# Forms-specific scopes
+FORMS_SCOPES = [
+    FORMS_BODY_SCOPE,
+    FORMS_BODY_READONLY_SCOPE,
+    FORMS_RESPONSES_READONLY_SCOPE
+]
+
 # Combined scopes for all supported Google Workspace operations
-SCOPES = list(set(BASE_SCOPES + CALENDAR_SCOPES + DRIVE_SCOPES + GMAIL_SCOPES + DOCS_SCOPES + CHAT_SCOPES + SHEETS_SCOPES))
+SCOPES = list(set(BASE_SCOPES + CALENDAR_SCOPES + DRIVE_SCOPES + GMAIL_SCOPES + DOCS_SCOPES + CHAT_SCOPES + SHEETS_SCOPES + FORMS_SCOPES))
