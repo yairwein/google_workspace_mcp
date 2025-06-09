@@ -19,6 +19,7 @@ startCommand:
       clientSecretsPath:
         type: "string"
         description: "Path to your client_secrets.json file"
-    required: ["clientSecretsPath"]
+        default: "/app/client_secrets.json"
+    required: []
   exampleConfig:
     clientSecretsPath: "/app/client_secrets.json"

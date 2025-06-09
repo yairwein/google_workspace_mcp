@@ -28,6 +28,9 @@ RUN uv pip install --system --no-cache \
 # Copy application code
 COPY . .
 
+# Create placeholder client_secrets.json for lazy loading capability
+RUN echo '{"installed":{"client_id":"placeholder","client_secret":"placeholder","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","redirect_uris":["http://localhost:8000/oauth2callback"]}}' > /app/client_secrets.json
+
 # Debug: List files to verify structure
 RUN echo "=== Debug: Listing app directory contents ===" && \
     ls -la /app && \

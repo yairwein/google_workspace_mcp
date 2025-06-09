@@ -9,6 +9,7 @@ from mcp import types
 
 from mcp.server.fastmcp import FastMCP
 from starlette.requests import Request
+from urllib.parse import parse_qs
 
 from auth.google_auth import handle_auth_callback, start_auth_flow, CONFIG_CLIENT_SECRETS_PATH
 from auth.oauth_callback_server import get_oauth_redirect_uri, ensure_oauth_callback_available
@@ -58,7 +59,8 @@ _current_transport_mode = "stdio"  # Default to stdio
 server = FastMCP(
     name="google_workspace",
     server_url=f"{WORKSPACE_MCP_BASE_URI}:{WORKSPACE_MCP_PORT}/mcp",
-    port=WORKSPACE_MCP_PORT
+    port=WORKSPACE_MCP_PORT,
+    host="0.0.0.0"
 )
 
 def set_transport_mode(mode: str):
@@ -82,6 +84,7 @@ async def health_check(request: Request):
         "version": "0.1.1",
         "transport": _current_transport_mode
     })
+
 
 # Register OAuth callback as a custom route
 @server.custom_route("/oauth2callback", methods=["GET"])
