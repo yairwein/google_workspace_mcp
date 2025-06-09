@@ -31,13 +31,17 @@ COPY . .
 # Create placeholder client_secrets.json for lazy loading capability
 RUN echo '{"installed":{"client_id":"placeholder","client_secret":"placeholder","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","redirect_uris":["http://localhost:8000/oauth2callback"]}}' > /app/client_secrets.json
 
+# Debug: Check PORT environment variable first
+RUN echo "=== Debug: Environment Variables ===" && \
+    echo "PORT=${PORT:-8000}" && \
+    echo "WORKSPACE_MCP_PORT=${WORKSPACE_MCP_PORT:-8000}" && \
+    echo "WORKSPACE_MCP_BASE_URI=${WORKSPACE_MCP_BASE_URI:-http://localhost}"
+
 # Debug: List files to verify structure
 RUN echo "=== Debug: Listing app directory contents ===" && \
     ls -la /app && \
     echo "=== Debug: Checking if main.py exists ===" && \
     ls -la /app/main.py && \
-    echo "=== Debug: Checking PORT environment variable ===" && \
-    echo "PORT=${PORT:-8000}" && \
     echo "=== Debug: Checking Python path and imports ===" && \
     python -c "import sys; print('Python path:', sys.path)" && \
     python -c "import core.server; print('Server import successful')" && \
