@@ -7,12 +7,7 @@ build:
   buildArgs: {}
   platform: "linux/amd64"
 startCommand:
-  type: "http"
-  port: 8000
-  healthCheck:
-    path: "/health"
-    intervalSeconds: 30
-    timeoutSeconds: 10
+  type: "stdio"
   configSchema:
     type: "object"
     properties:
@@ -21,5 +16,11 @@ startCommand:
         description: "Path to your client_secrets.json file"
         default: "/app/client_secrets.json"
     required: []
-  exampleConfig:
-    clientSecretsPath: "/app/client_secrets.json"
+  commandFunction: |
+    (config) => ({
+      "command": "python",
+      "args": ["main.py"],
+      "env": {
+        "GOOGLE_CLIENT_SECRETS": config.clientSecretsPath || "/app/client_secrets.json"
+      }
+    })
