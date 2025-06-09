@@ -1,8 +1,8 @@
 """
-Google Workspace MCP Configuration
+Google Workspace OAuth Scopes
 
-This module centralizes configuration variables for Google Workspace integration,
-including OAuth scopes and the state map for authentication flows.
+This module centralizes OAuth scope definitions for Google Workspace integration.
+Separated from service_decorator.py to avoid circular imports.
 """
 import logging
 from typing import Dict
@@ -28,11 +28,11 @@ DOCS_READONLY_SCOPE = 'https://www.googleapis.com/auth/documents.readonly'
 DOCS_WRITE_SCOPE = 'https://www.googleapis.com/auth/documents'
 
 # Gmail API scopes
-GMAIL_READONLY_SCOPE   = 'https://www.googleapis.com/auth/gmail.readonly'
-GMAIL_SEND_SCOPE       = 'https://www.googleapis.com/auth/gmail.send'
-GMAIL_COMPOSE_SCOPE    = 'https://www.googleapis.com/auth/gmail.compose'
-GMAIL_MODIFY_SCOPE     = 'https://www.googleapis.com/auth/gmail.modify'
-GMAIL_LABELS_SCOPE     = 'https://www.googleapis.com/auth/gmail.labels'
+GMAIL_READONLY_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly'
+GMAIL_SEND_SCOPE = 'https://www.googleapis.com/auth/gmail.send'
+GMAIL_COMPOSE_SCOPE = 'https://www.googleapis.com/auth/gmail.compose'
+GMAIL_MODIFY_SCOPE = 'https://www.googleapis.com/auth/gmail.modify'
+GMAIL_LABELS_SCOPE = 'https://www.googleapis.com/auth/gmail.labels'
 
 # Google Chat API scopes
 CHAT_READONLY_SCOPE = 'https://www.googleapis.com/auth/chat.messages.readonly'
@@ -54,25 +54,22 @@ BASE_SCOPES = [
     OPENID_SCOPE
 ]
 
-# Calendar-specific scopes
+# Service-specific scope groups
 DOCS_SCOPES = [
     DOCS_READONLY_SCOPE,
     DOCS_WRITE_SCOPE
 ]
 
-# Calendar-specific scopes
 CALENDAR_SCOPES = [
     CALENDAR_READONLY_SCOPE,
     CALENDAR_EVENTS_SCOPE
 ]
 
-# Drive-specific scopes
 DRIVE_SCOPES = [
     DRIVE_READONLY_SCOPE,
     DRIVE_FILE_SCOPE
 ]
 
-# Gmail-specific scopes
 GMAIL_SCOPES = [
     GMAIL_READONLY_SCOPE,
     GMAIL_SEND_SCOPE,
@@ -81,20 +78,17 @@ GMAIL_SCOPES = [
     GMAIL_LABELS_SCOPE
 ]
 
-# Chat-specific scopes
 CHAT_SCOPES = [
     CHAT_READONLY_SCOPE,
     CHAT_WRITE_SCOPE,
     CHAT_SPACES_SCOPE
 ]
 
-# Sheets-specific scopes
 SHEETS_SCOPES = [
     SHEETS_READONLY_SCOPE,
     SHEETS_WRITE_SCOPE
 ]
 
-# Forms-specific scopes
 FORMS_SCOPES = [
     FORMS_BODY_SCOPE,
     FORMS_BODY_READONLY_SCOPE,

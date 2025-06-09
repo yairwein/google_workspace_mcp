@@ -9,7 +9,7 @@
 
 **The world's most feature-complete Google Workspace MCP server**
 
-*Connect MCP Clients, AI assistants and developer tools to Google Calendar, Drive, Gmail, Docs, Sheets, and Chat through the Model Context Protocol*
+*Connect MCP Clients, AI assistants and developer tools to Google Calendar, Drive, Gmail, Docs, Sheets, Forms, and Chat through the Model Context Protocol*
 
 </div>
 
@@ -27,12 +27,13 @@ A production-ready MCP server that integrates all major Google Workspace service
 
 ## ✨ Features
 
-- **🔐 Advanced OAuth 2.0**: Secure authentication with automatic token refresh, transport-aware callback handling, session management, and service-specific scope handling
+- **🔐 Advanced OAuth 2.0**: Secure authentication with automatic token refresh, transport-aware callback handling, session management, and centralized scope management
 - **📅 Google Calendar**: Full calendar management with event CRUD operations
 - **📁 Google Drive**: File operations with native Microsoft Office format support (.docx, .xlsx)
 - **📧 Gmail**: Complete email management with search, send, and draft capabilities
 - **📄 Google Docs**: Document operations including content extraction and creation
 - **📊 Google Sheets**: Comprehensive spreadsheet management with flexible cell operations
+- **📝 Google Forms**: Form creation, retrieval, publish settings, and response management
 - **💬 Google Chat**: Space management and messaging capabilities
 - **🔄 Multiple Transports**: HTTP with SSE fallback, OpenAPI compatibility via `mcpo`
 - **⚡ High Performance**: Service caching, thread-safe sessions, FastMCP integration
@@ -60,7 +61,7 @@ uv run main.py
 
 1. **Google Cloud Setup**:
    - Create OAuth 2.0 credentials (web application) in [Google Cloud Console](https://console.cloud.google.com/)
-   - Enable APIs: Calendar, Drive, Gmail, Docs, Sheets, Chat
+   - Enable APIs: Calendar, Drive, Gmail, Docs, Sheets, Forms, Chat
    - Download credentials as `client_secret.json` in project root
    - Add redirect URI: `http://localhost:8000/oauth2callback`
 
@@ -96,7 +97,7 @@ docker build -t google-workspace-mcp .
 docker run -p 8000:8000 -v $(pwd):/app google-workspace-mcp --transport streamable-http
 ```
 
-**Available Tools for `--tools` flag**: `gmail`, `drive`, `calendar`, `docs`, `sheets`, `chat`
+**Available Tools for `--tools` flag**: `gmail`, `drive`, `calendar`, `docs`, `sheets`, `forms`, `chat`
 
 ### Connect to Claude Desktop
 
@@ -210,6 +211,16 @@ When calling a tool:
 | `modify_sheet_values` | Write/update/clear cells |
 | `create_spreadsheet` | Create new spreadsheets |
 | `create_sheet` | Add sheets to existing files |
+
+### 📝 Google Forms ([`forms_tools.py`](gforms/forms_tools.py))
+
+| Tool | Description |
+|------|-------------|
+| `create_form` | Create new forms with title and description |
+| `get_form` | Retrieve form details, questions, and URLs |
+| `set_publish_settings` | Configure form template and authentication settings |
+| `get_form_response` | Get individual form response details |
+| `list_form_responses` | List all responses to a form with pagination |
 
 ### 💬 Google Chat ([`chat_tools.py`](gchat/chat_tools.py))
 

@@ -15,7 +15,7 @@ from auth.oauth_callback_server import get_oauth_redirect_uri, ensure_oauth_call
 from auth.oauth_responses import create_error_response, create_success_response, create_server_error_response
 
 # Import shared configuration
-from config.google_config import (
+from auth.scopes import (
     OAUTH_STATE_TO_SESSION_ID_MAP,
     USERINFO_EMAIL_SCOPE,
     OPENID_SCOPE,

@@ -13,7 +13,7 @@ from google.auth.transport.requests import Request
 from google.auth.exceptions import RefreshError
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-from config.google_config import OAUTH_STATE_TO_SESSION_ID_MAP, SCOPES
+from auth.scopes import OAUTH_STATE_TO_SESSION_ID_MAP, SCOPES
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

@@ -16,7 +16,7 @@ from fastapi import FastAPI, Request
 import uvicorn
 
 from auth.google_auth import handle_auth_callback, CONFIG_CLIENT_SECRETS_PATH
-from config.google_config import OAUTH_STATE_TO_SESSION_ID_MAP, SCOPES
+from auth.scopes import OAUTH_STATE_TO_SESSION_ID_MAP, SCOPES
 from auth.oauth_responses import create_error_response, create_success_response, create_server_error_response
 
 logger = logging.getLogger(__name__)
