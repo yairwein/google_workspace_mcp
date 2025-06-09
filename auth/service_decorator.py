@@ -16,7 +16,8 @@ SERVICE_CONFIGS = {
     "calendar": {"service": "calendar", "version": "v3"},
     "docs": {"service": "docs", "version": "v1"},
     "sheets": {"service": "sheets", "version": "v4"},
-    "chat": {"service": "chat", "version": "v1"}
+    "chat": {"service": "chat", "version": "v1"},
+    "forms": {"service": "forms", "version": "v1"}
 }
 
 # Scope group definitions for easy reference
@@ -48,6 +49,11 @@ SCOPE_GROUPS = {
     "chat_read": "https://www.googleapis.com/auth/chat.messages.readonly",
     "chat_write": "https://www.googleapis.com/auth/chat.messages",
     "chat_spaces": "https://www.googleapis.com/auth/chat.spaces.readonly",
+
+    # Forms scopes
+    "forms": "https://www.googleapis.com/auth/forms.body",
+    "forms_read": "https://www.googleapis.com/auth/forms.body.readonly",
+    "forms_responses_read": "https://www.googleapis.com/auth/forms.responses.readonly",
 }
 
 # Service cache: {cache_key: (service, cached_time, user_email)}
