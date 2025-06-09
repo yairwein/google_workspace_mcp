@@ -9,7 +9,6 @@ from mcp import types
 
 from mcp.server.fastmcp import FastMCP
 from starlette.requests import Request
-from urllib.parse import parse_qs
 
 from auth.google_auth import handle_auth_callback, start_auth_flow, CONFIG_CLIENT_SECRETS_PATH
 from auth.oauth_callback_server import get_oauth_redirect_uri, ensure_oauth_callback_available
