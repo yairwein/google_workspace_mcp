@@ -42,7 +42,7 @@ def main():
     parser.add_argument('--single-user', action='store_true',
                         help='Run in single-user mode - bypass session mapping and use any credentials from ./credentials directory')
     parser.add_argument('--tools', nargs='*',
-                        choices=['gmail', 'drive', 'calendar', 'docs', 'sheets', 'chat'],
+                        choices=['gmail', 'drive', 'calendar', 'docs', 'sheets', 'chat', 'forms'],
                         help='Specify which tools to register. If not provided, all tools are registered.')
     parser.add_argument('--transport', choices=['stdio', 'streamable-http'], default='stdio',
                         help='Transport mode: stdio (default) or streamable-http')
@@ -71,7 +71,8 @@ def main():
         'calendar': lambda: __import__('gcalendar.calendar_tools'),
         'docs': lambda: __import__('gdocs.docs_tools'),
         'sheets': lambda: __import__('gsheets.sheets_tools'),
-        'chat': lambda: __import__('gchat.chat_tools')
+        'chat': lambda: __import__('gchat.chat_tools'),
+        'forms': lambda: __import__('gforms.forms_tools')
     }
 
     tool_icons = {
@@ -80,7 +81,8 @@ def main():
         'calendar': '📅',
         'docs': '📄',
         'sheets': '📊',
-        'chat': '💬'
+        'chat': '💬',
+        'forms': '📝'
     }
 
     # Import specified tools or all tools if none specified
