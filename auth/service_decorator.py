@@ -9,6 +9,17 @@ from auth.google_auth import get_authenticated_google_service, GoogleAuthenticat
 
 logger = logging.getLogger(__name__)
 
+# Import scope constants
+from auth.scopes import (
+    GMAIL_READONLY_SCOPE, GMAIL_SEND_SCOPE, GMAIL_COMPOSE_SCOPE, GMAIL_MODIFY_SCOPE, GMAIL_LABELS_SCOPE,
+    DRIVE_READONLY_SCOPE, DRIVE_FILE_SCOPE,
+    DOCS_READONLY_SCOPE, DOCS_WRITE_SCOPE,
+    CALENDAR_READONLY_SCOPE, CALENDAR_EVENTS_SCOPE,
+    SHEETS_READONLY_SCOPE, SHEETS_WRITE_SCOPE,
+    CHAT_READONLY_SCOPE, CHAT_WRITE_SCOPE, CHAT_SPACES_SCOPE,
+    FORMS_BODY_SCOPE, FORMS_BODY_READONLY_SCOPE, FORMS_RESPONSES_READONLY_SCOPE
+)
+
 # Service configuration mapping
 SERVICE_CONFIGS = {
     "gmail": {"service": "gmail", "version": "v1"},
@@ -20,40 +31,41 @@ SERVICE_CONFIGS = {
     "forms": {"service": "forms", "version": "v1"}
 }
 
+
 # Scope group definitions for easy reference
 SCOPE_GROUPS = {
     # Gmail scopes
-    "gmail_read": "https://www.googleapis.com/auth/gmail.readonly",
-    "gmail_send": "https://www.googleapis.com/auth/gmail.send",
-    "gmail_compose": "https://www.googleapis.com/auth/gmail.compose",
-    "gmail_modify": "https://www.googleapis.com/auth/gmail.modify",
-    "gmail_labels": "https://www.googleapis.com/auth/gmail.labels",
+    "gmail_read": GMAIL_READONLY_SCOPE,
+    "gmail_send": GMAIL_SEND_SCOPE,
+    "gmail_compose": GMAIL_COMPOSE_SCOPE,
+    "gmail_modify": GMAIL_MODIFY_SCOPE,
+    "gmail_labels": GMAIL_LABELS_SCOPE,
 
     # Drive scopes
-    "drive_read": "https://www.googleapis.com/auth/drive.readonly",
-    "drive_file": "https://www.googleapis.com/auth/drive.file",
+    "drive_read": DRIVE_READONLY_SCOPE,
+    "drive_file": DRIVE_FILE_SCOPE,
 
     # Docs scopes
-    "docs_read": "https://www.googleapis.com/auth/documents.readonly",
-    "docs_write": "https://www.googleapis.com/auth/documents",
+    "docs_read": DOCS_READONLY_SCOPE,
+    "docs_write": DOCS_WRITE_SCOPE,
 
     # Calendar scopes
-    "calendar_read": "https://www.googleapis.com/auth/calendar.readonly",
-    "calendar_events": "https://www.googleapis.com/auth/calendar.events",
+    "calendar_read": CALENDAR_READONLY_SCOPE,
+    "calendar_events": CALENDAR_EVENTS_SCOPE,
 
     # Sheets scopes
-    "sheets_read": "https://www.googleapis.com/auth/spreadsheets.readonly",
-    "sheets_write": "https://www.googleapis.com/auth/spreadsheets",
+    "sheets_read": SHEETS_READONLY_SCOPE,
+    "sheets_write": SHEETS_WRITE_SCOPE,
 
     # Chat scopes
-    "chat_read": "https://www.googleapis.com/auth/chat.messages.readonly",
-    "chat_write": "https://www.googleapis.com/auth/chat.messages",
-    "chat_spaces": "https://www.googleapis.com/auth/chat.spaces.readonly",
+    "chat_read": CHAT_READONLY_SCOPE,
+    "chat_write": CHAT_WRITE_SCOPE,
+    "chat_spaces": CHAT_SPACES_SCOPE,
 
     # Forms scopes
-    "forms": "https://www.googleapis.com/auth/forms.body",
-    "forms_read": "https://www.googleapis.com/auth/forms.body.readonly",
-    "forms_responses_read": "https://www.googleapis.com/auth/forms.responses.readonly",
+    "forms": FORMS_BODY_SCOPE,
+    "forms_read": FORMS_BODY_READONLY_SCOPE,
+    "forms_responses_read": FORMS_RESPONSES_READONLY_SCOPE,
 }
 
 # Service cache: {cache_key: (service, cached_time, user_email)}
