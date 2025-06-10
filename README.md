@@ -11,6 +11,10 @@
 
 *Connect MCP Clients, AI assistants and developer tools to Google Calendar, Drive, Gmail, Docs, Sheets, Forms, and Chat through the Model Context Protocol*
 
+<a href="https://glama.ai/mcp/servers/@taylorwilsdon/google_workspace_mcp">
+  <img width="380" height="200" src="https://glama.ai/mcp/servers/@taylorwilsdon/google_workspace_mcp/badge" alt="Google Workspace Server MCP server" />
+</a>
+
 </div>
 
 **See it in action:**
@@ -23,7 +27,6 @@
 ## 🌐 Overview
 
 A production-ready MCP server that integrates all major Google Workspace services with AI assistants. Built with FastMCP for optimal performance, featuring advanced authentication handling, service caching, and streamlined development patterns.
-
 
 ## ✨ Features
 
