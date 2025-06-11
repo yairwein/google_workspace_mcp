@@ -1,15 +1,68 @@
-FROM debian:bullseye-slim
-
-ENV DEBIAN_FRONTEND=noninteractive \
-    GLAMA_VERSION="1.0.0"
-
-RUN (apt-get update) && (apt-get install -y --no-install-recommends build-essential curl wget software-properties-common libssl-dev zlib1g-dev git) && (rm -rf /var/lib/apt/lists/*) && (curl -fsSL https://deb.nodesource.com/setup_22.x | bash -) && (apt-get install -y nodejs) && (apt-get clean) && (npm install -g mcp-proxy@^4) && (npm install -g pnpm@9.15.5) && (npm install -g bun@1.1.42) && (node --version) && (curl -LsSf https://astral.sh/uv/install.sh | UV_INSTALL_DIR="/usr/local/bin" sh) && (uv python install 3.12 --default --preview) && (ln -s $(uv python find) /usr/local/bin/python) && (python --version) && (apt-get clean) && (rm -rf /var/lib/apt/lists/*) && (rm -rf /tmp/*) && (rm -rf /var/tmp/*) && (uv python install 3.12 --default --preview && python --version)
+FROM python:3.11-slim
 
 WORKDIR /app
 
-RUN git clone https://github.com/taylorwilsdon/google_workspace_mcp . && git checkout 43d8f5bcc3b2ed1c3763e5cf22f27f32a3833b9e
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN (uv sync)
+# Install uv for faster dependency management
+RUN pip install --no-cache-dir uv
 
-CMD ["mcp-proxy","uv","run","google-workspace-mcp"]
+# Copy dependency files
+COPY pyproject.toml uv.lock ./
 
+# Install Python dependencies from pyproject.toml
+RUN uv pip install --system --no-cache \
+    fastapi>=0.115.12 \
+    fastmcp>=2.3.3 \
+    google-api-python-client>=2.168.0 \
+    google-auth-httplib2>=0.2.0 \
+    google-auth-oauthlib>=1.2.2 \
+    httpx>=0.28.1 \
+    "mcp[cli]>=1.6.0" \
+    sse-starlette>=2.3.3 \
+    uvicorn>=0.34.2
+
+# Copy application code
+COPY . .
+
+# Create placeholder client_secrets.json for lazy loading capability
+RUN echo '{"installed":{"client_id":"placeholder","client_secret":"placeholder","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","redirect_uris":["http://localhost:8000/oauth2callback"]}}' > /app/client_secrets.json
+
+# Debug: Check PORT environment variable first
+RUN echo "=== Debug: Environment Variables ===" && \
+    echo "PORT=${PORT:-8000}" && \
+    echo "WORKSPACE_MCP_PORT=${WORKSPACE_MCP_PORT:-8000}" && \
+    echo "WORKSPACE_MCP_BASE_URI=${WORKSPACE_MCP_BASE_URI:-http://localhost}"
+
+# Debug: List files to verify structure
+RUN echo "=== Debug: Listing app directory contents ===" && \
+    ls -la /app && \
+    echo "=== Debug: Checking if main.py exists ===" && \
+    ls -la /app/main.py && \
+    echo "=== Debug: Checking Python path and imports ===" && \
+    python -c "import sys; print('Python path:', sys.path)" && \
+    python -c "import core.server; print('Server import successful')" && \
+    echo "=== Debug: Testing health endpoint ===" && \
+    python -c "from core.server import health_check; print('Health check function exists')"
+
+# Create non-root user for security
+RUN useradd --create-home --shell /bin/bash app \
+    && chown -R app:app /app
+USER app
+
+# Expose port (use default of 8000 if PORT not set)
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Debug startup
+RUN echo "=== Debug: Final startup test ===" && \
+    python -c "print('Testing main.py import...'); import main; print('Main.py import successful')"
+
+# Command to run the application
+CMD ["python", "main.py", "--transport", "streamable-http"]
