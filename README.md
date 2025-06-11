@@ -1,9 +1,6 @@
 <div align="center">
 
 # Google Workspace MCP Server <img src="https://github.com/user-attachments/assets/b89524e4-6e6e-49e6-ba77-00d6df0c6e5c" width="80" align="right" />
-<a href="https://glama.ai/mcp/servers/@taylorwilsdon/google_workspace_mcp">
-  <img width="190" height="100" src="https://glama.ai/mcp/servers/@taylorwilsdon/google_workspace_mcp/badge" alt="Google Workspace Server MCP server" align="left"/>
-</a>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
@@ -12,9 +9,20 @@
 
 **The world's most feature-complete Google Workspace MCP server**
 
-*Connect MCP Clients, AI assistants and developer tools to Google Calendar, Drive, Gmail, Docs, Sheets, Forms, and Chat through the Model Context Protocol*
+*Connect MCP Clients, AI assistants and developer tools to Google Calendar, Drive, Gmail, Docs, Sheets, Forms, and Chat*
 
 </div>
+
+<div align="center">
+<a href="https://glama.ai/mcp/servers/@taylorwilsdon/google_workspace_mcp">
+  <img width="195" src="https://glama.ai/mcp/servers/@taylorwilsdon/google_workspace_mcp/badge" alt="Google Workspace Server MCP server" align="center"/>
+</a>
+<a href="https://www.pulsemcp.com/servers/taylorwilsdon-google-workspace">
+<img width="456" src="https://github.com/user-attachments/assets/0794ef1a-dc1c-447d-9661-9c704d7acc9d" align="center"/>
+</a>
+</div>
+
+---
 
 
 **See it in action:**
@@ -23,6 +31,7 @@
 </div>
 
 ---
+
 
 ## 🌐 Overview
 
