@@ -1,6 +1,9 @@
 <div align="center">
 
 # Google Workspace MCP Server <img src="https://github.com/user-attachments/assets/b89524e4-6e6e-49e6-ba77-00d6df0c6e5c" width="80" align="right" />
+<a href="https://glama.ai/mcp/servers/@taylorwilsdon/google_workspace_mcp">
+  <img width="190" height="100" src="https://glama.ai/mcp/servers/@taylorwilsdon/google_workspace_mcp/badge" alt="Google Workspace Server MCP server" align="left"/>
+</a>
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
@@ -13,6 +16,7 @@
 
 </div>
 
+
 **See it in action:**
 <div align="center">
   <video width="832" src="https://github.com/user-attachments/assets/a342ebb4-1319-4060-a974-39d202329710"></video>
@@ -23,7 +27,6 @@
 ## 🌐 Overview
 
 A production-ready MCP server that integrates all major Google Workspace services with AI assistants. Built with FastMCP for optimal performance, featuring advanced authentication handling, service caching, and streamlined development patterns.
-
 
 ## ✨ Features
 
