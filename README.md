@@ -9,7 +9,7 @@
 
 **The world's most feature-complete Google Workspace MCP server**
 
-*Connect MCP Clients, AI assistants and developer tools to Google Calendar, Drive, Gmail, Docs, Sheets, Forms, and Chat*
+*Connect MCP Clients, AI assistants and developer tools to Google Calendar, Drive, Gmail, Docs, Sheets, Slides, Forms, and Chat*
 
 </div>
 
@@ -45,6 +45,7 @@ A production-ready MCP server that integrates all major Google Workspace service
 - **📧 Gmail**: Complete email management with search, send, and draft capabilities
 - **📄 Google Docs**: Document operations including content extraction and creation
 - **📊 Google Sheets**: Comprehensive spreadsheet management with flexible cell operations
+- **🖼️ Google Slides**: Presentation management with slide creation, updates, and content manipulation
 - **📝 Google Forms**: Form creation, retrieval, publish settings, and response management
 - **💬 Google Chat**: Space management and messaging capabilities
 - **🔄 Multiple Transports**: HTTP with SSE fallback, OpenAPI compatibility via `mcpo`
@@ -73,7 +74,7 @@ uv run main.py
 
 1. **Google Cloud Setup**:
    - Create OAuth 2.0 credentials (web application) in [Google Cloud Console](https://console.cloud.google.com/)
-   - Enable APIs: Calendar, Drive, Gmail, Docs, Sheets, Forms, Chat
+   - Enable APIs: Calendar, Drive, Gmail, Docs, Sheets, Slides, Forms, Chat
    - Download credentials as `client_secret.json` in project root
    - Add redirect URI: `http://localhost:8000/oauth2callback`
 

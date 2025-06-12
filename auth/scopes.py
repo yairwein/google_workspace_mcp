@@ -48,6 +48,10 @@ FORMS_BODY_SCOPE = 'https://www.googleapis.com/auth/forms.body'
 FORMS_BODY_READONLY_SCOPE = 'https://www.googleapis.com/auth/forms.body.readonly'
 FORMS_RESPONSES_READONLY_SCOPE = 'https://www.googleapis.com/auth/forms.responses.readonly'
 
+# Google Slides API scopes
+SLIDES_SCOPE = 'https://www.googleapis.com/auth/presentations'
+SLIDES_READONLY_SCOPE = 'https://www.googleapis.com/auth/presentations.readonly'
+
 # Base OAuth scopes required for user identification
 BASE_SCOPES = [
     USERINFO_EMAIL_SCOPE,
@@ -95,5 +99,10 @@ FORMS_SCOPES = [
     FORMS_RESPONSES_READONLY_SCOPE
 ]
 
+SLIDES_SCOPES = [
+    SLIDES_SCOPE,
+    SLIDES_READONLY_SCOPE
+]
+
 # Combined scopes for all supported Google Workspace operations
-SCOPES = list(set(BASE_SCOPES + CALENDAR_SCOPES + DRIVE_SCOPES + GMAIL_SCOPES + DOCS_SCOPES + CHAT_SCOPES + SHEETS_SCOPES + FORMS_SCOPES))
+SCOPES = list(set(BASE_SCOPES + CALENDAR_SCOPES + DRIVE_SCOPES + GMAIL_SCOPES + DOCS_SCOPES + CHAT_SCOPES + SHEETS_SCOPES + FORMS_SCOPES + SLIDES_SCOPES))
