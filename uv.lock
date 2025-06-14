@@ -234,7 +234,7 @@ wheels = [
 ]
 
 [[package]]
-name = "google-workspace-mcp"
+name = "workspace-mcp"
 version = "0.1.1"
 source = { editable = "." }
 dependencies = [
