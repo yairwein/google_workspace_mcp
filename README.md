@@ -4,6 +4,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
+[![PyPI](https://img.shields.io/pypi/v/workspace-mcp.svg)](https://pypi.org/project/workspace-mcp/)
 [![UV](https://img.shields.io/badge/Package%20Installer-UV-blueviolet)](https://github.com/astral-sh/uv)
 [![Website](https://img.shields.io/badge/Website-workspacemcp.com-green.svg)](https://workspacemcp.com)
 
@@ -56,19 +57,38 @@ A production-ready MCP server that integrates all major Google Workspace service
 
 ## 🚀 Quick Start
 
-### Prerequisites
+### Simplest Start (uvx - Recommended)
 
-- **Python 3.11+**
-- **[uv](https://github.com/astral-sh/uv)** (recommended) or pip
-- **Google Cloud Project** with OAuth 2.0 credentials
+Run instantly without installation:
 
-### Installation
+```bash
+# Start the server with all Google Workspace tools
+uvx workspace-mcp
+
+# Start with specific tools only
+uvx workspace-mcp --tools gmail drive calendar
+
+# Start in HTTP mode for debugging
+uvx workspace-mcp --transport streamable-http
+```
+
+*Requires Python 3.11+ and [uvx](https://github.com/astral-sh/uv). The package is available on [PyPI](https://pypi.org/project/workspace-mcp).*
+
+### Development Installation
+
+For development or customization:
 
 ```bash
 git clone https://github.com/taylorwilsdon/google_workspace_mcp.git
 cd google_workspace_mcp
 uv run main.py
 ```
+
+### Prerequisites
+
+- **Python 3.11+**
+- **[uvx](https://github.com/astral-sh/uv)** (for instant installation) or [uv](https://github.com/astral-sh/uv) (for development)
+- **Google Cloud Project** with OAuth 2.0 credentials
 
 ### Configuration
 
@@ -129,6 +149,18 @@ python install_claude.py
    - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
 3. Add the server configuration:
 
+```json
+{
+  "mcpServers": {
+    "google_workspace": {
+      "command": "uvx",
+      "args": ["workspace-mcp"]
+    }
+  }
+}
+```
+
+**Alternative (Development Installation)**:
 ```json
 {
   "mcpServers": {

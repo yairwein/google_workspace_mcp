@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Dict, Any, Optional
+from typing import Optional
 from importlib import metadata
 
 from fastapi import Header
@@ -97,7 +97,6 @@ async def health_check(request: Request):
     })
 
 
-# Register OAuth callback as a custom route
 @server.custom_route("/oauth2callback", methods=["GET"])
 async def oauth2_callback(request: Request) -> HTMLResponse:
     """
@@ -105,8 +104,6 @@ async def oauth2_callback(request: Request) -> HTMLResponse:
     This endpoint exchanges the authorization code for credentials and saves them.
     It then displays a success or error page to the user.
     """
-    # State is used by google-auth-library for CSRF protection and should be present.
-    # We don't need to track it ourselves in this simplified flow.
     state = request.query_params.get("state")
     code = request.query_params.get("code")
     error = request.query_params.get("error")
@@ -122,7 +119,6 @@ async def oauth2_callback(request: Request) -> HTMLResponse:
         return create_error_response(error_message)
 
     try:
-        # Use the centralized CONFIG_CLIENT_SECRETS_PATH
         client_secrets_path = CONFIG_CLIENT_SECRETS_PATH
         if not os.path.exists(client_secrets_path):
             logger.error(f"OAuth client secrets file not found at {client_secrets_path}")
@@ -207,13 +203,10 @@ async def start_google_auth(
     if not ensure_oauth_callback_available(_current_transport_mode, WORKSPACE_MCP_PORT, WORKSPACE_MCP_BASE_URI):
         raise Exception("Failed to start OAuth callback server. Please try again.")
 
-    # Use the centralized start_auth_flow from auth.google_auth
     auth_result = await start_auth_flow(
         mcp_session_id=mcp_session_id,
         user_google_email=user_google_email,
         service_name=service_name,
         redirect_uri=redirect_uri
     )
-
-    # auth_result is now a plain string, not a CallToolResult
     return auth_result

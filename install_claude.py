@@ -44,8 +44,8 @@ def main():
         
         # Add Google Workspace MCP server
         config["mcpServers"]["google_workspace"] = {
-            "command": "npx",
-            "args": ["mcp-remote", "http://localhost:8000/mcp"]
+            "command": "uvx",
+            "args": ["workspace-mcp"]
         }
         
         # Write updated config
@@ -55,9 +55,10 @@ def main():
         print(f"✅ Successfully added Google Workspace MCP to Claude Desktop config!")
         print(f"📁 Config file: {config_path}")
         print("\n🚀 Next steps:")
-        print("1. Start the MCP server: uv run main.py")
-        print("2. Restart Claude Desktop")
-        print("3. The Google Workspace tools will be available in your chats!")
+        print("1. Restart Claude Desktop")
+        print("2. The Google Workspace tools will be available in your chats!")
+        print("\n💡 The server will start automatically when Claude Desktop needs it.")
+        print("   No need to manually start the server - uvx handles everything!")
         
     except Exception as e:
         print(f"❌ Error: {e}")
