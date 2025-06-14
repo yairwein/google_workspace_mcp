@@ -106,8 +106,8 @@ uv run main.py --tools sheets docs
 uv run main.py --single-user --tools gmail  # Can combine with other flags
 
 # Docker
-docker build -t google-workspace-mcp .
-docker run -p 8000:8000 -v $(pwd):/app google-workspace-mcp --transport streamable-http
+docker build -t workspace-mcp .
+docker run -p 8000:8000 -v $(pwd):/app workspace-mcp --transport streamable-http
 ```
 
 **Available Tools for `--tools` flag**: `gmail`, `drive`, `calendar`, `docs`, `sheets`, `forms`, `chat`
