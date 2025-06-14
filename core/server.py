@@ -86,12 +86,12 @@ async def health_check(request: Request):
     """Health check endpoint for container orchestration."""
     from fastapi.responses import JSONResponse
     try:
-        version = metadata.version("google-workspace-mcp")
+        version = metadata.version("workspace-mcp")
     except metadata.PackageNotFoundError:
         version = "dev"
     return JSONResponse({
         "status": "healthy",
-        "service": "google-workspace-mcp",
+        "service": "workspace-mcp",
         "version": version,
         "transport": _current_transport_mode
     })

@@ -57,7 +57,7 @@ def main():
     print("=" * 35)
     print("📋 Server Information:")
     try:
-        version = metadata.version("google-workspace-mcp")
+        version = metadata.version("workspace-mcp")
     except metadata.PackageNotFoundError:
         version = "dev"
     print(f"   📦 Version: {version}")
