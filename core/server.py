@@ -1,6 +1,7 @@
 import logging
 import os
 from typing import Dict, Any, Optional
+from importlib import metadata
 
 from fastapi import Header
 from fastapi.responses import HTMLResponse
@@ -84,10 +85,14 @@ def get_oauth_redirect_uri_for_current_mode() -> str:
 async def health_check(request: Request):
     """Health check endpoint for container orchestration."""
     from fastapi.responses import JSONResponse
+    try:
+        version = metadata.version("google-workspace-mcp")
+    except metadata.PackageNotFoundError:
+        version = "dev"
     return JSONResponse({
         "status": "healthy",
-        "service": "google-workspace-mcp", 
-        "version": "0.1.1",
+        "service": "google-workspace-mcp",
+        "version": version,
         "transport": _current_transport_mode
     })
 

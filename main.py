@@ -2,6 +2,7 @@ import argparse
 import logging
 import os
 import sys
+from importlib import metadata
 
 # Local imports
 from core.server import server, set_transport_mode
@@ -55,7 +56,11 @@ def main():
     print("🔧 Google Workspace MCP Server")
     print("=" * 35)
     print("📋 Server Information:")
-    print(f"   📦 Version: 0.1.1")
+    try:
+        version = metadata.version("google-workspace-mcp")
+    except metadata.PackageNotFoundError:
+        version = "dev"
+    print(f"   📦 Version: {version}")
     print(f"   🌐 Transport: {args.transport}")
     if args.transport == 'streamable-http':
         print(f"   🔗 URL: {base_uri}:{port}")
