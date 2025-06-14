@@ -2,8 +2,8 @@
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 [project]
-name = "google-workspace-mcp"
-version = "0.1.1"
+name = "workspace-mcp"
+version = "1.0.0"
 description = "Comprehensive, highly performant Google Workspace Streamable HTTP & SSE MCP Server for Calendar, Gmail, Docs, Sheets, Slides & Drive"
 license = "MIT"
 authors = [{ name = "Taylor Wilsdon", email = "taylor@taylorwilsdon.com" }]
@@ -46,7 +46,7 @@ classifiers = [
 ]
 
 [project.scripts]
-google-workspace-mcp = "main:main"
+workspace-mcp = "main:main"
 
 [tool.setuptools]
 packages = ["auth", "gcalendar", "core", "gdocs", "gdrive", "gmail", "gchat", "gsheets", "gforms", "gslides"]
