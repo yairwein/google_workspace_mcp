@@ -197,7 +197,7 @@ async def get_events(
             end = item["end"].get("dateTime", item["end"].get("date"))
             link = item.get("htmlLink", "No Link")
             event_id = item.get("id", "No ID")
-            # Include the event ID and end date in the output so users can copy it for modify/delete operations
+            # Include the start/end date, and event ID in the output so users can copy it for modify/delete operations
             event_details_list.append(
                 f'- "{summary}" (Starts: {start}, Ends: {end}) ID: {event_id} | Link: {link}'
             )
