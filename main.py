@@ -33,6 +33,14 @@ try:
 except Exception as e:
     sys.stderr.write(f"CRITICAL: Failed to set up file logging to '{log_file_path}': {e}\n")
 
+def safe_print(text):
+    try:
+        print(text)
+    except UnicodeEncodeError:
+        print(text.encode('ascii', errors='replace').decode())
+
+safe_print("🔧 Google Workspace MCP Server")
+
 def main():
     """
     Main entry point for the Google Workspace MCP server.
@@ -53,21 +61,21 @@ def main():
     port = int(os.getenv("PORT", os.getenv("WORKSPACE_MCP_PORT", 8000)))
     base_uri = os.getenv("WORKSPACE_MCP_BASE_URI", "http://localhost")
 
-    print("🔧 Google Workspace MCP Server")
-    print("=" * 35)
-    print("📋 Server Information:")
+    safe_print("🔧 Google Workspace MCP Server")
+    safe_print("=" * 35)
+    safe_print("📋 Server Information:")
     try:
         version = metadata.version("workspace-mcp")
     except metadata.PackageNotFoundError:
         version = "dev"
-    print(f"   📦 Version: {version}")
-    print(f"   🌐 Transport: {args.transport}")
+    safe_print(f"   📦 Version: {version}")
+    safe_print(f"   🌐 Transport: {args.transport}")
     if args.transport == 'streamable-http':
-        print(f"   🔗 URL: {base_uri}:{port}")
-        print(f"   🔐 OAuth Callback: {base_uri}:{port}/oauth2callback")
-    print(f"   👤 Mode: {'Single-user' if args.single_user else 'Multi-user'}")
-    print(f"   🐍 Python: {sys.version.split()[0]}")
-    print()
+        safe_print(f"   🔗 URL: {base_uri}:{port}")
+        safe_print(f"   🔐 OAuth Callback: {base_uri}:{port}/oauth2callback")
+    safe_print(f"   👤 Mode: {'Single-user' if args.single_user else 'Multi-user'}")
+    safe_print(f"   🐍 Python: {sys.version.split()[0]}")
+    safe_print()
 
     # Import tool modules to register them with the MCP server via decorators
     tool_imports = {
@@ -94,32 +102,32 @@ def main():
 
     # Import specified tools or all tools if none specified
     tools_to_import = args.tools if args.tools is not None else tool_imports.keys()
-    print(f"🛠️  Loading {len(tools_to_import)} tool module{'s' if len(tools_to_import) != 1 else ''}:")
+    safe_print(f"🛠️  Loading {len(tools_to_import)} tool module{'s' if len(tools_to_import) != 1 else ''}:")
     for tool in tools_to_import:
         tool_imports[tool]()
-        print(f"   {tool_icons[tool]} {tool.title()} - Google {tool.title()} API integration")
+        safe_print(f"   {tool_icons[tool]} {tool.title()} - Google {tool.title()} API integration")
     print()
 
-    print(f"📊 Configuration Summary:")
-    print(f"   🔧 Tools Enabled: {len(tools_to_import)}/{len(tool_imports)}")
-    print(f"   🔑 Auth Method: OAuth 2.0 with PKCE")
-    print(f"   📝 Log Level: {logging.getLogger().getEffectiveLevel()}")
+    safe_print(f"📊 Configuration Summary:")
+    safe_print(f"   🔧 Tools Enabled: {len(tools_to_import)}/{len(tool_imports)}")
+    safe_print(f"   🔑 Auth Method: OAuth 2.0 with PKCE")
+    safe_print(f"   📝 Log Level: {logging.getLogger().getEffectiveLevel()}")
     print()
 
     # Set global single-user mode flag
     if args.single_user:
         os.environ['MCP_SINGLE_USER_MODE'] = '1'
-        print("🔐 Single-user mode enabled")
+        safe_print("🔐 Single-user mode enabled")
         print()
 
     # Check credentials directory permissions before starting
     try:
-        print("🔍 Checking credentials directory permissions...")
+        safe_print("🔍 Checking credentials directory permissions...")
         check_credentials_directory_permissions()
-        print("✅ Credentials directory permissions verified")
+        safe_print("✅ Credentials directory permissions verified")
         print()
     except (PermissionError, OSError) as e:
-        print(f"❌ Credentials directory permission check failed: {e}")
+        safe_print(f"❌ Credentials directory permission check failed: {e}")
         print("   Please ensure the service has write permissions to create/access the .credentials directory")
         logger.error(f"Failed credentials directory permission check: {e}")
         sys.exit(1)
@@ -129,15 +137,15 @@ def main():
         set_transport_mode(args.transport)
 
         if args.transport == 'streamable-http':
-            print(f"🚀 Starting server on {base_uri}:{port}")
+            safe_print(f"🚀 Starting server on {base_uri}:{port}")
         else:
-            print("🚀 Starting server in stdio mode")
+            safe_print("🚀 Starting server in stdio mode")
             # Start minimal OAuth callback server for stdio mode
             from auth.oauth_callback_server import ensure_oauth_callback_available
             if ensure_oauth_callback_available('stdio', port, base_uri):
                 print(f"   OAuth callback server started on {base_uri}:{port}/oauth2callback")
             else:
-                print("   ⚠️  Warning: Failed to start OAuth callback server")
+                safe_print("   ⚠️  Warning: Failed to start OAuth callback server")
 
         print("   Ready for MCP connections!")
         print()
@@ -148,13 +156,13 @@ def main():
         else:
             server.run()
     except KeyboardInterrupt:
-        print("\n👋 Server shutdown requested")
+        safe_print("\n👋 Server shutdown requested")
         # Clean up OAuth callback server if running
         from auth.oauth_callback_server import cleanup_oauth_callback_server
         cleanup_oauth_callback_server()
         sys.exit(0)
     except Exception as e:
-        print(f"\n❌ Server error: {e}")
+        safe_print(f"\n❌ Server error: {e}")
         logger.error(f"Unexpected error running server: {e}", exc_info=True)
         # Clean up OAuth callback server if running
         from auth.oauth_callback_server import cleanup_oauth_callback_server
