@@ -39,8 +39,6 @@ def safe_print(text):
     except UnicodeEncodeError:
         print(text.encode('ascii', errors='replace').decode())
 
-safe_print("🔧 Google Workspace MCP Server")
-
 def main():
     """
     Main entry point for the Google Workspace MCP server.
