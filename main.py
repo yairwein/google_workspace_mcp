@@ -75,7 +75,7 @@ def main():
         safe_print(f"   🔐 OAuth Callback: {base_uri}:{port}/oauth2callback")
     safe_print(f"   👤 Mode: {'Single-user' if args.single_user else 'Multi-user'}")
     safe_print(f"   🐍 Python: {sys.version.split()[0]}")
-    safe_print()
+    print()
 
     # Import tool modules to register them with the MCP server via decorators
     tool_imports = {
