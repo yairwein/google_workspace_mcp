@@ -8,9 +8,9 @@
 [![UV](https://img.shields.io/badge/Package%20Installer-UV-blueviolet)](https://github.com/astral-sh/uv)
 [![Website](https://img.shields.io/badge/Website-workspacemcp.com-green.svg)](https://workspacemcp.com)
 
-**The world's most feature-complete Google Workspace MCP server**
+**This is the single most feature-complete Google Workspace MCP server**
 
-*Connect MCP Clients, AI assistants and developer tools to Google Calendar, Drive, Gmail, Docs, Sheets, Slides, Forms, and Chat*
+*Full natural language control over Google Calendar, Drive, Gmail, Docs, Sheets, Slides, Forms, and Chat through all MCP clients, AI assistants and developer tools*
 
 </div>
 
