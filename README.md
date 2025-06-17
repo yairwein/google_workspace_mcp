@@ -1,5 +1,3 @@
-[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/taylorwilsdon-google-workspace-mcp-badge.png)](https://mseep.ai/app/taylorwilsdon-google-workspace-mcp)
-
 <div align="center">
 
 # Google Workspace MCP Server <img src="https://github.com/user-attachments/assets/b89524e4-6e6e-49e6-ba77-00d6df0c6e5c" width="80" align="right" />
@@ -9,6 +7,7 @@
 [![PyPI](https://img.shields.io/pypi/v/workspace-mcp.svg)](https://pypi.org/project/workspace-mcp/)
 [![UV](https://img.shields.io/badge/Package%20Installer-UV-blueviolet)](https://github.com/astral-sh/uv)
 [![Website](https://img.shields.io/badge/Website-workspacemcp.com-green.svg)](https://workspacemcp.com)
+[![Verified on MseeP](https://mseep.ai/badge.svg)](https://mseep.ai/app/eebbc4a6-0f8c-41b2-ace8-038e5516dba0)
 
 **This is the single most feature-complete Google Workspace MCP server**
 
