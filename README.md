@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/taylorwilsdon-google-workspace-mcp-badge.png)](https://mseep.ai/app/taylorwilsdon-google-workspace-mcp)
+
 <div align="center">
 
 # Google Workspace MCP Server <img src="https://github.com/user-attachments/assets/b89524e4-6e6e-49e6-ba77-00d6df0c6e5c" width="80" align="right" />
