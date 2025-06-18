@@ -13,12 +13,14 @@ from googleapiclient.errors import HttpError
 
 from auth.service_decorator import require_google_service
 from core.server import server
+from core.utils import handle_http_errors
 
 logger = logging.getLogger(__name__)
 
 
 @server.tool()
 @require_google_service("slides", "slides")
+@handle_http_errors("create_presentation")
 async def create_presentation(
     service,
     user_google_email: str,
@@ -36,39 +38,30 @@ async def create_presentation(
     """
     logger.info(f"[create_presentation] Invoked. Email: '{user_google_email}', Title: '{title}'")
 
-    try:
-        body = {
-            'title': title
-        }
-        
-        result = await asyncio.to_thread(
-            service.presentations().create(body=body).execute
-        )
-        
-        presentation_id = result.get('presentationId')
-        presentation_url = f"https://docs.google.com/presentation/d/{presentation_id}/edit"
-        
-        confirmation_message = f"""Presentation Created Successfully for {user_google_email}:
+    body = {
+        'title': title
+    }
+    
+    result = await asyncio.to_thread(
+        service.presentations().create(body=body).execute
+    )
+    
+    presentation_id = result.get('presentationId')
+    presentation_url = f"https://docs.google.com/presentation/d/{presentation_id}/edit"
+    
+    confirmation_message = f"""Presentation Created Successfully for {user_google_email}:
 - Title: {title}
 - Presentation ID: {presentation_id}
 - URL: {presentation_url}
 - Slides: {len(result.get('slides', []))} slide(s) created"""
-        
-        logger.info(f"Presentation created successfully for {user_google_email}")
-        return confirmation_message
-        
-    except HttpError as error:
-        message = f"API error: {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with the user's email ({user_google_email}) and service_name='Google Slides'."
-        logger.error(message, exc_info=True)
-        raise Exception(message)
-    except Exception as e:
-        message = f"Unexpected error: {e}."
-        logger.exception(message)
-        raise Exception(message)
+    
+    logger.info(f"Presentation created successfully for {user_google_email}")
+    return confirmation_message
 
 
 @server.tool()
 @require_google_service("slides", "slides_read")
+@handle_http_errors("get_presentation")
 async def get_presentation(
     service,
     user_google_email: str,
@@ -86,22 +79,21 @@ async def get_presentation(
     """
     logger.info(f"[get_presentation] Invoked. Email: '{user_google_email}', ID: '{presentation_id}'")
 
-    try:
-        result = await asyncio.to_thread(
-            service.presentations().get(presentationId=presentation_id).execute
-        )
-        
-        title = result.get('title', 'Untitled')
-        slides = result.get('slides', [])
-        page_size = result.get('pageSize', {})
-        
-        slides_info = []
-        for i, slide in enumerate(slides, 1):
-            slide_id = slide.get('objectId', 'Unknown')
-            page_elements = slide.get('pageElements', [])
-            slides_info.append(f"  Slide {i}: ID {slide_id}, {len(page_elements)} element(s)")
-        
-        confirmation_message = f"""Presentation Details for {user_google_email}:
+    result = await asyncio.to_thread(
+        service.presentations().get(presentationId=presentation_id).execute
+    )
+    
+    title = result.get('title', 'Untitled')
+    slides = result.get('slides', [])
+    page_size = result.get('pageSize', {})
+    
+    slides_info = []
+    for i, slide in enumerate(slides, 1):
+        slide_id = slide.get('objectId', 'Unknown')
+        page_elements = slide.get('pageElements', [])
+        slides_info.append(f"  Slide {i}: ID {slide_id}, {len(page_elements)} element(s)")
+    
+    confirmation_message = f"""Presentation Details for {user_google_email}:
 - Title: {title}
 - Presentation ID: {presentation_id}
 - URL: https://docs.google.com/presentation/d/{presentation_id}/edit
@@ -110,22 +102,14 @@ async def get_presentation(
 
 Slides Breakdown:
 {chr(10).join(slides_info) if slides_info else '  No slides found'}"""
-        
-        logger.info(f"Presentation retrieved successfully for {user_google_email}")
-        return confirmation_message
-        
-    except HttpError as error:
-        message = f"API error: {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with the user's email ({user_google_email}) and service_name='Google Slides'."
-        logger.error(message, exc_info=True)
-        raise Exception(message)
-    except Exception as e:
-        message = f"Unexpected error: {e}."
-        logger.exception(message)
-        raise Exception(message)
+    
+    logger.info(f"Presentation retrieved successfully for {user_google_email}")
+    return confirmation_message
 
 
 @server.tool()
 @require_google_service("slides", "slides")
+@handle_http_errors("batch_update_presentation")
 async def batch_update_presentation(
     service,
     user_google_email: str,
@@ -145,53 +129,44 @@ async def batch_update_presentation(
     """
     logger.info(f"[batch_update_presentation] Invoked. Email: '{user_google_email}', ID: '{presentation_id}', Requests: {len(requests)}")
 
-    try:
-        body = {
-            'requests': requests
-        }
-        
-        result = await asyncio.to_thread(
-            service.presentations().batchUpdate(
-                presentationId=presentation_id,
-                body=body
-            ).execute
-        )
-        
-        replies = result.get('replies', [])
-        
-        confirmation_message = f"""Batch Update Completed for {user_google_email}:
+    body = {
+        'requests': requests
+    }
+    
+    result = await asyncio.to_thread(
+        service.presentations().batchUpdate(
+            presentationId=presentation_id,
+            body=body
+        ).execute
+    )
+    
+    replies = result.get('replies', [])
+    
+    confirmation_message = f"""Batch Update Completed for {user_google_email}:
 - Presentation ID: {presentation_id}
 - URL: https://docs.google.com/presentation/d/{presentation_id}/edit
 - Requests Applied: {len(requests)}
 - Replies Received: {len(replies)}"""
-        
-        if replies:
-            confirmation_message += "\n\nUpdate Results:"
-            for i, reply in enumerate(replies, 1):
-                if 'createSlide' in reply:
-                    slide_id = reply['createSlide'].get('objectId', 'Unknown')
-                    confirmation_message += f"\n  Request {i}: Created slide with ID {slide_id}"
-                elif 'createShape' in reply:
-                    shape_id = reply['createShape'].get('objectId', 'Unknown')
-                    confirmation_message += f"\n  Request {i}: Created shape with ID {shape_id}"
-                else:
-                    confirmation_message += f"\n  Request {i}: Operation completed"
-        
-        logger.info(f"Batch update completed successfully for {user_google_email}")
-        return confirmation_message
-        
-    except HttpError as error:
-        message = f"API error: {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with the user's email ({user_google_email}) and service_name='Google Slides'."
-        logger.error(message, exc_info=True)
-        raise Exception(message)
-    except Exception as e:
-        message = f"Unexpected error: {e}."
-        logger.exception(message)
-        raise Exception(message)
+    
+    if replies:
+        confirmation_message += "\n\nUpdate Results:"
+        for i, reply in enumerate(replies, 1):
+            if 'createSlide' in reply:
+                slide_id = reply['createSlide'].get('objectId', 'Unknown')
+                confirmation_message += f"\n  Request {i}: Created slide with ID {slide_id}"
+            elif 'createShape' in reply:
+                shape_id = reply['createShape'].get('objectId', 'Unknown')
+                confirmation_message += f"\n  Request {i}: Created shape with ID {shape_id}"
+            else:
+                confirmation_message += f"\n  Request {i}: Operation completed"
+    
+    logger.info(f"Batch update completed successfully for {user_google_email}")
+    return confirmation_message
 
 
 @server.tool()
 @require_google_service("slides", "slides_read")
+@handle_http_errors("get_page")
 async def get_page(
     service,
     user_google_email: str,
@@ -211,35 +186,34 @@ async def get_page(
     """
     logger.info(f"[get_page] Invoked. Email: '{user_google_email}', Presentation: '{presentation_id}', Page: '{page_object_id}'")
 
-    try:
-        result = await asyncio.to_thread(
-            service.presentations().pages().get(
-                presentationId=presentation_id,
-                pageObjectId=page_object_id
-            ).execute
-        )
-        
-        page_type = result.get('pageType', 'Unknown')
-        page_elements = result.get('pageElements', [])
-        
-        elements_info = []
-        for element in page_elements:
-            element_id = element.get('objectId', 'Unknown')
-            if 'shape' in element:
-                shape_type = element['shape'].get('shapeType', 'Unknown')
-                elements_info.append(f"  Shape: ID {element_id}, Type: {shape_type}")
-            elif 'table' in element:
-                table = element['table']
-                rows = table.get('rows', 0)
-                cols = table.get('columns', 0)
-                elements_info.append(f"  Table: ID {element_id}, Size: {rows}x{cols}")
-            elif 'line' in element:
-                line_type = element['line'].get('lineType', 'Unknown')
-                elements_info.append(f"  Line: ID {element_id}, Type: {line_type}")
-            else:
-                elements_info.append(f"  Element: ID {element_id}, Type: Unknown")
-        
-        confirmation_message = f"""Page Details for {user_google_email}:
+    result = await asyncio.to_thread(
+        service.presentations().pages().get(
+            presentationId=presentation_id,
+            pageObjectId=page_object_id
+        ).execute
+    )
+    
+    page_type = result.get('pageType', 'Unknown')
+    page_elements = result.get('pageElements', [])
+    
+    elements_info = []
+    for element in page_elements:
+        element_id = element.get('objectId', 'Unknown')
+        if 'shape' in element:
+            shape_type = element['shape'].get('shapeType', 'Unknown')
+            elements_info.append(f"  Shape: ID {element_id}, Type: {shape_type}")
+        elif 'table' in element:
+            table = element['table']
+            rows = table.get('rows', 0)
+            cols = table.get('columns', 0)
+            elements_info.append(f"  Table: ID {element_id}, Size: {rows}x{cols}")
+        elif 'line' in element:
+            line_type = element['line'].get('lineType', 'Unknown')
+            elements_info.append(f"  Line: ID {element_id}, Type: {line_type}")
+        else:
+            elements_info.append(f"  Element: ID {element_id}, Type: Unknown")
+    
+    confirmation_message = f"""Page Details for {user_google_email}:
 - Presentation ID: {presentation_id}
 - Page ID: {page_object_id}
 - Page Type: {page_type}
@@ -247,22 +221,14 @@ async def get_page(
 
 Page Elements:
 {chr(10).join(elements_info) if elements_info else '  No elements found'}"""
-        
-        logger.info(f"Page retrieved successfully for {user_google_email}")
-        return confirmation_message
-        
-    except HttpError as error:
-        message = f"API error: {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with the user's email ({user_google_email}) and service_name='Google Slides'."
-        logger.error(message, exc_info=True)
-        raise Exception(message)
-    except Exception as e:
-        message = f"Unexpected error: {e}."
-        logger.exception(message)
-        raise Exception(message)
+    
+    logger.info(f"Page retrieved successfully for {user_google_email}")
+    return confirmation_message
 
 
 @server.tool()
 @require_google_service("slides", "slides_read")
+@handle_http_errors("get_page_thumbnail")
 async def get_page_thumbnail(
     service,
     user_google_email: str,
@@ -284,33 +250,23 @@ async def get_page_thumbnail(
     """
     logger.info(f"[get_page_thumbnail] Invoked. Email: '{user_google_email}', Presentation: '{presentation_id}', Page: '{page_object_id}', Size: '{thumbnail_size}'")
 
-    try:
-        result = await asyncio.to_thread(
-            service.presentations().pages().getThumbnail(
-                presentationId=presentation_id,
-                pageObjectId=page_object_id,
-                thumbnailPropertiesImageSize=thumbnail_size
-            ).execute
-        )
-        
-        thumbnail_url = result.get('contentUrl', '')
-        
-        confirmation_message = f"""Thumbnail Generated for {user_google_email}:
+    result = await asyncio.to_thread(
+        service.presentations().pages().getThumbnail(
+            presentationId=presentation_id,
+            pageObjectId=page_object_id,
+            thumbnailPropertiesImageSize=thumbnail_size
+        ).execute
+    )
+    
+    thumbnail_url = result.get('contentUrl', '')
+    
+    confirmation_message = f"""Thumbnail Generated for {user_google_email}:
 - Presentation ID: {presentation_id}
 - Page ID: {page_object_id}
 - Thumbnail Size: {thumbnail_size}
 - Thumbnail URL: {thumbnail_url}
 
 You can view or download the thumbnail using the provided URL."""
-        
-        logger.info(f"Thumbnail generated successfully for {user_google_email}")
-        return confirmation_message
-        
-    except HttpError as error:
-        message = f"API error: {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with the user's email ({user_google_email}) and service_name='Google Slides'."
-        logger.error(message, exc_info=True)
-        raise Exception(message)
-    except Exception as e:
-        message = f"Unexpected error: {e}."
-        logger.exception(message)
-        raise Exception(message)
+    
+    logger.info(f"Thumbnail generated successfully for {user_google_email}")
+    return confirmation_message

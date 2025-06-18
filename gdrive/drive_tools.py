@@ -15,7 +15,7 @@ import io
 import httpx
 
 from auth.service_decorator import require_google_service
-from core.utils import extract_office_xml_text
+from core.utils import extract_office_xml_text, handle_http_errors
 from core.server import server
 
 logger = logging.getLogger(__name__)
@@ -77,6 +77,7 @@ def _build_drive_list_params(
 
 @server.tool()
 @require_google_service("drive", "drive_read")
+@handle_http_errors("search_drive_files")
 async def search_drive_files(
     service,
     user_google_email: str,
@@ -104,52 +105,46 @@ async def search_drive_files(
     """
     logger.info(f"[search_drive_files] Invoked. Email: '{user_google_email}', Query: '{query}'")
 
-    try:
-        # Check if the query looks like a structured Drive query or free text
-        # Look for Drive API operators and structured query patterns
-        is_structured_query = any(pattern.search(query) for pattern in DRIVE_QUERY_PATTERNS)
+    # Check if the query looks like a structured Drive query or free text
+    # Look for Drive API operators and structured query patterns
+    is_structured_query = any(pattern.search(query) for pattern in DRIVE_QUERY_PATTERNS)
 
-        if is_structured_query:
-            final_query = query
-            logger.info(f"[search_drive_files] Using structured query as-is: '{final_query}'")
-        else:
-            # For free text queries, wrap in fullText contains
-            escaped_query = query.replace("'", "\\'")
-            final_query = f"fullText contains '{escaped_query}'"
-            logger.info(f"[search_drive_files] Reformatting free text query '{query}' to '{final_query}'")
+    if is_structured_query:
+        final_query = query
+        logger.info(f"[search_drive_files] Using structured query as-is: '{final_query}'")
+    else:
+        # For free text queries, wrap in fullText contains
+        escaped_query = query.replace("'", "\\'")
+        final_query = f"fullText contains '{escaped_query}'"
+        logger.info(f"[search_drive_files] Reformatting free text query '{query}' to '{final_query}'")
 
-        list_params = _build_drive_list_params(
-            query=final_query,
-            page_size=page_size,
-            drive_id=drive_id,
-            include_items_from_all_drives=include_items_from_all_drives,
-            corpora=corpora,
+    list_params = _build_drive_list_params(
+        query=final_query,
+        page_size=page_size,
+        drive_id=drive_id,
+        include_items_from_all_drives=include_items_from_all_drives,
+        corpora=corpora,
+    )
+
+    results = await asyncio.to_thread(
+        service.files().list(**list_params).execute
+    )
+    files = results.get('files', [])
+    if not files:
+        return f"No files found for '{query}'."
+
+    formatted_files_text_parts = [f"Found {len(files)} files for {user_google_email} matching '{query}':"]
+    for item in files:
+        size_str = f", Size: {item.get('size', 'N/A')}" if 'size' in item else ""
+        formatted_files_text_parts.append(
+            f"- Name: \"{item['name']}\" (ID: {item['id']}, Type: {item['mimeType']}{size_str}, Modified: {item.get('modifiedTime', 'N/A')}) Link: {item.get('webViewLink', '#')}"
         )
-
-        results = await asyncio.to_thread(
-            service.files().list(**list_params).execute
-        )
-        files = results.get('files', [])
-        if not files:
-            return f"No files found for '{query}'."
-
-        formatted_files_text_parts = [f"Found {len(files)} files for {user_google_email} matching '{query}':"]
-        for item in files:
-            size_str = f", Size: {item.get('size', 'N/A')}" if 'size' in item else ""
-            formatted_files_text_parts.append(
-                f"- Name: \"{item['name']}\" (ID: {item['id']}, Type: {item['mimeType']}{size_str}, Modified: {item.get('modifiedTime', 'N/A')}) Link: {item.get('webViewLink', '#')}"
-            )
-        text_output = "\n".join(formatted_files_text_parts)
-        return text_output
-    except HttpError as error:
-        logger.error(f"API error searching Drive files: {error}", exc_info=True)
-        raise Exception(f"API error: {error}")
-    except Exception as e:
-        logger.exception(f"Unexpected error searching Drive files: {e}")
-        raise Exception(f"Unexpected error: {e}")
+    text_output = "\n".join(formatted_files_text_parts)
+    return text_output
 
 @server.tool()
 @require_google_service("drive", "drive_read")
+@handle_http_errors("get_drive_file_content")
 async def get_drive_file_content(
     service,
     user_google_email: str,
@@ -172,56 +167,46 @@ async def get_drive_file_content(
     """
     logger.info(f"[get_drive_file_content] Invoked. File ID: '{file_id}'")
 
-    try:
-        file_metadata = await asyncio.to_thread(
-            service.files().get(
-                fileId=file_id, fields="id, name, mimeType, webViewLink", supportsAllDrives=True
-            ).execute
-        )
-        mime_type = file_metadata.get("mimeType", "")
-        file_name = file_metadata.get("name", "Unknown File")
-        export_mime_type = {
-            "application/vnd.google-apps.document": "text/plain",
-            "application/vnd.google-apps.spreadsheet": "text/csv",
-            "application/vnd.google-apps.presentation": "text/plain",
-        }.get(mime_type)
+    file_metadata = await asyncio.to_thread(
+        service.files().get(
+            fileId=file_id, fields="id, name, mimeType, webViewLink", supportsAllDrives=True
+        ).execute
+    )
+    mime_type = file_metadata.get("mimeType", "")
+    file_name = file_metadata.get("name", "Unknown File")
+    export_mime_type = {
+        "application/vnd.google-apps.document": "text/plain",
+        "application/vnd.google-apps.spreadsheet": "text/csv",
+        "application/vnd.google-apps.presentation": "text/plain",
+    }.get(mime_type)
 
-        request_obj = (
-            service.files().export_media(fileId=file_id, mimeType=export_mime_type)
-            if export_mime_type
-            else service.files().get_media(fileId=file_id)
-        )
-        fh = io.BytesIO()
-        downloader = MediaIoBaseDownload(fh, request_obj)
-        loop = asyncio.get_event_loop()
-        done = False
-        while not done:
-            status, done = await loop.run_in_executor(None, downloader.next_chunk)
+    request_obj = (
+        service.files().export_media(fileId=file_id, mimeType=export_mime_type)
+        if export_mime_type
+        else service.files().get_media(fileId=file_id)
+    )
+    fh = io.BytesIO()
+    downloader = MediaIoBaseDownload(fh, request_obj)
+    loop = asyncio.get_event_loop()
+    done = False
+    while not done:
+        status, done = await loop.run_in_executor(None, downloader.next_chunk)
 
-        file_content_bytes = fh.getvalue()
+    file_content_bytes = fh.getvalue()
 
-        # Attempt Office XML extraction only for actual Office XML files
-        office_mime_types = {
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            "application/vnd.openxmlformats-officedocument.presentationml.presentation", 
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        }
-        
-        if mime_type in office_mime_types:
-            office_text = extract_office_xml_text(file_content_bytes, mime_type)
-            if office_text:
-                body_text = office_text
-            else:
-                # Fallback: try UTF-8; otherwise flag binary
-                try:
-                    body_text = file_content_bytes.decode("utf-8")
-                except UnicodeDecodeError:
-                    body_text = (
-                        f"[Binary or unsupported text encoding for mimeType '{mime_type}' - "
-                        f"{len(file_content_bytes)} bytes]"
-                    )
+    # Attempt Office XML extraction only for actual Office XML files
+    office_mime_types = {
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    }
+    
+    if mime_type in office_mime_types:
+        office_text = extract_office_xml_text(file_content_bytes, mime_type)
+        if office_text:
+            body_text = office_text
         else:
-            # For non-Office files (including Google native files), try UTF-8 decode directly
+            # Fallback: try UTF-8; otherwise flag binary
             try:
                 body_text = file_content_bytes.decode("utf-8")
             except UnicodeDecodeError:
@@ -229,26 +214,27 @@ async def get_drive_file_content(
                     f"[Binary or unsupported text encoding for mimeType '{mime_type}' - "
                     f"{len(file_content_bytes)} bytes]"
                 )
+    else:
+        # For non-Office files (including Google native files), try UTF-8 decode directly
+        try:
+            body_text = file_content_bytes.decode("utf-8")
+        except UnicodeDecodeError:
+            body_text = (
+                f"[Binary or unsupported text encoding for mimeType '{mime_type}' - "
+                f"{len(file_content_bytes)} bytes]"
+            )
 
-        # Assemble response
-        header = (
-            f'File: "{file_name}" (ID: {file_id}, Type: {mime_type})\n'
-            f'Link: {file_metadata.get("webViewLink", "#")}\n\n--- CONTENT ---\n'
-        )
-        return header + body_text
-
-    except HttpError as error:
-        logger.error(
-            f"API error getting Drive file content for {file_id}: {error}",
-            exc_info=True,
-        )
-        raise Exception(f"API error: {error}")
-    except Exception as e:
-        logger.exception(f"Unexpected error getting Drive file content for {file_id}: {e}")
-        raise Exception(f"Unexpected error: {e}")
+    # Assemble response
+    header = (
+        f'File: "{file_name}" (ID: {file_id}, Type: {mime_type})\n'
+        f'Link: {file_metadata.get("webViewLink", "#")}\n\n--- CONTENT ---\n'
+    )
+    return header + body_text
 
 
+@server.tool()
 @require_google_service("drive", "drive_read")
+@handle_http_errors("list_drive_items")
 async def list_drive_items(
     service,
     user_google_email: str,
@@ -276,41 +262,35 @@ async def list_drive_items(
     """
     logger.info(f"[list_drive_items] Invoked. Email: '{user_google_email}', Folder ID: '{folder_id}'")
 
-    try:
-        final_query = f"'{folder_id}' in parents and trashed=false"
+    final_query = f"'{folder_id}' in parents and trashed=false"
 
-        list_params = _build_drive_list_params(
-            query=final_query,
-            page_size=page_size,
-            drive_id=drive_id,
-            include_items_from_all_drives=include_items_from_all_drives,
-            corpora=corpora,
+    list_params = _build_drive_list_params(
+        query=final_query,
+        page_size=page_size,
+        drive_id=drive_id,
+        include_items_from_all_drives=include_items_from_all_drives,
+        corpora=corpora,
+    )
+
+    results = await asyncio.to_thread(
+        service.files().list(**list_params).execute
+    )
+    files = results.get('files', [])
+    if not files:
+        return f"No items found in folder '{folder_id}'."
+
+    formatted_items_text_parts = [f"Found {len(files)} items in folder '{folder_id}' for {user_google_email}:"]
+    for item in files:
+        size_str = f", Size: {item.get('size', 'N/A')}" if 'size' in item else ""
+        formatted_items_text_parts.append(
+            f"- Name: \"{item['name']}\" (ID: {item['id']}, Type: {item['mimeType']}{size_str}, Modified: {item.get('modifiedTime', 'N/A')}) Link: {item.get('webViewLink', '#')}"
         )
-
-        results = await asyncio.to_thread(
-            service.files().list(**list_params).execute
-        )
-        files = results.get('files', [])
-        if not files:
-            return f"No items found in folder '{folder_id}'."
-
-        formatted_items_text_parts = [f"Found {len(files)} items in folder '{folder_id}' for {user_google_email}:"]
-        for item in files:
-            size_str = f", Size: {item.get('size', 'N/A')}" if 'size' in item else ""
-            formatted_items_text_parts.append(
-                f"- Name: \"{item['name']}\" (ID: {item['id']}, Type: {item['mimeType']}{size_str}, Modified: {item.get('modifiedTime', 'N/A')}) Link: {item.get('webViewLink', '#')}"
-            )
-        text_output = "\n".join(formatted_items_text_parts)
-        return text_output
-    except HttpError as error:
-        logger.error(f"API error listing Drive items in folder {folder_id}: {error}", exc_info=True)
-        raise Exception(f"API error: {error}")
-    except Exception as e:
-        logger.exception(f"Unexpected error listing Drive items in folder {folder_id}: {e}")
-        raise Exception(f"Unexpected error: {e}")
+    text_output = "\n".join(formatted_items_text_parts)
+    return text_output
 
 @server.tool()
 @require_google_service("drive", "drive_file")
+@handle_http_errors("create_drive_file")
 async def create_drive_file(
     service,
     user_google_email: str,
@@ -337,51 +317,43 @@ async def create_drive_file(
     """
     logger.info(f"[create_drive_file] Invoked. Email: '{user_google_email}', File Name: {file_name}, Folder ID: {folder_id}, fileUrl: {fileUrl}")
 
-    try:
-        if not content and not fileUrl:
-            raise Exception("You must provide either 'content' or 'fileUrl'.")
+    if not content and not fileUrl:
+        raise Exception("You must provide either 'content' or 'fileUrl'.")
 
-        file_data = None
-        # Prefer fileUrl if both are provided
-        if fileUrl:
-            logger.info(f"[create_drive_file] Fetching file from URL: {fileUrl}")
-            async with httpx.AsyncClient() as client:
-                resp = await client.get(fileUrl)
-                if resp.status_code != 200:
-                    raise Exception(f"Failed to fetch file from URL: {fileUrl} (status {resp.status_code})")
-                file_data = await resp.aread()
-                # Try to get MIME type from Content-Type header
-                content_type = resp.headers.get("Content-Type")
-                if content_type and content_type != "application/octet-stream":
-                    mime_type = content_type
-                    logger.info(f"[create_drive_file] Using MIME type from Content-Type header: {mime_type}")
-        elif content:
-            file_data = content.encode('utf-8')
+    file_data = None
+    # Prefer fileUrl if both are provided
+    if fileUrl:
+        logger.info(f"[create_drive_file] Fetching file from URL: {fileUrl}")
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(fileUrl)
+            if resp.status_code != 200:
+                raise Exception(f"Failed to fetch file from URL: {fileUrl} (status {resp.status_code})")
+            file_data = await resp.aread()
+            # Try to get MIME type from Content-Type header
+            content_type = resp.headers.get("Content-Type")
+            if content_type and content_type != "application/octet-stream":
+                mime_type = content_type
+                logger.info(f"[create_drive_file] Using MIME type from Content-Type header: {mime_type}")
+    elif content:
+        file_data = content.encode('utf-8')
 
-        file_metadata = {
-            'name': file_name,
-            'parents': [folder_id],
-            'mimeType': mime_type
-        }
-        media = io.BytesIO(file_data)
+    file_metadata = {
+        'name': file_name,
+        'parents': [folder_id],
+        'mimeType': mime_type
+    }
+    media = io.BytesIO(file_data)
 
-        created_file = await asyncio.to_thread(
-            service.files().create(
-                body=file_metadata,
-                media_body=MediaIoBaseUpload(media, mimetype=mime_type, resumable=True),
-                fields='id, name, webViewLink',
-                supportsAllDrives=True
-            ).execute
-        )
+    created_file = await asyncio.to_thread(
+        service.files().create(
+            body=file_metadata,
+            media_body=MediaIoBaseUpload(media, mimetype=mime_type, resumable=True),
+            fields='id, name, webViewLink',
+            supportsAllDrives=True
+        ).execute
+    )
 
-        link = created_file.get('webViewLink', 'No link available')
-        confirmation_message = f"Successfully created file '{created_file.get('name', file_name)}' (ID: {created_file.get('id', 'N/A')}) in folder '{folder_id}' for {user_google_email}. Link: {link}"
-        logger.info(f"Successfully created file. Link: {link}")
-        return confirmation_message
-
-    except HttpError as error:
-        logger.error(f"API error creating Drive file '{file_name}': {error}", exc_info=True)
-        raise Exception(f"API error: {error}")
-    except Exception as e:
-        logger.exception(f"Unexpected error creating Drive file '{file_name}': {e}")
-        raise Exception(f"Unexpected error: {e}")
+    link = created_file.get('webViewLink', 'No link available')
+    confirmation_message = f"Successfully created file '{created_file.get('name', file_name)}' (ID: {created_file.get('id', 'N/A')}) in folder '{folder_id}' for {user_google_email}. Link: {link}"
+    logger.info(f"Successfully created file. Link: {link}")
+    return confirmation_message

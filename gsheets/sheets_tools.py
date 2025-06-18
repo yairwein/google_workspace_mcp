@@ -13,6 +13,7 @@ from googleapiclient.errors import HttpError
 
 from auth.service_decorator import require_google_service
 from core.server import server
+from core.utils import handle_http_errors
 
 # Configure module logger
 logger = logging.getLogger(__name__)
@@ -20,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 @server.tool()
 @require_google_service("drive", "drive_read")
+@handle_http_errors("list_spreadsheets")
 async def list_spreadsheets(
     service,
     user_google_email: str,
@@ -37,47 +39,38 @@ async def list_spreadsheets(
     """
     logger.info(f"[list_spreadsheets] Invoked. Email: '{user_google_email}'")
 
-    try:
-        files_response = await asyncio.to_thread(
-            service.files()
-            .list(
-                q="mimeType='application/vnd.google-apps.spreadsheet'",
-                pageSize=max_results,
-                fields="files(id,name,modifiedTime,webViewLink)",
-                orderBy="modifiedTime desc",
-            )
-            .execute
+    files_response = await asyncio.to_thread(
+        service.files()
+        .list(
+            q="mimeType='application/vnd.google-apps.spreadsheet'",
+            pageSize=max_results,
+            fields="files(id,name,modifiedTime,webViewLink)",
+            orderBy="modifiedTime desc",
         )
+        .execute
+    )
 
-        files = files_response.get("files", [])
-        if not files:
-            return f"No spreadsheets found for {user_google_email}."
+    files = files_response.get("files", [])
+    if not files:
+        return f"No spreadsheets found for {user_google_email}."
 
-        spreadsheets_list = [
-            f"- \"{file['name']}\" (ID: {file['id']}) | Modified: {file.get('modifiedTime', 'Unknown')} | Link: {file.get('webViewLink', 'No link')}"
-            for file in files
-        ]
+    spreadsheets_list = [
+        f"- \"{file['name']}\" (ID: {file['id']}) | Modified: {file.get('modifiedTime', 'Unknown')} | Link: {file.get('webViewLink', 'No link')}"
+        for file in files
+    ]
 
-        text_output = (
-            f"Successfully listed {len(files)} spreadsheets for {user_google_email}:\n"
-            + "\n".join(spreadsheets_list)
-        )
+    text_output = (
+        f"Successfully listed {len(files)} spreadsheets for {user_google_email}:\n"
+        + "\n".join(spreadsheets_list)
+    )
 
-        logger.info(f"Successfully listed {len(files)} spreadsheets for {user_google_email}.")
-        return text_output
-
-    except HttpError as error:
-        message = f"API error listing spreadsheets: {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with user's email and service_name='Google Sheets'."
-        logger.error(message, exc_info=True)
-        raise Exception(message)
-    except Exception as e:
-        message = f"Unexpected error listing spreadsheets: {e}."
-        logger.exception(message)
-        raise Exception(message)
+    logger.info(f"Successfully listed {len(files)} spreadsheets for {user_google_email}.")
+    return text_output
 
 
 @server.tool()
 @require_google_service("sheets", "sheets_read")
+@handle_http_errors("get_spreadsheet_info")
 async def get_spreadsheet_info(
     service,
     user_google_email: str,
@@ -95,48 +88,39 @@ async def get_spreadsheet_info(
     """
     logger.info(f"[get_spreadsheet_info] Invoked. Email: '{user_google_email}', Spreadsheet ID: {spreadsheet_id}")
 
-    try:
-        spreadsheet = await asyncio.to_thread(
-            service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute
+    spreadsheet = await asyncio.to_thread(
+        service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute
+    )
+
+    title = spreadsheet.get("properties", {}).get("title", "Unknown")
+    sheets = spreadsheet.get("sheets", [])
+
+    sheets_info = []
+    for sheet in sheets:
+        sheet_props = sheet.get("properties", {})
+        sheet_name = sheet_props.get("title", "Unknown")
+        sheet_id = sheet_props.get("sheetId", "Unknown")
+        grid_props = sheet_props.get("gridProperties", {})
+        rows = grid_props.get("rowCount", "Unknown")
+        cols = grid_props.get("columnCount", "Unknown")
+
+        sheets_info.append(
+            f"  - \"{sheet_name}\" (ID: {sheet_id}) | Size: {rows}x{cols}"
         )
 
-        title = spreadsheet.get("properties", {}).get("title", "Unknown")
-        sheets = spreadsheet.get("sheets", [])
+    text_output = (
+        f"Spreadsheet: \"{title}\" (ID: {spreadsheet_id})\n"
+        f"Sheets ({len(sheets)}):\n"
+        + "\n".join(sheets_info) if sheets_info else "  No sheets found"
+    )
 
-        sheets_info = []
-        for sheet in sheets:
-            sheet_props = sheet.get("properties", {})
-            sheet_name = sheet_props.get("title", "Unknown")
-            sheet_id = sheet_props.get("sheetId", "Unknown")
-            grid_props = sheet_props.get("gridProperties", {})
-            rows = grid_props.get("rowCount", "Unknown")
-            cols = grid_props.get("columnCount", "Unknown")
-
-            sheets_info.append(
-                f"  - \"{sheet_name}\" (ID: {sheet_id}) | Size: {rows}x{cols}"
-            )
-
-        text_output = (
-            f"Spreadsheet: \"{title}\" (ID: {spreadsheet_id})\n"
-            f"Sheets ({len(sheets)}):\n"
-            + "\n".join(sheets_info) if sheets_info else "  No sheets found"
-        )
-
-        logger.info(f"Successfully retrieved info for spreadsheet {spreadsheet_id} for {user_google_email}.")
-        return text_output
-
-    except HttpError as error:
-        message = f"API error getting spreadsheet info: {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with user's email and service_name='Google Sheets'."
-        logger.error(message, exc_info=True)
-        raise Exception(message)
-    except Exception as e:
-        message = f"Unexpected error getting spreadsheet info: {e}."
-        logger.exception(message)
-        raise Exception(message)
+    logger.info(f"Successfully retrieved info for spreadsheet {spreadsheet_id} for {user_google_email}.")
+    return text_output
 
 
 @server.tool()
 @require_google_service("sheets", "sheets_read")
+@handle_http_errors("read_sheet_values")
 async def read_sheet_values(
     service,
     user_google_email: str,
@@ -156,46 +140,37 @@ async def read_sheet_values(
     """
     logger.info(f"[read_sheet_values] Invoked. Email: '{user_google_email}', Spreadsheet: {spreadsheet_id}, Range: {range_name}")
 
-    try:
-        result = await asyncio.to_thread(
-            service.spreadsheets()
-            .values()
-            .get(spreadsheetId=spreadsheet_id, range=range_name)
-            .execute
-        )
+    result = await asyncio.to_thread(
+        service.spreadsheets()
+        .values()
+        .get(spreadsheetId=spreadsheet_id, range=range_name)
+        .execute
+    )
 
-        values = result.get("values", [])
-        if not values:
-            return f"No data found in range '{range_name}' for {user_google_email}."
+    values = result.get("values", [])
+    if not values:
+        return f"No data found in range '{range_name}' for {user_google_email}."
 
-        # Format the output as a readable table
-        formatted_rows = []
-        for i, row in enumerate(values, 1):
-            # Pad row with empty strings to show structure
-            padded_row = row + [""] * max(0, len(values[0]) - len(row)) if values else row
-            formatted_rows.append(f"Row {i:2d}: {padded_row}")
+    # Format the output as a readable table
+    formatted_rows = []
+    for i, row in enumerate(values, 1):
+        # Pad row with empty strings to show structure
+        padded_row = row + [""] * max(0, len(values[0]) - len(row)) if values else row
+        formatted_rows.append(f"Row {i:2d}: {padded_row}")
 
-        text_output = (
-            f"Successfully read {len(values)} rows from range '{range_name}' in spreadsheet {spreadsheet_id} for {user_google_email}:\n"
-            + "\n".join(formatted_rows[:50])  # Limit to first 50 rows for readability
-            + (f"\n... and {len(values) - 50} more rows" if len(values) > 50 else "")
-        )
+    text_output = (
+        f"Successfully read {len(values)} rows from range '{range_name}' in spreadsheet {spreadsheet_id} for {user_google_email}:\n"
+        + "\n".join(formatted_rows[:50])  # Limit to first 50 rows for readability
+        + (f"\n... and {len(values) - 50} more rows" if len(values) > 50 else "")
+    )
 
-        logger.info(f"Successfully read {len(values)} rows for {user_google_email}.")
-        return text_output
-
-    except HttpError as error:
-        message = f"API error reading sheet values: {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with user's email and service_name='Google Sheets'."
-        logger.error(message, exc_info=True)
-        raise Exception(message)
-    except Exception as e:
-        message = f"Unexpected error reading sheet values: {e}."
-        logger.exception(message)
-        raise Exception(message)
+    logger.info(f"Successfully read {len(values)} rows for {user_google_email}.")
+    return text_output
 
 
 @server.tool()
 @require_google_service("sheets", "sheets_write")
+@handle_http_errors("modify_sheet_values")
 async def modify_sheet_values(
     service,
     user_google_email: str,
@@ -225,57 +200,48 @@ async def modify_sheet_values(
     if not clear_values and not values:
         raise Exception("Either 'values' must be provided or 'clear_values' must be True.")
 
-    try:
-        if clear_values:
-            result = await asyncio.to_thread(
-                service.spreadsheets()
-                .values()
-                .clear(spreadsheetId=spreadsheet_id, range=range_name)
-                .execute
+    if clear_values:
+        result = await asyncio.to_thread(
+            service.spreadsheets()
+            .values()
+            .clear(spreadsheetId=spreadsheet_id, range=range_name)
+            .execute
+        )
+
+        cleared_range = result.get("clearedRange", range_name)
+        text_output = f"Successfully cleared range '{cleared_range}' in spreadsheet {spreadsheet_id} for {user_google_email}."
+        logger.info(f"Successfully cleared range '{cleared_range}' for {user_google_email}.")
+    else:
+        body = {"values": values}
+
+        result = await asyncio.to_thread(
+            service.spreadsheets()
+            .values()
+            .update(
+                spreadsheetId=spreadsheet_id,
+                range=range_name,
+                valueInputOption=value_input_option,
+                body=body,
             )
+            .execute
+        )
 
-            cleared_range = result.get("clearedRange", range_name)
-            text_output = f"Successfully cleared range '{cleared_range}' in spreadsheet {spreadsheet_id} for {user_google_email}."
-            logger.info(f"Successfully cleared range '{cleared_range}' for {user_google_email}.")
-        else:
-            body = {"values": values}
+        updated_cells = result.get("updatedCells", 0)
+        updated_rows = result.get("updatedRows", 0)
+        updated_columns = result.get("updatedColumns", 0)
 
-            result = await asyncio.to_thread(
-                service.spreadsheets()
-                .values()
-                .update(
-                    spreadsheetId=spreadsheet_id,
-                    range=range_name,
-                    valueInputOption=value_input_option,
-                    body=body,
-                )
-                .execute
-            )
+        text_output = (
+            f"Successfully updated range '{range_name}' in spreadsheet {spreadsheet_id} for {user_google_email}. "
+            f"Updated: {updated_cells} cells, {updated_rows} rows, {updated_columns} columns."
+        )
+        logger.info(f"Successfully updated {updated_cells} cells for {user_google_email}.")
 
-            updated_cells = result.get("updatedCells", 0)
-            updated_rows = result.get("updatedRows", 0)
-            updated_columns = result.get("updatedColumns", 0)
-
-            text_output = (
-                f"Successfully updated range '{range_name}' in spreadsheet {spreadsheet_id} for {user_google_email}. "
-                f"Updated: {updated_cells} cells, {updated_rows} rows, {updated_columns} columns."
-            )
-            logger.info(f"Successfully updated {updated_cells} cells for {user_google_email}.")
-
-        return text_output
-
-    except HttpError as error:
-        message = f"API error modifying sheet values: {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with user's email and service_name='Google Sheets'."
-        logger.error(message, exc_info=True)
-        raise Exception(message)
-    except Exception as e:
-        message = f"Unexpected error modifying sheet values: {e}."
-        logger.exception(message)
-        raise Exception(message)
+    return text_output
 
 
 @server.tool()
 @require_google_service("sheets", "sheets_write")
+@handle_http_errors("create_spreadsheet")
 async def create_spreadsheet(
     service,
     user_google_email: str,
@@ -295,45 +261,36 @@ async def create_spreadsheet(
     """
     logger.info(f"[create_spreadsheet] Invoked. Email: '{user_google_email}', Title: {title}")
 
-    try:
-        spreadsheet_body = {
-            "properties": {
-                "title": title
-            }
+    spreadsheet_body = {
+        "properties": {
+            "title": title
         }
+    }
 
-        if sheet_names:
-            spreadsheet_body["sheets"] = [
-                {"properties": {"title": sheet_name}} for sheet_name in sheet_names
-            ]
+    if sheet_names:
+        spreadsheet_body["sheets"] = [
+            {"properties": {"title": sheet_name}} for sheet_name in sheet_names
+        ]
 
-        spreadsheet = await asyncio.to_thread(
-            service.spreadsheets().create(body=spreadsheet_body).execute
-        )
+    spreadsheet = await asyncio.to_thread(
+        service.spreadsheets().create(body=spreadsheet_body).execute
+    )
 
-        spreadsheet_id = spreadsheet.get("spreadsheetId")
-        spreadsheet_url = spreadsheet.get("spreadsheetUrl")
+    spreadsheet_id = spreadsheet.get("spreadsheetId")
+    spreadsheet_url = spreadsheet.get("spreadsheetUrl")
 
-        text_output = (
-            f"Successfully created spreadsheet '{title}' for {user_google_email}. "
-            f"ID: {spreadsheet_id} | URL: {spreadsheet_url}"
-        )
+    text_output = (
+        f"Successfully created spreadsheet '{title}' for {user_google_email}. "
+        f"ID: {spreadsheet_id} | URL: {spreadsheet_url}"
+    )
 
-        logger.info(f"Successfully created spreadsheet for {user_google_email}. ID: {spreadsheet_id}")
-        return text_output
-
-    except HttpError as error:
-        message = f"API error creating spreadsheet: {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with user's email and service_name='Google Sheets'."
-        logger.error(message, exc_info=True)
-        raise Exception(message)
-    except Exception as e:
-        message = f"Unexpected error creating spreadsheet: {e}."
-        logger.exception(message)
-        raise Exception(message)
+    logger.info(f"Successfully created spreadsheet for {user_google_email}. ID: {spreadsheet_id}")
+    return text_output
 
 
 @server.tool()
 @require_google_service("sheets", "sheets_write")
+@handle_http_errors("create_sheet")
 async def create_sheet(
     service,
     user_google_email: str,
@@ -353,41 +310,31 @@ async def create_sheet(
     """
     logger.info(f"[create_sheet] Invoked. Email: '{user_google_email}', Spreadsheet: {spreadsheet_id}, Sheet: {sheet_name}")
 
-    try:
-        request_body = {
-            "requests": [
-                {
-                    "addSheet": {
-                        "properties": {
-                            "title": sheet_name
-                        }
+    request_body = {
+        "requests": [
+            {
+                "addSheet": {
+                    "properties": {
+                        "title": sheet_name
                     }
                 }
-            ]
-        }
+            }
+        ]
+    }
 
-        response = await asyncio.to_thread(
-            service.spreadsheets()
-            .batchUpdate(spreadsheetId=spreadsheet_id, body=request_body)
-            .execute
-        )
+    response = await asyncio.to_thread(
+        service.spreadsheets()
+        .batchUpdate(spreadsheetId=spreadsheet_id, body=request_body)
+        .execute
+    )
 
-        sheet_id = response["replies"][0]["addSheet"]["properties"]["sheetId"]
+    sheet_id = response["replies"][0]["addSheet"]["properties"]["sheetId"]
 
-        text_output = (
-            f"Successfully created sheet '{sheet_name}' (ID: {sheet_id}) in spreadsheet {spreadsheet_id} for {user_google_email}."
-        )
+    text_output = (
+        f"Successfully created sheet '{sheet_name}' (ID: {sheet_id}) in spreadsheet {spreadsheet_id} for {user_google_email}."
+    )
 
-        logger.info(f"Successfully created sheet for {user_google_email}. Sheet ID: {sheet_id}")
-        return text_output
-
-    except HttpError as error:
-        message = f"API error creating sheet: {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with user's email and service_name='Google Sheets'."
-        logger.error(message, exc_info=True)
-        raise Exception(message)
-    except Exception as e:
-        message = f"Unexpected error creating sheet: {e}."
-        logger.exception(message)
-        raise Exception(message)
+    logger.info(f"Successfully created sheet for {user_google_email}. Sheet ID: {sheet_id}")
+    return text_output
 
 
