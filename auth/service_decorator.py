@@ -193,29 +193,37 @@ def require_google_service(
             # Original authentication logic is handled automatically
     """
     def decorator(func: Callable) -> Callable:
+        # Inspect the original function signature
+        original_sig = inspect.signature(func)
+        params = list(original_sig.parameters.values())
+
+        # The decorated function must have 'service' as its first parameter.
+        if not params or params[0].name != 'service':
+            raise TypeError(
+                f"Function '{func.__name__}' decorated with @require_google_service "
+                "must have 'service' as its first parameter."
+            )
+
+        # Create a new signature for the wrapper that excludes the 'service' parameter.
+        # This is the signature that FastMCP will see.
+        wrapper_sig = original_sig.replace(parameters=params[1:])
+
         @wraps(func)
         async def wrapper(*args, **kwargs):
-            # Extract user_google_email from function parameters
-            sig = inspect.signature(func)
-            param_names = list(sig.parameters.keys())
+            # Note: `args` and `kwargs` are now the arguments for the *wrapper*,
+            # which does not include 'service'.
 
-            # Find user_google_email parameter
-            user_google_email = None
-            if 'user_google_email' in kwargs:
-                user_google_email = kwargs['user_google_email']
-            else:
-                # Look for user_google_email in positional args
-                try:
-                    user_email_index = param_names.index('user_google_email')
-                    if user_email_index < len(args):
-                        user_google_email = args[user_email_index]
-                except ValueError:
-                    pass
+            # Extract user_google_email from the arguments passed to the wrapper
+            bound_args = wrapper_sig.bind(*args, **kwargs)
+            bound_args.apply_defaults()
+            user_google_email = bound_args.arguments.get('user_google_email')
 
             if not user_google_email:
-                raise Exception("user_google_email parameter is required but not found")
+                # This should ideally not be reached if 'user_google_email' is a required parameter
+                # in the function signature, but it's a good safeguard.
+                raise Exception("'user_google_email' parameter is required but was not found.")
 
-            # Get service configuration
+            # Get service configuration from the decorator's arguments
             if service_type not in SERVICE_CONFIGS:
                 raise Exception(f"Unknown service type: {service_type}")
 
@@ -226,7 +234,7 @@ def require_google_service(
             # Resolve scopes
             resolved_scopes = _resolve_scopes(scopes)
 
-            # Check cache first if enabled
+            # --- Service Caching and Authentication Logic (largely unchanged) ---
             service = None
             actual_user_email = user_google_email
 
@@ -235,8 +243,7 @@ def require_google_service(
                 cached_result = _get_cached_service(cache_key)
                 if cached_result:
                     service, actual_user_email = cached_result
-
-            # If not cached, authenticate
+            
             if service is None:
                 try:
                     tool_name = func.__name__
@@ -247,30 +254,22 @@ def require_google_service(
                         user_google_email=user_google_email,
                         required_scopes=resolved_scopes,
                     )
-
-                    # Cache the service if caching is enabled
                     if cache_enabled:
                         cache_key = _get_cache_key(user_google_email, service_name, service_version, resolved_scopes)
                         _cache_service(cache_key, service, actual_user_email)
-
                 except GoogleAuthenticationError as e:
                     raise Exception(str(e))
 
-            # Inject service as first parameter
-            if 'service' in param_names:
-                kwargs['service'] = service
-            else:
-                # Insert service as first positional argument
-                args = (service,) + args
-
-            # Call the original function with refresh error handling
+            # --- Call the original function with the service object injected ---
             try:
-                return await func(*args, **kwargs)
+                # Prepend the fetched service object to the original arguments
+                return await func(service, *args, **kwargs)
             except RefreshError as e:
-                # Handle token refresh errors gracefully
                 error_message = _handle_token_refresh_error(e, actual_user_email, service_name)
                 raise Exception(error_message)
 
+        # Set the wrapper's signature to the one without 'service'
+        wrapper.__signature__ = wrapper_sig
         return wrapper
     return decorator
 
