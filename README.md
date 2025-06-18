@@ -97,6 +97,7 @@ uv run main.py
    - Create OAuth 2.0 credentials (web application) in [Google Cloud Console](https://console.cloud.google.com/)
    - Enable APIs: Calendar, Drive, Gmail, Docs, Sheets, Slides, Forms, Chat
    - Download credentials as `client_secret.json` in project root
+     - To use a different location for `client_secret.json`, you can set the `GOOGLE_CLIENT_SECRETS` environment variable with that path
    - Add redirect URI: `http://localhost:8000/oauth2callback`
 
 2. **Environment**:
