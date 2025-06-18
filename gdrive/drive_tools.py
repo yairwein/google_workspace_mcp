@@ -12,6 +12,7 @@ from mcp import types
 from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 import io
+import aiohttp
 
 from auth.service_decorator import require_google_service
 from core.utils import extract_office_xml_text
@@ -308,37 +309,61 @@ async def list_drive_items(
         logger.exception(f"Unexpected error listing Drive items in folder {folder_id}: {e}")
         raise Exception(f"Unexpected error: {e}")
 
+@server.tool()
 @require_google_service("drive", "drive_file")
 async def create_drive_file(
     service,
     user_google_email: str,
     file_name: str,
-    content: str,
+    content: Optional[str] = None,  # Now explicitly Optional
     folder_id: str = 'root',
     mime_type: str = 'text/plain',
+    fileUrl: Optional[str] = None,  # Now explicitly Optional
 ) -> str:
     """
     Creates a new file in Google Drive, supporting creation within shared drives.
+    Accepts either direct content or a fileUrl to fetch the content from.
 
     Args:
         user_google_email (str): The user's Google email address. Required.
         file_name (str): The name for the new file.
-        content (str): The content to write to the file.
+        content (Optional[str]): If provided, the content to write to the file.
         folder_id (str): The ID of the parent folder. Defaults to 'root'. For shared drives, this must be a folder ID within the shared drive.
         mime_type (str): The MIME type of the file. Defaults to 'text/plain'.
+        fileUrl (Optional[str]): If provided, fetches the file content from this URL.
 
     Returns:
         str: Confirmation message of the successful file creation with file link.
     """
-    logger.info(f"[create_drive_file] Invoked. Email: '{user_google_email}', File Name: {file_name}, Folder ID: {folder_id}")
+    logger.info(f"[create_drive_file] Invoked. Email: '{user_google_email}', File Name: {file_name}, Folder ID: {folder_id}, fileUrl: {fileUrl}")
 
     try:
+        if not content and not fileUrl:
+            raise Exception("You must provide either 'content' or 'fileUrl'.")
+
+        file_data = None
+        # Prefer fileUrl if both are provided
+        if fileUrl:
+            logger.info(f"[create_drive_file] Fetching file from URL: {fileUrl}")
+            async with aiohttp.ClientSession() as session:
+                async with session.get(fileUrl) as resp:
+                    if resp.status != 200:
+                        raise Exception(f"Failed to fetch file from URL: {fileUrl} (status {resp.status})")
+                    file_data = await resp.read()
+                    # Try to get MIME type from Content-Type header
+                    content_type = resp.headers.get('Content-Type')
+                    if content_type and content_type != 'application/octet-stream':
+                        mime_type = content_type
+                        logger.info(f"[create_drive_file] Using MIME type from Content-Type header: {mime_type}")
+        elif content:
+            file_data = content.encode('utf-8')
+
         file_metadata = {
             'name': file_name,
             'parents': [folder_id],
             'mimeType': mime_type
         }
-        media = io.BytesIO(content.encode('utf-8'))
+        media = io.BytesIO(file_data)
 
         created_file = await asyncio.to_thread(
             service.files().create(
