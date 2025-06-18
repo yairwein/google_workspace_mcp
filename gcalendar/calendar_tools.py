@@ -329,6 +329,7 @@ async def create_event(
                 service.events().insert(calendarId=calendar_id, body=event_body).execute
             )
         link = created_event.get("htmlLink", "No link available")
+        confirmation_message = f"Successfully created event '{created_event.get('summary', summary)}' for {user_google_email}. Link: {link}"
         logger.info(
                 f"Event created successfully for {user_google_email}. ID: {created_event.get('id')}, Link: {link}"
             )

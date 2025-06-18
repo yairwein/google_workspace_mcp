@@ -12,7 +12,7 @@ from mcp import types
 from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 import io
-import aiohttp
+import httpx
 
 from auth.service_decorator import require_google_service
 from core.utils import extract_office_xml_text
@@ -345,16 +345,16 @@ async def create_drive_file(
         # Prefer fileUrl if both are provided
         if fileUrl:
             logger.info(f"[create_drive_file] Fetching file from URL: {fileUrl}")
-            async with aiohttp.ClientSession() as session:
-                async with session.get(fileUrl) as resp:
-                    if resp.status != 200:
-                        raise Exception(f"Failed to fetch file from URL: {fileUrl} (status {resp.status})")
-                    file_data = await resp.read()
-                    # Try to get MIME type from Content-Type header
-                    content_type = resp.headers.get('Content-Type')
-                    if content_type and content_type != 'application/octet-stream':
-                        mime_type = content_type
-                        logger.info(f"[create_drive_file] Using MIME type from Content-Type header: {mime_type}")
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(fileUrl)
+                if resp.status_code != 200:
+                    raise Exception(f"Failed to fetch file from URL: {fileUrl} (status {resp.status_code})")
+                file_data = await resp.aread()
+                # Try to get MIME type from Content-Type header
+                content_type = resp.headers.get("Content-Type")
+                if content_type and content_type != "application/octet-stream":
+                    mime_type = content_type
+                    logger.info(f"[create_drive_file] Using MIME type from Content-Type header: {mime_type}")
         elif content:
             file_data = content.encode('utf-8')
 
