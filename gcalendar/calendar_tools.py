@@ -9,6 +9,7 @@ import logging
 import asyncio
 import os
 import sys
+import re
 from typing import List, Optional, Dict, Any
 
 from mcp import types
@@ -96,7 +97,7 @@ async def list_calendars(service, user_google_email: str) -> str:
     logger.info(f"[list_calendars] Invoked. Email: '{user_google_email}'")
 
     calendar_list_response = await asyncio.to_thread(
-        service.calendarList().list().execute
+        lambda: service.calendarList().list().execute()
     )
     items = calendar_list_response.get("items", [])
     if not items:
@@ -168,7 +169,7 @@ async def get_events(
     )
 
     events_result = await asyncio.to_thread(
-        service.events()
+        lambda: service.events()
         .list(
             calendarId=calendar_id,
             timeMin=effective_time_min,
@@ -177,7 +178,7 @@ async def get_events(
             singleEvents=True,
             orderBy="startTime",
         )
-        .execute
+        .execute()
     )
     items = events_result.get("items", [])
     if not items:
@@ -217,6 +218,7 @@ async def create_event(
     location: Optional[str] = None,
     attendees: Optional[List[str]] = None,
     timezone: Optional[str] = None,
+    attachments: Optional[List[str]] = None,
 ) -> str:
     """
     Creates a new event.
@@ -231,6 +233,7 @@ async def create_event(
         location (Optional[str]): Event location.
         attendees (Optional[List[str]]): Attendee email addresses.
         timezone (Optional[str]): Timezone (e.g., "America/New_York").
+        attachments (Optional[List[str]]): List of Google Drive file URLs or IDs to attach to the event.
 
     Returns:
         str: Confirmation message of the successful event creation with event link.
@@ -238,7 +241,11 @@ async def create_event(
     logger.info(
         f"[create_event] Invoked. Email: '{user_google_email}', Summary: {summary}"
     )
-
+    logger.info(f"[create_event] Incoming attachments param: {attachments}")
+    # If attachments is a string, split by comma and strip whitespace
+    if attachments and isinstance(attachments, str):
+        attachments = [a.strip() for a in attachments.split(',') if a.strip()]
+        logger.info(f"[create_event] Parsed attachments list from string: {attachments}")
     event_body: Dict[str, Any] = {
         "summary": summary,
         "start": (
@@ -261,16 +268,64 @@ async def create_event(
             event_body["end"]["timeZone"] = timezone
     if attendees:
         event_body["attendees"] = [{"email": email} for email in attendees]
-
-    created_event = await asyncio.to_thread(
-        service.events().insert(calendarId=calendar_id, body=event_body).execute
-    )
-
+    
+    if attachments:
+        # Accept both file URLs and file IDs. If a URL, extract the fileId.
+        event_body["attachments"] = []
+        from googleapiclient.discovery import build
+        drive_service = None
+        try:
+            drive_service = service._http and build("drive", "v3", http=service._http)
+        except Exception as e:
+            logger.warning(f"Could not build Drive service for MIME type lookup: {e}")
+        for att in attachments:
+            file_id = None
+            if att.startswith("https://"):
+                # Match /d/<id>, /file/d/<id>, ?id=<id>
+                match = re.search(r"(?:/d/|/file/d/|id=)([\w-]+)", att)
+                file_id = match.group(1) if match else None
+                logger.info(f"[create_event] Extracted file_id '{file_id}' from attachment URL '{att}'")
+            else:
+                file_id = att
+                logger.info(f"[create_event] Using direct file_id '{file_id}' for attachment")
+            if file_id:
+                file_url = f"https://drive.google.com/open?id={file_id}"
+                mime_type = "application/vnd.google-apps.drive-sdk"
+                title = "Drive Attachment"
+                # Try to get the actual MIME type and filename from Drive
+                if drive_service:
+                    try:
+                        file_metadata = await asyncio.to_thread(
+                            lambda: drive_service.files().get(fileId=file_id, fields="mimeType,name").execute()
+                        )
+                        mime_type = file_metadata.get("mimeType", mime_type)
+                        filename = file_metadata.get("name")
+                        if filename:
+                            title = filename
+                            logger.info(f"[create_event] Using filename '{filename}' as attachment title")
+                        else:
+                            logger.info(f"[create_event] No filename found, using generic title")
+                    except Exception as e:
+                        logger.warning(f"Could not fetch metadata for file {file_id}: {e}")
+                event_body["attachments"].append({
+                    "fileUrl": file_url,
+                    "title": title,
+                    "mimeType": mime_type,
+                })
+        created_event = await asyncio.to_thread(
+            lambda: service.events().insert(
+                calendarId=calendar_id, body=event_body, supportsAttachments=True
+            ).execute()
+        )
+    else:
+        created_event = await asyncio.to_thread(
+            lambda: service.events().insert(calendarId=calendar_id, body=event_body).execute()
+        )
     link = created_event.get("htmlLink", "No link available")
     confirmation_message = f"Successfully created event '{created_event.get('summary', summary)}' for {user_google_email}. Link: {link}"
     logger.info(
-        f"Event created successfully for {user_google_email}. ID: {created_event.get('id')}, Link: {link}"
-    )
+            f"Event created successfully for {user_google_email}. ID: {created_event.get('id')}, Link: {link}"
+        )
     return confirmation_message
 
 
@@ -362,7 +417,7 @@ async def modify_event(
     # Try to get the event first to verify it exists
     try:
         await asyncio.to_thread(
-            service.events().get(calendarId=calendar_id, eventId=event_id).execute
+            lambda: service.events().get(calendarId=calendar_id, eventId=event_id).execute()
         )
         logger.info(
             f"[modify_event] Successfully verified event exists before update"
@@ -381,9 +436,9 @@ async def modify_event(
 
     # Proceed with the update
     updated_event = await asyncio.to_thread(
-        service.events()
+        lambda: service.events()
         .update(calendarId=calendar_id, eventId=event_id, body=event_body)
-        .execute
+        .execute()
     )
 
     link = updated_event.get("htmlLink", "No link available")
@@ -421,7 +476,7 @@ async def delete_event(service, user_google_email: str, event_id: str, calendar_
     # Try to get the event first to verify it exists
     try:
         await asyncio.to_thread(
-            service.events().get(calendarId=calendar_id, eventId=event_id).execute
+            lambda: service.events().get(calendarId=calendar_id, eventId=event_id).execute()
         )
         logger.info(
             f"[delete_event] Successfully verified event exists before deletion"
@@ -440,9 +495,56 @@ async def delete_event(service, user_google_email: str, event_id: str, calendar_
 
     # Proceed with the deletion
     await asyncio.to_thread(
-        service.events().delete(calendarId=calendar_id, eventId=event_id).execute
+        lambda: service.events().delete(calendarId=calendar_id, eventId=event_id).execute()
     )
 
     confirmation_message = f"Successfully deleted event (ID: {event_id}) from calendar '{calendar_id}' for {user_google_email}."
     logger.info(f"Event deleted successfully for {user_google_email}. ID: {event_id}")
     return confirmation_message
+
+
+@server.tool()
+@require_google_service("calendar", "calendar_read")
+@handle_http_errors("get_event")
+async def get_event(
+    service,
+    user_google_email: str,
+    event_id: str,
+    calendar_id: str = "primary"
+) -> str:
+    """
+    Retrieves the details of a single event by its ID from a specified Google Calendar.
+
+    Args:
+        user_google_email (str): The user's Google email address. Required.
+        event_id (str): The ID of the event to retrieve. Required.
+        calendar_id (str): The ID of the calendar to query. Defaults to 'primary'.
+
+    Returns:
+        str: A formatted string with the event's details.
+    """
+    logger.info(f"[get_event] Invoked. Email: '{user_google_email}', Event ID: {event_id}")
+    event = await asyncio.to_thread(
+        lambda: service.events().get(calendarId=calendar_id, eventId=event_id).execute()
+    )
+    summary = event.get("summary", "No Title")
+    start = event["start"].get("dateTime", event["start"].get("date"))
+    end = event["end"].get("dateTime", event["end"].get("date"))
+    link = event.get("htmlLink", "No Link")
+    description = event.get("description", "No Description")
+    location = event.get("location", "No Location")
+    attendees = event.get("attendees", [])
+    attendee_emails = ", ".join([a.get("email", "") for a in attendees]) if attendees else "None"
+    event_details = (
+        f'Event Details:\n'
+        f'- Title: {summary}\n'
+        f'- Starts: {start}\n'
+        f'- Ends: {end}\n'
+        f'- Description: {description}\n'
+        f'- Location: {location}\n'
+        f'- Attendees: {attendee_emails}\n'
+        f'- Event ID: {event_id}\n'
+        f'- Link: {link}'
+    )
+    logger.info(f"[get_event] Successfully retrieved event {event_id} for {user_google_email}.")
+    return event_details
