@@ -218,7 +218,7 @@ async def create_event(
     location: Optional[str] = None,
     attendees: Optional[List[str]] = None,
     timezone: Optional[str] = None,
-    attachments: Optional[List[str]] = None,  # New parameter for Drive file links/IDs
+    attachments: Optional[List[str]] = None,
 ) -> str:
     """
     Creates a new event.
