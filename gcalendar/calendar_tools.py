@@ -15,6 +15,7 @@ from mcp import types
 from googleapiclient.errors import HttpError
 
 from auth.service_decorator import require_google_service
+from core.utils import handle_http_errors
 
 from core.server import server
 
@@ -81,6 +82,7 @@ def _correct_time_format_for_api(
 
 @server.tool()
 @require_google_service("calendar", "calendar_read")
+@handle_http_errors("list_calendars")
 async def list_calendars(service, user_google_email: str) -> str:
     """
     Retrieves a list of calendars accessible to the authenticated user.
@@ -93,36 +95,28 @@ async def list_calendars(service, user_google_email: str) -> str:
     """
     logger.info(f"[list_calendars] Invoked. Email: '{user_google_email}'")
 
-    try:
-        calendar_list_response = await asyncio.to_thread(
-            service.calendarList().list().execute
-        )
-        items = calendar_list_response.get("items", [])
-        if not items:
-            return f"No calendars found for {user_google_email}."
+    calendar_list_response = await asyncio.to_thread(
+        service.calendarList().list().execute
+    )
+    items = calendar_list_response.get("items", [])
+    if not items:
+        return f"No calendars found for {user_google_email}."
 
-        calendars_summary_list = [
-            f"- \"{cal.get('summary', 'No Summary')}\"{' (Primary)' if cal.get('primary') else ''} (ID: {cal['id']})"
-            for cal in items
-        ]
-        text_output = (
-            f"Successfully listed {len(items)} calendars for {user_google_email}:\n"
-            + "\n".join(calendars_summary_list)
-        )
-        logger.info(f"Successfully listed {len(items)} calendars for {user_google_email}.")
-        return text_output
-    except HttpError as error:
-        message = f"API error listing calendars: {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with user's email and service_name='Google Calendar'."
-        logger.error(message, exc_info=True)
-        raise Exception(message)
-    except Exception as e:
-        message = f"Unexpected error listing calendars: {e}."
-        logger.exception(message)
-        raise Exception(message)
+    calendars_summary_list = [
+        f"- \"{cal.get('summary', 'No Summary')}\"{' (Primary)' if cal.get('primary') else ''} (ID: {cal['id']})"
+        for cal in items
+    ]
+    text_output = (
+        f"Successfully listed {len(items)} calendars for {user_google_email}:\n"
+        + "\n".join(calendars_summary_list)
+    )
+    logger.info(f"Successfully listed {len(items)} calendars for {user_google_email}.")
+    return text_output
 
 
 @server.tool()
 @require_google_service("calendar", "calendar_read")
+@handle_http_errors("get_events")
 async def get_events(
     service,
     user_google_email: str,
@@ -144,82 +138,74 @@ async def get_events(
     Returns:
         str: A formatted list of events (summary, start and end times, link) within the specified range.
     """
-    try:
+    logger.info(
+        f"[get_events] Raw time parameters - time_min: '{time_min}', time_max: '{time_max}'"
+    )
+
+    # Ensure time_min and time_max are correctly formatted for the API
+    formatted_time_min = _correct_time_format_for_api(time_min, "time_min")
+    effective_time_min = formatted_time_min or (
+        datetime.datetime.utcnow().isoformat() + "Z"
+    )
+    if time_min is None:
         logger.info(
-            f"[get_events] Raw time parameters - time_min: '{time_min}', time_max: '{time_max}'"
+            f"time_min not provided, defaulting to current UTC time: {effective_time_min}"
         )
-
-        # Ensure time_min and time_max are correctly formatted for the API
-        formatted_time_min = _correct_time_format_for_api(time_min, "time_min")
-        effective_time_min = formatted_time_min or (
-            datetime.datetime.utcnow().isoformat() + "Z"
-        )
-        if time_min is None:
-            logger.info(
-                f"time_min not provided, defaulting to current UTC time: {effective_time_min}"
-            )
-        else:
-            logger.info(
-                f"time_min processing: original='{time_min}', formatted='{formatted_time_min}', effective='{effective_time_min}'"
-            )
-
-        effective_time_max = _correct_time_format_for_api(time_max, "time_max")
-        if time_max:
-            logger.info(
-                f"time_max processing: original='{time_max}', formatted='{effective_time_max}'"
-            )
-
-        # Log the final API call parameters
+    else:
         logger.info(
-            f"[get_events] Final API parameters - calendarId: '{calendar_id}', timeMin: '{effective_time_min}', timeMax: '{effective_time_max}', maxResults: {max_results}"
+            f"time_min processing: original='{time_min}', formatted='{formatted_time_min}', effective='{effective_time_min}'"
         )
 
-        events_result = await asyncio.to_thread(
-            service.events()
-            .list(
-                calendarId=calendar_id,
-                timeMin=effective_time_min,
-                timeMax=effective_time_max,
-                maxResults=max_results,
-                singleEvents=True,
-                orderBy="startTime",
-            )
-            .execute
+    effective_time_max = _correct_time_format_for_api(time_max, "time_max")
+    if time_max:
+        logger.info(
+            f"time_max processing: original='{time_max}', formatted='{effective_time_max}'"
         )
-        items = events_result.get("items", [])
-        if not items:
-            return f"No events found in calendar '{calendar_id}' for {user_google_email} for the specified time range."
 
-        event_details_list = []
-        for item in items:
-            summary = item.get("summary", "No Title")
-            start_time = item["start"].get("dateTime", item["start"].get("date"))
-            end_time = item["end"].get("dateTime", item["end"].get("date"))
-            link = item.get("htmlLink", "No Link")
-            event_id = item.get("id", "No ID")
-            # Include the start/end date, and event ID in the output so users can copy it for modify/delete operations
-            event_details_list.append(
-                f'- "{summary}" (Starts: {start_time}, Ends: {end_time}) ID: {event_id} | Link: {link}'
-            )
+    # Log the final API call parameters
+    logger.info(
+        f"[get_events] Final API parameters - calendarId: '{calendar_id}', timeMin: '{effective_time_min}', timeMax: '{effective_time_max}', maxResults: {max_results}"
+    )
 
-        text_output = (
-            f"Successfully retrieved {len(items)} events from calendar '{calendar_id}' for {user_google_email}:\n"
-            + "\n".join(event_details_list)
+    events_result = await asyncio.to_thread(
+        service.events()
+        .list(
+            calendarId=calendar_id,
+            timeMin=effective_time_min,
+            timeMax=effective_time_max,
+            maxResults=max_results,
+            singleEvents=True,
+            orderBy="startTime",
         )
-        logger.info(f"Successfully retrieved {len(items)} events for {user_google_email}.")
-        return text_output
-    except HttpError as error:
-        message = f"API error getting events: {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with user's email and service_name='Google Calendar'."
-        logger.error(message, exc_info=True)
-        raise Exception(message)
-    except Exception as e:
-        message = f"Unexpected error getting events: {e}"
-        logger.exception(message)
-        raise Exception(message)
+        .execute
+    )
+    items = events_result.get("items", [])
+    if not items:
+        return f"No events found in calendar '{calendar_id}' for {user_google_email} for the specified time range."
+
+    event_details_list = []
+    for item in items:
+        summary = item.get("summary", "No Title")
+        start_time = item["start"].get("dateTime", item["start"].get("date"))
+        end_time = item["end"].get("dateTime", item["end"].get("date"))
+        link = item.get("htmlLink", "No Link")
+        event_id = item.get("id", "No ID")
+        # Include the start/end date, and event ID in the output so users can copy it for modify/delete operations
+        event_details_list.append(
+            f'- "{summary}" (Starts: {start_time}, Ends: {end_time}) ID: {event_id} | Link: {link}'
+        )
+
+    text_output = (
+        f"Successfully retrieved {len(items)} events from calendar '{calendar_id}' for {user_google_email}:\n"
+        + "\n".join(event_details_list)
+    )
+    logger.info(f"Successfully retrieved {len(items)} events for {user_google_email}.")
+    return text_output
 
 
 @server.tool()
 @require_google_service("calendar", "calendar_events")
+@handle_http_errors("create_event")
 async def create_event(
     service,
     user_google_email: str,
@@ -253,52 +239,44 @@ async def create_event(
         f"[create_event] Invoked. Email: '{user_google_email}', Summary: {summary}"
     )
 
-    try:
-        event_body: Dict[str, Any] = {
-            "summary": summary,
-            "start": (
-                {"date": start_time}
-                if "T" not in start_time
-                else {"dateTime": start_time}
-            ),
-            "end": (
-                {"date": end_time} if "T" not in end_time else {"dateTime": end_time}
-            ),
-        }
-        if location:
-            event_body["location"] = location
-        if description:
-            event_body["description"] = description
-        if timezone:
-            if "dateTime" in event_body["start"]:
-                event_body["start"]["timeZone"] = timezone
-            if "dateTime" in event_body["end"]:
-                event_body["end"]["timeZone"] = timezone
-        if attendees:
-            event_body["attendees"] = [{"email": email} for email in attendees]
+    event_body: Dict[str, Any] = {
+        "summary": summary,
+        "start": (
+            {"date": start_time}
+            if "T" not in start_time
+            else {"dateTime": start_time}
+        ),
+        "end": (
+            {"date": end_time} if "T" not in end_time else {"dateTime": end_time}
+        ),
+    }
+    if location:
+        event_body["location"] = location
+    if description:
+        event_body["description"] = description
+    if timezone:
+        if "dateTime" in event_body["start"]:
+            event_body["start"]["timeZone"] = timezone
+        if "dateTime" in event_body["end"]:
+            event_body["end"]["timeZone"] = timezone
+    if attendees:
+        event_body["attendees"] = [{"email": email} for email in attendees]
 
-        created_event = await asyncio.to_thread(
-            service.events().insert(calendarId=calendar_id, body=event_body).execute
-        )
+    created_event = await asyncio.to_thread(
+        service.events().insert(calendarId=calendar_id, body=event_body).execute
+    )
 
-        link = created_event.get("htmlLink", "No link available")
-        confirmation_message = f"Successfully created event '{created_event.get('summary', summary)}' for {user_google_email}. Link: {link}"
-        logger.info(
-            f"Event created successfully for {user_google_email}. ID: {created_event.get('id')}, Link: {link}"
-        )
-        return confirmation_message
-    except HttpError as error:
-        message = f"API error creating event: {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with the user's email ({user_google_email}) and service_name='Google Calendar'."
-        logger.error(message, exc_info=True)
-        raise Exception(message)
-    except Exception as e:
-        message = f"Unexpected error creating event: {e}."
-        logger.exception(message)
-        raise Exception(message)
+    link = created_event.get("htmlLink", "No link available")
+    confirmation_message = f"Successfully created event '{created_event.get('summary', summary)}' for {user_google_email}. Link: {link}"
+    logger.info(
+        f"Event created successfully for {user_google_email}. ID: {created_event.get('id')}, Link: {link}"
+    )
+    return confirmation_message
 
 
 @server.tool()
 @require_google_service("calendar", "calendar_events")
+@handle_http_errors("modify_event")
 async def modify_event(
     service,
     user_google_email: str,
@@ -334,104 +312,91 @@ async def modify_event(
         f"[modify_event] Invoked. Email: '{user_google_email}', Event ID: {event_id}"
     )
 
+    # Build the event body with only the fields that are provided
+    event_body: Dict[str, Any] = {}
+    if summary is not None:
+        event_body["summary"] = summary
+    if start_time is not None:
+        event_body["start"] = (
+            {"date": start_time}
+            if "T" not in start_time
+            else {"dateTime": start_time}
+        )
+        if timezone is not None and "dateTime" in event_body["start"]:
+            event_body["start"]["timeZone"] = timezone
+    if end_time is not None:
+        event_body["end"] = (
+            {"date": end_time} if "T" not in end_time else {"dateTime": end_time}
+        )
+        if timezone is not None and "dateTime" in event_body["end"]:
+            event_body["end"]["timeZone"] = timezone
+    if description is not None:
+        event_body["description"] = description
+    if location is not None:
+        event_body["location"] = location
+    if attendees is not None:
+        event_body["attendees"] = [{"email": email} for email in attendees]
+    if (
+        timezone is not None
+        and "start" not in event_body
+        and "end" not in event_body
+    ):
+        # If timezone is provided but start/end times are not, we need to fetch the existing event
+        # to apply the timezone correctly. This is a simplification; a full implementation
+        # might handle this more robustly or require start/end with timezone.
+        # For now, we'll log a warning and skip applying timezone if start/end are missing.
+        logger.warning(
+            f"[modify_event] Timezone provided but start_time and end_time are missing. Timezone will not be applied unless start/end times are also provided."
+        )
+
+    if not event_body:
+        message = "No fields provided to modify the event."
+        logger.warning(f"[modify_event] {message}")
+        raise Exception(message)
+
+    # Log the event ID for debugging
+    logger.info(
+        f"[modify_event] Attempting to update event with ID: '{event_id}' in calendar '{calendar_id}'"
+    )
+
+    # Try to get the event first to verify it exists
     try:
-        # Build the event body with only the fields that are provided
-        event_body: Dict[str, Any] = {}
-        if summary is not None:
-            event_body["summary"] = summary
-        if start_time is not None:
-            event_body["start"] = (
-                {"date": start_time}
-                if "T" not in start_time
-                else {"dateTime": start_time}
+        await asyncio.to_thread(
+            service.events().get(calendarId=calendar_id, eventId=event_id).execute
+        )
+        logger.info(
+            f"[modify_event] Successfully verified event exists before update"
+        )
+    except HttpError as get_error:
+        if get_error.resp.status == 404:
+            logger.error(
+                f"[modify_event] Event not found during pre-update verification: {get_error}"
             )
-            if timezone is not None and "dateTime" in event_body["start"]:
-                event_body["start"]["timeZone"] = timezone
-        if end_time is not None:
-            event_body["end"] = (
-                {"date": end_time} if "T" not in end_time else {"dateTime": end_time}
-            )
-            if timezone is not None and "dateTime" in event_body["end"]:
-                event_body["end"]["timeZone"] = timezone
-        if description is not None:
-            event_body["description"] = description
-        if location is not None:
-            event_body["location"] = location
-        if attendees is not None:
-            event_body["attendees"] = [{"email": email} for email in attendees]
-        if (
-            timezone is not None
-            and "start" not in event_body
-            and "end" not in event_body
-        ):
-            # If timezone is provided but start/end times are not, we need to fetch the existing event
-            # to apply the timezone correctly. This is a simplification; a full implementation
-            # might handle this more robustly or require start/end with timezone.
-            # For now, we'll log a warning and skip applying timezone if start/end are missing.
-            logger.warning(
-                f"[modify_event] Timezone provided but start_time and end_time are missing. Timezone will not be applied unless start/end times are also provided."
-            )
-
-        if not event_body:
-            message = "No fields provided to modify the event."
-            logger.warning(f"[modify_event] {message}")
+            message = f"Event not found during verification. The event with ID '{event_id}' could not be found in calendar '{calendar_id}'. This may be due to incorrect ID format or the event no longer exists."
             raise Exception(message)
-
-        # Log the event ID for debugging
-        logger.info(
-            f"[modify_event] Attempting to update event with ID: '{event_id}' in calendar '{calendar_id}'"
-        )
-
-        # Try to get the event first to verify it exists
-        try:
-            await asyncio.to_thread(
-                service.events().get(calendarId=calendar_id, eventId=event_id).execute
-            )
-            logger.info(
-                f"[modify_event] Successfully verified event exists before update"
-            )
-        except HttpError as get_error:
-            if get_error.resp.status == 404:
-                logger.error(
-                    f"[modify_event] Event not found during pre-update verification: {get_error}"
-                )
-                message = f"Event not found during verification. The event with ID '{event_id}' could not be found in calendar '{calendar_id}'. This may be due to incorrect ID format or the event no longer exists."
-                raise Exception(message)
-            else:
-                logger.warning(
-                    f"[modify_event] Error during pre-update verification, but proceeding with update: {get_error}"
-                )
-
-        # Proceed with the update
-        updated_event = await asyncio.to_thread(
-            service.events()
-            .update(calendarId=calendar_id, eventId=event_id, body=event_body)
-            .execute
-        )
-
-        link = updated_event.get("htmlLink", "No link available")
-        confirmation_message = f"Successfully modified event '{updated_event.get('summary', summary)}' (ID: {event_id}) for {user_google_email}. Link: {link}"
-        logger.info(
-            f"Event modified successfully for {user_google_email}. ID: {updated_event.get('id')}, Link: {link}"
-        )
-        return confirmation_message
-    except HttpError as error:
-        # Check for 404 Not Found error specifically
-        if error.resp.status == 404:
-            message = f"Event not found. The event with ID '{event_id}' could not be found in calendar '{calendar_id}'. LLM: The event may have been deleted, or the event ID might be incorrect. Verify the event exists using 'get_events' before attempting to modify it."
-            logger.error(f"[modify_event] {message}")
         else:
-            message = f"API error modifying event (ID: {event_id}): {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with the user's email ({user_google_email}) and service_name='Google Calendar'."
-            logger.error(message, exc_info=True)
-        raise Exception(message)
-    except Exception as e:
-        message = f"Unexpected error modifying event (ID: {event_id}): {e}."
-        logger.exception(message)
-        raise Exception(message)
+            logger.warning(
+                f"[modify_event] Error during pre-update verification, but proceeding with update: {get_error}"
+            )
+
+    # Proceed with the update
+    updated_event = await asyncio.to_thread(
+        service.events()
+        .update(calendarId=calendar_id, eventId=event_id, body=event_body)
+        .execute
+    )
+
+    link = updated_event.get("htmlLink", "No link available")
+    confirmation_message = f"Successfully modified event '{updated_event.get('summary', summary)}' (ID: {event_id}) for {user_google_email}. Link: {link}"
+    logger.info(
+        f"Event modified successfully for {user_google_email}. ID: {updated_event.get('id')}, Link: {link}"
+    )
+    return confirmation_message
 
 
 @server.tool()
 @require_google_service("calendar", "calendar_events")
+@handle_http_errors("delete_event")
 async def delete_event(service, user_google_email: str, event_id: str, calendar_id: str = "primary") -> str:
     """
     Deletes an existing event.
@@ -448,50 +413,36 @@ async def delete_event(service, user_google_email: str, event_id: str, calendar_
         f"[delete_event] Invoked. Email: '{user_google_email}', Event ID: {event_id}"
     )
 
+    # Log the event ID for debugging
+    logger.info(
+        f"[delete_event] Attempting to delete event with ID: '{event_id}' in calendar '{calendar_id}'"
+    )
+
+    # Try to get the event first to verify it exists
     try:
-        # Log the event ID for debugging
-        logger.info(
-            f"[delete_event] Attempting to delete event with ID: '{event_id}' in calendar '{calendar_id}'"
-        )
-
-        # Try to get the event first to verify it exists
-        try:
-            await asyncio.to_thread(
-                service.events().get(calendarId=calendar_id, eventId=event_id).execute
-            )
-            logger.info(
-                f"[delete_event] Successfully verified event exists before deletion"
-            )
-        except HttpError as get_error:
-            if get_error.resp.status == 404:
-                logger.error(
-                    f"[delete_event] Event not found during pre-delete verification: {get_error}"
-                )
-                message = f"Event not found during verification. The event with ID '{event_id}' could not be found in calendar '{calendar_id}'. This may be due to incorrect ID format or the event no longer exists."
-                raise Exception(message)
-            else:
-                logger.warning(
-                    f"[delete_event] Error during pre-delete verification, but proceeding with deletion: {get_error}"
-                )
-
-        # Proceed with the deletion
         await asyncio.to_thread(
-            service.events().delete(calendarId=calendar_id, eventId=event_id).execute
+            service.events().get(calendarId=calendar_id, eventId=event_id).execute
         )
-
-        confirmation_message = f"Successfully deleted event (ID: {event_id}) from calendar '{calendar_id}' for {user_google_email}."
-        logger.info(f"Event deleted successfully for {user_google_email}. ID: {event_id}")
-        return confirmation_message
-    except HttpError as error:
-        # Check for 404 Not Found error specifically
-        if error.resp.status == 404:
-            message = f"Event not found. The event with ID '{event_id}' could not be found in calendar '{calendar_id}'. LLM: The event may have been deleted already, or the event ID might be incorrect."
-            logger.error(f"[delete_event] {message}")
+        logger.info(
+            f"[delete_event] Successfully verified event exists before deletion"
+        )
+    except HttpError as get_error:
+        if get_error.resp.status == 404:
+            logger.error(
+                f"[delete_event] Event not found during pre-delete verification: {get_error}"
+            )
+            message = f"Event not found during verification. The event with ID '{event_id}' could not be found in calendar '{calendar_id}'. This may be due to incorrect ID format or the event no longer exists."
+            raise Exception(message)
         else:
-            message = f"API error deleting event (ID: {event_id}): {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with the user's email ({user_google_email}) and service_name='Google Calendar'."
-            logger.error(message, exc_info=True)
-        raise Exception(message)
-    except Exception as e:
-        message = f"Unexpected error deleting event (ID: {event_id}): {e}."
-        logger.exception(message)
-        raise Exception(message)
+            logger.warning(
+                f"[delete_event] Error during pre-delete verification, but proceeding with deletion: {get_error}"
+            )
+
+    # Proceed with the deletion
+    await asyncio.to_thread(
+        service.events().delete(calendarId=calendar_id, eventId=event_id).execute
+    )
+
+    confirmation_message = f"Successfully deleted event (ID: {event_id}) from calendar '{calendar_id}' for {user_google_email}."
+    logger.info(f"Event deleted successfully for {user_google_email}. ID: {event_id}")
+    return confirmation_message

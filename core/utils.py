@@ -160,3 +160,39 @@ def extract_office_xml_text(file_bytes: bytes, mime_type: str) -> Optional[str]:
     except Exception as e:
         logger.error(f"Failed to extract office XML text for {mime_type}: {e}", exc_info=True)
         return None
+
+import functools
+from googleapiclient.errors import HttpError
+
+def handle_http_errors(tool_name: str):
+    """
+    A decorator to handle Google API HttpErrors in a standardized way.
+
+    It wraps a tool function, catches HttpError, logs a detailed error message,
+    and raises a generic Exception with a user-friendly message.
+
+    Args:
+        tool_name (str): The name of the tool being decorated (e.g., 'list_calendars').
+                         This is used for logging purposes.
+    """
+    def decorator(func):
+        @functools.wraps(func)
+        async def wrapper(*args, **kwargs):
+            try:
+                return await func(*args, **kwargs)
+            except HttpError as error:
+                user_google_email = kwargs.get('user_google_email', 'N/A')
+                message = (
+                    f"API error in {tool_name}: {error}. "
+                    f"You might need to re-authenticate for user '{user_google_email}'. "
+                    f"LLM: Try 'start_google_auth' with the user's email and the appropriate service_name."
+                )
+                logger.error(message, exc_info=True)
+                raise Exception(message)
+            except Exception as e:
+                # Catch any other unexpected errors
+                message = f"An unexpected error occurred in {tool_name}: {e}"
+                logger.exception(message)
+                raise Exception(message)
+        return wrapper
+    return decorator

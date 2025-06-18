@@ -243,7 +243,7 @@ def require_google_service(
                 cached_result = _get_cached_service(cache_key)
                 if cached_result:
                     service, actual_user_email = cached_result
-            
+
             if service is None:
                 try:
                     tool_name = func.__name__
