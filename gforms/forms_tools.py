@@ -13,12 +13,14 @@ from googleapiclient.errors import HttpError
 
 from auth.service_decorator import require_google_service
 from core.server import server
+from core.utils import handle_http_errors
 
 logger = logging.getLogger(__name__)
 
 
 @server.tool()
 @require_google_service("forms", "forms")
+@handle_http_errors("create_form")
 async def create_form(
     service,
     user_google_email: str,
@@ -40,42 +42,34 @@ async def create_form(
     """
     logger.info(f"[create_form] Invoked. Email: '{user_google_email}', Title: {title}")
 
-    try:
-        form_body: Dict[str, Any] = {
-            "info": {
-                "title": title
-            }
+    form_body: Dict[str, Any] = {
+        "info": {
+            "title": title
         }
+    }
+    
+    if description:
+        form_body["info"]["description"] = description
         
-        if description:
-            form_body["info"]["description"] = description
-            
-        if document_title:
-            form_body["info"]["document_title"] = document_title
+    if document_title:
+        form_body["info"]["document_title"] = document_title
 
-        created_form = await asyncio.to_thread(
-            service.forms().create(body=form_body).execute
-        )
+    created_form = await asyncio.to_thread(
+        service.forms().create(body=form_body).execute
+    )
 
-        form_id = created_form.get("formId")
-        edit_url = f"https://docs.google.com/forms/d/{form_id}/edit"
-        responder_url = created_form.get("responderUri", f"https://docs.google.com/forms/d/{form_id}/viewform")
-        
-        confirmation_message = f"Successfully created form '{created_form.get('info', {}).get('title', title)}' for {user_google_email}. Form ID: {form_id}. Edit URL: {edit_url}. Responder URL: {responder_url}"
-        logger.info(f"Form created successfully for {user_google_email}. ID: {form_id}")
-        return confirmation_message
-    except HttpError as error:
-        message = f"API error creating form: {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with the user's email ({user_google_email}) and service_name='Google Forms'."
-        logger.error(message, exc_info=True)
-        raise Exception(message)
-    except Exception as e:
-        message = f"Unexpected error creating form: {e}."
-        logger.exception(message)
-        raise Exception(message)
+    form_id = created_form.get("formId")
+    edit_url = f"https://docs.google.com/forms/d/{form_id}/edit"
+    responder_url = created_form.get("responderUri", f"https://docs.google.com/forms/d/{form_id}/viewform")
+    
+    confirmation_message = f"Successfully created form '{created_form.get('info', {}).get('title', title)}' for {user_google_email}. Form ID: {form_id}. Edit URL: {edit_url}. Responder URL: {responder_url}"
+    logger.info(f"Form created successfully for {user_google_email}. ID: {form_id}")
+    return confirmation_message
 
 
 @server.tool()
 @require_google_service("forms", "forms")
+@handle_http_errors("get_form")
 async def get_form(
     service,
     user_google_email: str,
@@ -93,30 +87,29 @@ async def get_form(
     """
     logger.info(f"[get_form] Invoked. Email: '{user_google_email}', Form ID: {form_id}")
 
-    try:
-        form = await asyncio.to_thread(
-            service.forms().get(formId=form_id).execute
-        )
+    form = await asyncio.to_thread(
+        service.forms().get(formId=form_id).execute
+    )
 
-        form_info = form.get("info", {})
-        title = form_info.get("title", "No Title")
-        description = form_info.get("description", "No Description")
-        document_title = form_info.get("documentTitle", title)
-        
-        edit_url = f"https://docs.google.com/forms/d/{form_id}/edit"
-        responder_url = form.get("responderUri", f"https://docs.google.com/forms/d/{form_id}/viewform")
-        
-        items = form.get("items", [])
-        questions_summary = []
-        for i, item in enumerate(items, 1):
-            item_title = item.get("title", f"Question {i}")
-            item_type = item.get("questionItem", {}).get("question", {}).get("required", False)
-            required_text = " (Required)" if item_type else ""
-            questions_summary.append(f"  {i}. {item_title}{required_text}")
-        
-        questions_text = "\n".join(questions_summary) if questions_summary else "  No questions found"
-        
-        result = f"""Form Details for {user_google_email}:
+    form_info = form.get("info", {})
+    title = form_info.get("title", "No Title")
+    description = form_info.get("description", "No Description")
+    document_title = form_info.get("documentTitle", title)
+    
+    edit_url = f"https://docs.google.com/forms/d/{form_id}/edit"
+    responder_url = form.get("responderUri", f"https://docs.google.com/forms/d/{form_id}/viewform")
+    
+    items = form.get("items", [])
+    questions_summary = []
+    for i, item in enumerate(items, 1):
+        item_title = item.get("title", f"Question {i}")
+        item_type = item.get("questionItem", {}).get("question", {}).get("required", False)
+        required_text = " (Required)" if item_type else ""
+        questions_summary.append(f"  {i}. {item_title}{required_text}")
+    
+    questions_text = "\n".join(questions_summary) if questions_summary else "  No questions found"
+    
+    result = f"""Form Details for {user_google_email}:
 - Title: "{title}"
 - Description: "{description}"
 - Document Title: "{document_title}"
@@ -125,21 +118,14 @@ async def get_form(
 - Responder URL: {responder_url}
 - Questions ({len(items)} total):
 {questions_text}"""
-        
-        logger.info(f"Successfully retrieved form for {user_google_email}. ID: {form_id}")
-        return result
-    except HttpError as error:
-        message = f"API error getting form: {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with the user's email ({user_google_email}) and service_name='Google Forms'."
-        logger.error(message, exc_info=True)
-        raise Exception(message)
-    except Exception as e:
-        message = f"Unexpected error getting form: {e}."
-        logger.exception(message)
-        raise Exception(message)
+    
+    logger.info(f"Successfully retrieved form for {user_google_email}. ID: {form_id}")
+    return result
 
 
 @server.tool()
 @require_google_service("forms", "forms")
+@handle_http_errors("set_publish_settings")
 async def set_publish_settings(
     service,
     user_google_email: str,
@@ -161,31 +147,23 @@ async def set_publish_settings(
     """
     logger.info(f"[set_publish_settings] Invoked. Email: '{user_google_email}', Form ID: {form_id}")
 
-    try:
-        settings_body = {
-            "publishAsTemplate": publish_as_template,
-            "requireAuthentication": require_authentication
-        }
+    settings_body = {
+        "publishAsTemplate": publish_as_template,
+        "requireAuthentication": require_authentication
+    }
 
-        await asyncio.to_thread(
-            service.forms().setPublishSettings(formId=form_id, body=settings_body).execute
-        )
+    await asyncio.to_thread(
+        service.forms().setPublishSettings(formId=form_id, body=settings_body).execute
+    )
 
-        confirmation_message = f"Successfully updated publish settings for form {form_id} for {user_google_email}. Publish as template: {publish_as_template}, Require authentication: {require_authentication}"
-        logger.info(f"Publish settings updated successfully for {user_google_email}. Form ID: {form_id}")
-        return confirmation_message
-    except HttpError as error:
-        message = f"API error updating publish settings: {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with the user's email ({user_google_email}) and service_name='Google Forms'."
-        logger.error(message, exc_info=True)
-        raise Exception(message)
-    except Exception as e:
-        message = f"Unexpected error updating publish settings: {e}."
-        logger.exception(message)
-        raise Exception(message)
+    confirmation_message = f"Successfully updated publish settings for form {form_id} for {user_google_email}. Publish as template: {publish_as_template}, Require authentication: {require_authentication}"
+    logger.info(f"Publish settings updated successfully for {user_google_email}. Form ID: {form_id}")
+    return confirmation_message
 
 
 @server.tool()
 @require_google_service("forms", "forms")
+@handle_http_errors("get_form_response")
 async def get_form_response(
     service,
     user_google_email: str,
@@ -205,49 +183,41 @@ async def get_form_response(
     """
     logger.info(f"[get_form_response] Invoked. Email: '{user_google_email}', Form ID: {form_id}, Response ID: {response_id}")
 
-    try:
-        response = await asyncio.to_thread(
-            service.forms().responses().get(formId=form_id, responseId=response_id).execute
-        )
+    response = await asyncio.to_thread(
+        service.forms().responses().get(formId=form_id, responseId=response_id).execute
+    )
 
-        response_id = response.get("responseId", "Unknown")
-        create_time = response.get("createTime", "Unknown")
-        last_submitted_time = response.get("lastSubmittedTime", "Unknown")
-        
-        answers = response.get("answers", {})
-        answer_details = []
-        for question_id, answer_data in answers.items():
-            question_response = answer_data.get("textAnswers", {}).get("answers", [])
-            if question_response:
-                answer_text = ", ".join([ans.get("value", "") for ans in question_response])
-                answer_details.append(f"  Question ID {question_id}: {answer_text}")
-            else:
-                answer_details.append(f"  Question ID {question_id}: No answer provided")
-        
-        answers_text = "\n".join(answer_details) if answer_details else "  No answers found"
-        
-        result = f"""Form Response Details for {user_google_email}:
+    response_id = response.get("responseId", "Unknown")
+    create_time = response.get("createTime", "Unknown")
+    last_submitted_time = response.get("lastSubmittedTime", "Unknown")
+    
+    answers = response.get("answers", {})
+    answer_details = []
+    for question_id, answer_data in answers.items():
+        question_response = answer_data.get("textAnswers", {}).get("answers", [])
+        if question_response:
+            answer_text = ", ".join([ans.get("value", "") for ans in question_response])
+            answer_details.append(f"  Question ID {question_id}: {answer_text}")
+        else:
+            answer_details.append(f"  Question ID {question_id}: No answer provided")
+    
+    answers_text = "\n".join(answer_details) if answer_details else "  No answers found"
+    
+    result = f"""Form Response Details for {user_google_email}:
 - Form ID: {form_id}
 - Response ID: {response_id}
 - Created: {create_time}
 - Last Submitted: {last_submitted_time}
 - Answers:
 {answers_text}"""
-        
-        logger.info(f"Successfully retrieved response for {user_google_email}. Response ID: {response_id}")
-        return result
-    except HttpError as error:
-        message = f"API error getting form response: {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with the user's email ({user_google_email}) and service_name='Google Forms'."
-        logger.error(message, exc_info=True)
-        raise Exception(message)
-    except Exception as e:
-        message = f"Unexpected error getting form response: {e}."
-        logger.exception(message)
-        raise Exception(message)
+    
+    logger.info(f"Successfully retrieved response for {user_google_email}. Response ID: {response_id}")
+    return result
 
 
 @server.tool()
 @require_google_service("forms", "forms")
+@handle_http_errors("list_form_responses")
 async def list_form_responses(
     service,
     user_google_email: str,
@@ -269,50 +239,41 @@ async def list_form_responses(
     """
     logger.info(f"[list_form_responses] Invoked. Email: '{user_google_email}', Form ID: {form_id}")
 
-    try:
-        params = {
-            "formId": form_id,
-            "pageSize": page_size
-        }
-        if page_token:
-            params["pageToken"] = page_token
+    params = {
+        "formId": form_id,
+        "pageSize": page_size
+    }
+    if page_token:
+        params["pageToken"] = page_token
 
-        responses_result = await asyncio.to_thread(
-            service.forms().responses().list(**params).execute
+    responses_result = await asyncio.to_thread(
+        service.forms().responses().list(**params).execute
+    )
+
+    responses = responses_result.get("responses", [])
+    next_page_token = responses_result.get("nextPageToken")
+    
+    if not responses:
+        return f"No responses found for form {form_id} for {user_google_email}."
+
+    response_details = []
+    for i, response in enumerate(responses, 1):
+        response_id = response.get("responseId", "Unknown")
+        create_time = response.get("createTime", "Unknown")
+        last_submitted_time = response.get("lastSubmittedTime", "Unknown")
+        
+        answers_count = len(response.get("answers", {}))
+        response_details.append(
+            f"  {i}. Response ID: {response_id} | Created: {create_time} | Last Submitted: {last_submitted_time} | Answers: {answers_count}"
         )
 
-        responses = responses_result.get("responses", [])
-        next_page_token = responses_result.get("nextPageToken")
-        
-        if not responses:
-            return f"No responses found for form {form_id} for {user_google_email}."
-
-        response_details = []
-        for i, response in enumerate(responses, 1):
-            response_id = response.get("responseId", "Unknown")
-            create_time = response.get("createTime", "Unknown")
-            last_submitted_time = response.get("lastSubmittedTime", "Unknown")
-            
-            answers_count = len(response.get("answers", {}))
-            response_details.append(
-                f"  {i}. Response ID: {response_id} | Created: {create_time} | Last Submitted: {last_submitted_time} | Answers: {answers_count}"
-            )
-
-        pagination_info = f"\nNext page token: {next_page_token}" if next_page_token else "\nNo more pages."
-        
-        result = f"""Form Responses for {user_google_email}:
+    pagination_info = f"\nNext page token: {next_page_token}" if next_page_token else "\nNo more pages."
+    
+    result = f"""Form Responses for {user_google_email}:
 - Form ID: {form_id}
 - Total responses returned: {len(responses)}
 - Responses:
 {chr(10).join(response_details)}{pagination_info}"""
-        
-        logger.info(f"Successfully retrieved {len(responses)} responses for {user_google_email}. Form ID: {form_id}")
-        return result
-    except HttpError as error:
-        message = f"API error listing form responses: {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with the user's email ({user_google_email}) and service_name='Google Forms'."
-        logger.error(message, exc_info=True)
-        raise Exception(message)
-    except Exception as e:
-        message = f"Unexpected error listing form responses: {e}."
-        logger.exception(message)
-        raise Exception(message)
+    
+    logger.info(f"Successfully retrieved {len(responses)} responses for {user_google_email}. Form ID: {form_id}")
+    return result
