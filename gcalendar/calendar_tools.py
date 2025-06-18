@@ -97,7 +97,7 @@ async def list_calendars(service, user_google_email: str) -> str:
     logger.info(f"[list_calendars] Invoked. Email: '{user_google_email}'")
 
     calendar_list_response = await asyncio.to_thread(
-        service.calendarList().list().execute
+        lambda: service.calendarList().list().execute()
     )
     items = calendar_list_response.get("items", [])
     if not items:
@@ -169,7 +169,7 @@ async def get_events(
     )
 
     events_result = await asyncio.to_thread(
-        service.events()
+        lambda: service.events()
         .list(
             calendarId=calendar_id,
             timeMin=effective_time_min,
@@ -178,7 +178,7 @@ async def get_events(
             singleEvents=True,
             orderBy="startTime",
         )
-        .execute
+        .execute()
     )
     items = events_result.get("items", [])
     if not items:
@@ -296,7 +296,7 @@ async def create_event(
                 if drive_service:
                     try:
                         file_metadata = await asyncio.to_thread(
-                            drive_service.files().get(fileId=file_id, fields="mimeType,name").execute
+                            lambda: drive_service.files().get(fileId=file_id, fields="mimeType,name").execute()
                         )
                         mime_type = file_metadata.get("mimeType", mime_type)
                         filename = file_metadata.get("name")
@@ -319,7 +319,7 @@ async def create_event(
         )
     else:
         created_event = await asyncio.to_thread(
-            service.events().insert(calendarId=calendar_id, body=event_body).execute
+            lambda: service.events().insert(calendarId=calendar_id, body=event_body).execute()
         )
     link = created_event.get("htmlLink", "No link available")
     confirmation_message = f"Successfully created event '{created_event.get('summary', summary)}' for {user_google_email}. Link: {link}"
@@ -417,7 +417,7 @@ async def modify_event(
     # Try to get the event first to verify it exists
     try:
         await asyncio.to_thread(
-            service.events().get(calendarId=calendar_id, eventId=event_id).execute
+            lambda: service.events().get(calendarId=calendar_id, eventId=event_id).execute()
         )
         logger.info(
             f"[modify_event] Successfully verified event exists before update"
@@ -436,9 +436,9 @@ async def modify_event(
 
     # Proceed with the update
     updated_event = await asyncio.to_thread(
-        service.events()
+        lambda: service.events()
         .update(calendarId=calendar_id, eventId=event_id, body=event_body)
-        .execute
+        .execute()
     )
 
     link = updated_event.get("htmlLink", "No link available")
@@ -476,7 +476,7 @@ async def delete_event(service, user_google_email: str, event_id: str, calendar_
     # Try to get the event first to verify it exists
     try:
         await asyncio.to_thread(
-            service.events().get(calendarId=calendar_id, eventId=event_id).execute
+            lambda: service.events().get(calendarId=calendar_id, eventId=event_id).execute()
         )
         logger.info(
             f"[delete_event] Successfully verified event exists before deletion"
@@ -495,7 +495,7 @@ async def delete_event(service, user_google_email: str, event_id: str, calendar_
 
     # Proceed with the deletion
     await asyncio.to_thread(
-        service.events().delete(calendarId=calendar_id, eventId=event_id).execute
+        lambda: service.events().delete(calendarId=calendar_id, eventId=event_id).execute()
     )
 
     confirmation_message = f"Successfully deleted event (ID: {event_id}) from calendar '{calendar_id}' for {user_google_email}."
@@ -525,7 +525,7 @@ async def get_event(
     """
     logger.info(f"[get_event] Invoked. Email: '{user_google_email}', Event ID: {event_id}")
     event = await asyncio.to_thread(
-        service.events().get(calendarId=calendar_id, eventId=event_id).execute
+        lambda: service.events().get(calendarId=calendar_id, eventId=event_id).execute()
     )
     summary = event.get("summary", "No Title")
     start = event["start"].get("dateTime", event["start"].get("date"))
