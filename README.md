@@ -7,10 +7,11 @@
 [![PyPI](https://img.shields.io/pypi/v/workspace-mcp.svg)](https://pypi.org/project/workspace-mcp/)
 [![UV](https://img.shields.io/badge/Package%20Installer-UV-blueviolet)](https://github.com/astral-sh/uv)
 [![Website](https://img.shields.io/badge/Website-workspacemcp.com-green.svg)](https://workspacemcp.com)
+[![Verified on MseeP](https://mseep.ai/badge.svg)](https://mseep.ai/app/eebbc4a6-0f8c-41b2-ace8-038e5516dba0)
 
-**The world's most feature-complete Google Workspace MCP server**
+**This is the single most feature-complete Google Workspace MCP server**
 
-*Connect MCP Clients, AI assistants and developer tools to Google Calendar, Drive, Gmail, Docs, Sheets, Slides, Forms, and Chat*
+*Full natural language control over Google Calendar, Drive, Gmail, Docs, Sheets, Slides, Forms, and Chat through all MCP clients, AI assistants and developer tools*
 
 </div>
 
@@ -96,6 +97,7 @@ uv run main.py
    - Create OAuth 2.0 credentials (web application) in [Google Cloud Console](https://console.cloud.google.com/)
    - Enable APIs: Calendar, Drive, Gmail, Docs, Sheets, Slides, Forms, Chat
    - Download credentials as `client_secret.json` in project root
+     - To use a different location for `client_secret.json`, you can set the `GOOGLE_CLIENT_SECRETS` environment variable with that path
    - Add redirect URI: `http://localhost:8000/oauth2callback`
 
 2. **Environment**:
