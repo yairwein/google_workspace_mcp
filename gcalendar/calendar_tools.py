@@ -310,9 +310,9 @@ async def create_event(
                 ).execute()
             )
         else:
-        created_event = await asyncio.to_thread(
-            service.events().insert(calendarId=calendar_id, body=event_body).execute
-        )
+            created_event = await asyncio.to_thread(
+                service.events().insert(calendarId=calendar_id, body=event_body).execute
+            )
     link = created_event.get("htmlLink", "No link available")
     confirmation_message = f"Successfully created event '{created_event.get('summary', summary)}' for {user_google_email}. Link: {link}"
     logger.info(
