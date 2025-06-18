@@ -329,9 +329,9 @@ async def create_event(
                 service.events().insert(calendarId=calendar_id, body=event_body).execute
             )
         link = created_event.get("htmlLink", "No link available")
-       logger.info(
-            f"Event created successfully for {user_google_email}. ID: {created_event.get('id')}, Link: {link}"
-        )
+        logger.info(
+                f"Event created successfully for {user_google_email}. ID: {created_event.get('id')}, Link: {link}"
+            )
         return confirmation_message
     except HttpError as error:
         message = f"API error creating event: {error}. You might need to re-authenticate. LLM: Try 'start_google_auth' with the user's email ({user_google_email}) and service_name='Google Calendar'."
