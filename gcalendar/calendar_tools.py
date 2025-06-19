@@ -7,8 +7,6 @@ This module provides MCP tools for interacting with Google Calendar API.
 import datetime
 import logging
 import asyncio
-import os
-import sys
 import re
 from typing import List, Optional, Dict, Any
 
