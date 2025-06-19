@@ -268,7 +268,7 @@ async def create_event(
             event_body["end"]["timeZone"] = timezone
     if attendees:
         event_body["attendees"] = [{"email": email} for email in attendees]
-    
+
     if attachments:
         # Accept both file URLs and file IDs. If a URL, extract the fileId.
         event_body["attachments"] = []
