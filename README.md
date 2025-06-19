@@ -217,7 +217,8 @@ When calling a tool:
 |------|-------------|
 | `list_calendars` | List accessible calendars |
 | `get_events` | Retrieve events with time range filtering |
-| `create_event` | Create events (all-day or timed) |
+| `get_event` | Fetch detailed information of a single event by ID |
+| `create_event` | Create events (all-day or timed) with optional Drive file attachments |
 | `modify_event` | Update existing events |
 | `delete_event` | Remove events |
 
@@ -228,7 +229,7 @@ When calling a tool:
 | `search_drive_files` | Search files with query syntax |
 | `get_drive_file_content` | Read file content (supports Office formats) |
 | `list_drive_items` | List folder contents |
-| `create_drive_file` | Create new files |
+| `create_drive_file` | Create new files or fetch content from public URLs |
 
 ### 📧 Gmail ([`gmail_tools.py`](gmail/gmail_tools.py))
 
