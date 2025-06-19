@@ -30,7 +30,6 @@ def _correct_time_format_for_api(
     if not time_str:
         return None
 
-    # Log the incoming time string for debugging
     logger.info(
         f"_correct_time_format_for_api: Processing {param_name} with value '{time_str}'"
     )
@@ -161,7 +160,6 @@ async def get_events(
             f"time_max processing: original='{time_max}', formatted='{effective_time_max}'"
         )
 
-    # Log the final API call parameters
     logger.info(
         f"[get_events] Final API parameters - calendarId: '{calendar_id}', timeMin: '{effective_time_min}', timeMax: '{effective_time_max}', maxResults: {max_results}"
     )
@@ -240,7 +238,7 @@ async def create_event(
         f"[create_event] Invoked. Email: '{user_google_email}', Summary: {summary}"
     )
     logger.info(f"[create_event] Incoming attachments param: {attachments}")
-    # If attachments is a string, split by comma and strip whitespace
+    # If attachments value is a string, split by comma and strip whitespace
     if attachments and isinstance(attachments, str):
         attachments = [a.strip() for a in attachments.split(',') if a.strip()]
         logger.info(f"[create_event] Parsed attachments list from string: {attachments}")
