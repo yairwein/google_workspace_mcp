@@ -60,7 +60,7 @@ A production-ready MCP server that integrates all major Google Workspace service
 
 ### Simplest Start (uvx - Recommended)
 
-Run instantly without installation:
+> Run instantly without manual installation - you must set the `GOOGLE_CLIENT_SECRETS` environment variable with the path to your `client_secret.json` when using uvx as you won't have a repo directory to pull from.
 
 ```bash
 # Start the server with all Google Workspace tools
