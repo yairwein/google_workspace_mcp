@@ -243,7 +243,7 @@ def check_client_secrets() -> Optional[str]:
     env_config = load_client_secrets_from_env()
     if not env_config and not os.path.exists(CONFIG_CLIENT_SECRETS_PATH):
         logger.error(f"OAuth client credentials not found. No environment variables set and no file at {CONFIG_CLIENT_SECRETS_PATH}")
-        return "OAuth client credentials not found. Please set GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET environment variables or provide client_secret.json file."
+        return f"OAuth client credentials not found. Please set GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET environment variables or provide a client secrets file at {CONFIG_CLIENT_SECRETS_PATH}."
     return None
 
 def create_oauth_flow(scopes: List[str], redirect_uri: str, state: Optional[str] = None) -> Flow:
