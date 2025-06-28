@@ -119,11 +119,12 @@ async def oauth2_callback(request: Request) -> HTMLResponse:
         return create_error_response(error_message)
 
     try:
-        client_secrets_path = CONFIG_CLIENT_SECRETS_PATH
-        if not os.path.exists(client_secrets_path):
-            logger.error(f"OAuth client secrets file not found at {client_secrets_path}")
-            # This is a server configuration error, should not happen in a deployed environment.
-            return HTMLResponse(content="Server Configuration Error: Client secrets not found.", status_code=500)
+        # Check if we have credentials available (environment variables or file)
+        from auth.google_auth import load_client_secrets_from_env
+        env_config = load_client_secrets_from_env()
+        if not env_config and not os.path.exists(CONFIG_CLIENT_SECRETS_PATH):
+            logger.error(f"OAuth client credentials not found. No environment variables set and no file at {CONFIG_CLIENT_SECRETS_PATH}")
+            return HTMLResponse(content="Server Configuration Error: OAuth client credentials not found. Please set GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET environment variables or provide client_secret.json file.", status_code=500)
 
         logger.info(f"OAuth callback: Received code (state: {state}). Attempting to exchange for tokens.")
 
@@ -136,7 +137,6 @@ async def oauth2_callback(request: Request) -> HTMLResponse:
         # Exchange code for credentials. handle_auth_callback will save them.
         # The user_id returned here is the Google-verified email.
         verified_user_id, credentials = handle_auth_callback(
-            client_secrets_path=client_secrets_path,
             scopes=SCOPES, # Ensure all necessary scopes are requested
             authorization_response=str(request.url),
             redirect_uri=get_oauth_redirect_uri_for_current_mode(),

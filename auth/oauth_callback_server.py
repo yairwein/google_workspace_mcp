@@ -59,6 +59,13 @@ class MinimalOAuthServer:
                 return create_error_response(error_message)
 
             try:
+                # Check if we have credentials available (environment variables or file)
+                from auth.google_auth import load_client_secrets_from_env
+                env_config = load_client_secrets_from_env()
+                if not env_config and not os.path.exists(CONFIG_CLIENT_SECRETS_PATH):
+                    logger.error(f"OAuth client credentials not found. No environment variables set and no file at {CONFIG_CLIENT_SECRETS_PATH}")
+                    return create_error_response("Server Configuration Error: OAuth client credentials not found. Please set GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET environment variables or provide client_secret.json file.")
+
                 logger.info(f"OAuth callback: Received code (state: {state}). Attempting to exchange for tokens.")
 
                 mcp_session_id: Optional[str] = OAUTH_STATE_TO_SESSION_ID_MAP.pop(state, None)
@@ -69,7 +76,6 @@ class MinimalOAuthServer:
 
                 # Exchange code for credentials
                 verified_user_id, credentials = handle_auth_callback(
-                    client_secrets_path=CONFIG_CLIENT_SECRETS_PATH,
                     scopes=SCOPES,
                     authorization_response=str(request.url),
                     redirect_uri=f"{self.base_uri}:{self.port}/oauth2callback",
