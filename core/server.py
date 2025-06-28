@@ -124,7 +124,7 @@ async def oauth2_callback(request: Request) -> HTMLResponse:
         env_config = load_client_secrets_from_env()
         if not env_config and not os.path.exists(CONFIG_CLIENT_SECRETS_PATH):
             logger.error(f"OAuth client credentials not found. No environment variables set and no file at {CONFIG_CLIENT_SECRETS_PATH}")
-            return HTMLResponse(content="Server Configuration Error: OAuth client credentials not found. Please set GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET environment variables or provide client_secret.json file.", status_code=500)
+            return create_server_error_response("OAuth client credentials not found. Please set GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET environment variables or provide client_secret.json file.")
 
         logger.info(f"OAuth callback: Received code (state: {state}). Attempting to exchange for tokens.")
 

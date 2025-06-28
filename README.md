@@ -60,7 +60,7 @@ A production-ready MCP server that integrates all major Google Workspace service
 
 ### Simplest Start (uvx - Recommended)
 
-> Run instantly without manual installation - you must configure OAuth credentials when using uvx. You can use either environment variables (recommended for production) or set `GOOGLE_CLIENT_SECRETS` to point to your client_secret.json file.
+> Run instantly without manual installation - you must configure OAuth credentials when using uvx. You can use either environment variables (recommended for production) or set the `GOOGLE_CLIENT_SECRET_PATH` (or legacy `GOOGLE_CLIENT_SECRETS`) environment variable to point to your `client_secret.json` file.
 
 ```bash
 # Set OAuth credentials via environment variables (recommended)
@@ -112,11 +112,11 @@ uv run main.py
 
      **Option B: File-based (Traditional)**
      - Download credentials as `client_secret.json` in project root
-     - To use a different location, set `GOOGLE_CLIENT_SECRETS` environment variable with the file path
+     - To use a different location, set `GOOGLE_CLIENT_SECRET_PATH` (or legacy `GOOGLE_CLIENT_SECRETS`) environment variable with the file path
 
    **Credential Loading Priority**:
    1. Environment variables (`GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`)
-   2. File specified by `GOOGLE_CLIENT_SECRETS` environment variable
+   2. File specified by `GOOGLE_CLIENT_SECRET_PATH` or `GOOGLE_CLIENT_SECRETS` environment variable
    3. Default file (`client_secret.json` in project root)
 
    **Why Environment Variables?**

@@ -27,7 +27,7 @@ DEFAULT_CREDENTIALS_DIR = ".credentials"
 # This should be more robust in a production system once OAuth2.1 is implemented in client.
 _SESSION_CREDENTIALS_CACHE: Dict[str, Credentials] = {}
 # Centralized Client Secrets Path Logic
-_client_secrets_env = os.getenv("GOOGLE_CLIENT_SECRETS")
+_client_secrets_env = os.getenv("GOOGLE_CLIENT_SECRET_PATH") or os.getenv("GOOGLE_CLIENT_SECRETS")
 if _client_secrets_env:
     CONFIG_CLIENT_SECRETS_PATH = _client_secrets_env
 else:
