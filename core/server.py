@@ -11,7 +11,7 @@ from mcp import types
 from mcp.server.fastmcp import FastMCP
 from starlette.requests import Request
 
-from auth.google_auth import handle_auth_callback, start_auth_flow, CONFIG_CLIENT_SECRETS_PATH
+from auth.google_auth import handle_auth_callback, start_auth_flow, check_client_secrets
 from auth.oauth_callback_server import get_oauth_redirect_uri, ensure_oauth_callback_available
 from auth.oauth_responses import create_error_response, create_success_response, create_server_error_response
 
@@ -120,11 +120,9 @@ async def oauth2_callback(request: Request) -> HTMLResponse:
 
     try:
         # Check if we have credentials available (environment variables or file)
-        from auth.google_auth import load_client_secrets_from_env
-        env_config = load_client_secrets_from_env()
-        if not env_config and not os.path.exists(CONFIG_CLIENT_SECRETS_PATH):
-            logger.error(f"OAuth client credentials not found. No environment variables set and no file at {CONFIG_CLIENT_SECRETS_PATH}")
-            return create_server_error_response("OAuth client credentials not found. Please set GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET environment variables or provide client_secret.json file.")
+        error_message = check_client_secrets()
+        if error_message:
+            return create_server_error_response(error_message)
 
         logger.info(f"OAuth callback: Received code (state: {state}). Attempting to exchange for tokens.")
 
