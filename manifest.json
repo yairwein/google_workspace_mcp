@@ -17,13 +17,14 @@
     "type": "python",
     "entry_point": "main.py",
     "mcp_config": {
-      "command": "python",
+      "command": "uv",
       "args": [
+        "run",
+        "--directory",
+        "${__dirname}",
+        "python",
         "${__dirname}/main.py"
-      ],
-      "env": {
-        "PYTHONPATH": "server/lib"
-      }
+      ]
     }
   },
   "tools": [
