@@ -31,18 +31,9 @@ def create_comment_tools(app_name: str, file_id_param: str):
         Dict containing the four comment management functions
     """
     
-    @server.tool()
-    @require_google_service("drive", "drive_read")
-    @handle_http_errors(f"read_{app_name}_comments")
-    async def read_comments(
-        service,
-        user_google_email: str,
-        **kwargs
-    ) -> str:
-        """
-        Read all comments from a Google Workspace file.
-        """
-        file_id = kwargs[file_id_param]
+    # Create read comments function
+    async def read_comments_impl(service, user_google_email: str, file_id: str) -> str:
+        """Read all comments from a Google Workspace file."""
         logger.info(f"[read_{app_name}_comments] Reading comments for {app_name} {file_id}")
 
         response = await asyncio.to_thread(
@@ -90,19 +81,9 @@ def create_comment_tools(app_name: str, file_id_param: str):
         
         return "\\n".join(output)
 
-    @server.tool()
-    @require_google_service("drive", "drive_file")
-    @handle_http_errors(f"create_{app_name}_comment")
-    async def create_comment(
-        service,
-        user_google_email: str,
-        comment_content: str,
-        **kwargs
-    ) -> str:
-        """
-        Create a new comment on a Google Workspace file.
-        """
-        file_id = kwargs[file_id_param]
+    # Create comment function
+    async def create_comment_impl(service, user_google_email: str, file_id: str, comment_content: str) -> str:
+        """Create a new comment on a Google Workspace file."""
         logger.info(f"[create_{app_name}_comment] Creating comment in {app_name} {file_id}")
 
         body = {"content": comment_content}
@@ -121,20 +102,9 @@ def create_comment_tools(app_name: str, file_id_param: str):
         
         return f"Comment created successfully!\\nComment ID: {comment_id}\\nAuthor: {author}\\nCreated: {created}\\nContent: {comment_content}"
 
-    @server.tool()
-    @require_google_service("drive", "drive_file")
-    @handle_http_errors(f"reply_to_{app_name}_comment")
-    async def reply_to_comment(
-        service,
-        user_google_email: str,
-        comment_id: str,
-        reply_content: str,
-        **kwargs
-    ) -> str:
-        """
-        Reply to a specific comment in a Google Workspace file.
-        """
-        file_id = kwargs[file_id_param]
+    # Reply to comment function
+    async def reply_to_comment_impl(service, user_google_email: str, file_id: str, comment_id: str, reply_content: str) -> str:
+        """Reply to a specific comment in a Google Workspace file."""
         logger.info(f"[reply_to_{app_name}_comment] Replying to comment {comment_id} in {app_name} {file_id}")
 
         body = {'content': reply_content}
@@ -154,19 +124,9 @@ def create_comment_tools(app_name: str, file_id_param: str):
         
         return f"Reply posted successfully!\\nReply ID: {reply_id}\\nAuthor: {author}\\nCreated: {created}\\nContent: {reply_content}"
 
-    @server.tool()
-    @require_google_service("drive", "drive_file")
-    @handle_http_errors(f"resolve_{app_name}_comment")
-    async def resolve_comment(
-        service,
-        user_google_email: str,
-        comment_id: str,
-        **kwargs
-    ) -> str:
-        """
-        Resolve a comment in a Google Workspace file.
-        """
-        file_id = kwargs[file_id_param]
+    # Resolve comment function  
+    async def resolve_comment_impl(service, user_google_email: str, file_id: str, comment_id: str) -> str:
+        """Resolve a comment in a Google Workspace file."""
         logger.info(f"[resolve_{app_name}_comment] Resolving comment {comment_id} in {app_name} {file_id}")
 
         body = {"resolved": True}
@@ -181,9 +141,102 @@ def create_comment_tools(app_name: str, file_id_param: str):
         
         return f"Comment {comment_id} has been resolved successfully."
 
+    # Now create the decorated wrapper functions dynamically
+    def create_read_comments():
+        if file_id_param == "document_id":
+            @server.tool()
+            @require_google_service("drive", "drive_read")
+            @handle_http_errors(f"read_{app_name}_comments")
+            async def read_comments(service, user_google_email: str, document_id: str) -> str:
+                return await read_comments_impl(service, user_google_email, document_id)
+            return read_comments
+        elif file_id_param == "spreadsheet_id":
+            @server.tool()
+            @require_google_service("drive", "drive_read")
+            @handle_http_errors(f"read_{app_name}_comments")
+            async def read_comments(service, user_google_email: str, spreadsheet_id: str) -> str:
+                return await read_comments_impl(service, user_google_email, spreadsheet_id)
+            return read_comments
+        elif file_id_param == "presentation_id":
+            @server.tool()
+            @require_google_service("drive", "drive_read")
+            @handle_http_errors(f"read_{app_name}_comments")
+            async def read_comments(service, user_google_email: str, presentation_id: str) -> str:
+                return await read_comments_impl(service, user_google_email, presentation_id)
+            return read_comments
+
+    def create_create_comment():
+        if file_id_param == "document_id":
+            @server.tool()
+            @require_google_service("drive", "drive_file")
+            @handle_http_errors(f"create_{app_name}_comment")
+            async def create_comment(service, user_google_email: str, document_id: str, comment_content: str) -> str:
+                return await create_comment_impl(service, user_google_email, document_id, comment_content)
+            return create_comment
+        elif file_id_param == "spreadsheet_id":
+            @server.tool()
+            @require_google_service("drive", "drive_file")
+            @handle_http_errors(f"create_{app_name}_comment")
+            async def create_comment(service, user_google_email: str, spreadsheet_id: str, comment_content: str) -> str:
+                return await create_comment_impl(service, user_google_email, spreadsheet_id, comment_content)
+            return create_comment
+        elif file_id_param == "presentation_id":
+            @server.tool()
+            @require_google_service("drive", "drive_file")
+            @handle_http_errors(f"create_{app_name}_comment")
+            async def create_comment(service, user_google_email: str, presentation_id: str, comment_content: str) -> str:
+                return await create_comment_impl(service, user_google_email, presentation_id, comment_content)
+            return create_comment
+
+    def create_reply_to_comment():
+        if file_id_param == "document_id":
+            @server.tool()
+            @require_google_service("drive", "drive_file")
+            @handle_http_errors(f"reply_to_{app_name}_comment")
+            async def reply_to_comment(service, user_google_email: str, document_id: str, comment_id: str, reply_content: str) -> str:
+                return await reply_to_comment_impl(service, user_google_email, document_id, comment_id, reply_content)
+            return reply_to_comment
+        elif file_id_param == "spreadsheet_id":
+            @server.tool()
+            @require_google_service("drive", "drive_file")
+            @handle_http_errors(f"reply_to_{app_name}_comment")
+            async def reply_to_comment(service, user_google_email: str, spreadsheet_id: str, comment_id: str, reply_content: str) -> str:
+                return await reply_to_comment_impl(service, user_google_email, spreadsheet_id, comment_id, reply_content)
+            return reply_to_comment
+        elif file_id_param == "presentation_id":
+            @server.tool()
+            @require_google_service("drive", "drive_file")
+            @handle_http_errors(f"reply_to_{app_name}_comment")
+            async def reply_to_comment(service, user_google_email: str, presentation_id: str, comment_id: str, reply_content: str) -> str:
+                return await reply_to_comment_impl(service, user_google_email, presentation_id, comment_id, reply_content)
+            return reply_to_comment
+
+    def create_resolve_comment():
+        if file_id_param == "document_id":
+            @server.tool()
+            @require_google_service("drive", "drive_file")
+            @handle_http_errors(f"resolve_{app_name}_comment")
+            async def resolve_comment(service, user_google_email: str, document_id: str, comment_id: str) -> str:
+                return await resolve_comment_impl(service, user_google_email, document_id, comment_id)
+            return resolve_comment
+        elif file_id_param == "spreadsheet_id":
+            @server.tool()
+            @require_google_service("drive", "drive_file")
+            @handle_http_errors(f"resolve_{app_name}_comment")
+            async def resolve_comment(service, user_google_email: str, spreadsheet_id: str, comment_id: str) -> str:
+                return await resolve_comment_impl(service, user_google_email, spreadsheet_id, comment_id)
+            return resolve_comment
+        elif file_id_param == "presentation_id":
+            @server.tool()
+            @require_google_service("drive", "drive_file")
+            @handle_http_errors(f"resolve_{app_name}_comment")
+            async def resolve_comment(service, user_google_email: str, presentation_id: str, comment_id: str) -> str:
+                return await resolve_comment_impl(service, user_google_email, presentation_id, comment_id)
+            return resolve_comment
+
     return {
-        'read_comments': read_comments,
-        'create_comment': create_comment,
-        'reply_to_comment': reply_to_comment,
-        'resolve_comment': resolve_comment
+        'read_comments': create_read_comments(),
+        'create_comment': create_create_comment(),
+        'reply_to_comment': create_reply_to_comment(),
+        'resolve_comment': create_resolve_comment()
     }
