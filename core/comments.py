@@ -122,7 +122,7 @@ def create_comment_tools(app_name: str, file_id_param: str):
         @require_google_service("drive", "drive_file")
         @handle_http_errors(resolve_func_name)
         async def resolve_comment(service, user_google_email: str, presentation_id: str, comment_id: str) -> str:
-            """Resolve a comment in a Google Google Slide, Sheet or Doc."""
+            """Resolve a comment in a Google Slide, Sheet or Doc."""
             return await _resolve_comment_impl(service, app_name, presentation_id, comment_id)
 
     # Set the proper function names for MCP registration
