@@ -319,10 +319,10 @@ When calling a tool:
 | `batch_update_presentation` | Apply multiple updates at once |
 | `get_page` | Get specific slide information |
 | `get_page_thumbnail` | Generate slide thumbnails |
-| `read_slide_comments` | Read all comments and replies |
-| `create_slide_comment` | Create new comments |
-| `reply_to_slide_comment` | Reply to existing comments |
-| `resolve_slide_comment` | Resolve comments |
+| `read_presentation_comments` | Read all comments and replies |
+| `create_presentation_comment` | Create new comments |
+| `reply_to_presentation_comment` | Reply to existing comments |
+| `resolve_presentation_comment` | Resolve comments |
 
 ### 📝 Google Forms ([`forms_tools.py`](gforms/forms_tools.py))
 
