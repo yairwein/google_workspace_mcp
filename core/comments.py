@@ -101,14 +101,14 @@ def create_comment_tools(app_name: str, file_id_param: str):
         @require_google_service("drive", "drive_read")
         @handle_http_errors(read_func_name)
         async def read_comments(service, user_google_email: str, presentation_id: str) -> str:
-            """Read all comments from a Google Google Slide, Sheet or Doc."""
+            """Read all comments from a Google Slide, Sheet or Doc."""
             return await _read_comments_impl(service, app_name, presentation_id)
 
         @server.tool()
         @require_google_service("drive", "drive_file")
         @handle_http_errors(create_func_name)
         async def create_comment(service, user_google_email: str, presentation_id: str, comment_content: str) -> str:
-            """Create a new comment on a Google Google Slide, Sheet or Doc."""
+            """Create a new comment on a Google Slide, Sheet or Doc."""
             return await _create_comment_impl(service, app_name, presentation_id, comment_content)
 
         @server.tool()
@@ -122,7 +122,7 @@ def create_comment_tools(app_name: str, file_id_param: str):
         @require_google_service("drive", "drive_file")
         @handle_http_errors(resolve_func_name)
         async def resolve_comment(service, user_google_email: str, presentation_id: str, comment_id: str) -> str:
-            """Resolve a comment in a Google Google Slide, Sheet or Doc."""
+            """Resolve a comment in a Google Slide, Sheet or Doc."""
             return await _resolve_comment_impl(service, app_name, presentation_id, comment_id)
 
     # Set the proper function names for MCP registration
