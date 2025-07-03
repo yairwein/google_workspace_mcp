@@ -236,14 +236,22 @@ async def _resolve_comment_impl(service, app_name: str, file_id: str, comment_id
     """Implementation for resolving a comment on any Google Workspace file."""
     logger.info(f"[resolve_{app_name}_comment] Resolving comment {comment_id} in {app_name} {file_id}")
 
-    body = {"resolved": True}
+    body = {
+        "content": "This comment has been resolved.",
+        "action": "resolve"
+    }
 
-    await asyncio.to_thread(
-        service.comments().update(
+    reply = await asyncio.to_thread(
+        service.replies().create(
             fileId=file_id,
             commentId=comment_id,
-            body=body
+            body=body,
+            fields="id,content,author,createdTime,modifiedTime"
         ).execute
     )
 
-    return f"Comment {comment_id} has been resolved successfully."
+    reply_id = reply.get('id', '')
+    author = reply.get('author', {}).get('displayName', 'Unknown')
+    created = reply.get('createdTime', '')
+
+    return f"Comment {comment_id} has been resolved successfully.\\nResolve reply ID: {reply_id}\\nAuthor: {author}\\nCreated: {created}"

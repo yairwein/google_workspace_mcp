@@ -342,17 +342,10 @@ async def create_sheet(
 # Create comment management tools for sheets
 _comment_tools = create_comment_tools("spreadsheet", "spreadsheet_id")
 
-# Extract and register the functions - this ensures they're properly registered with MCP
+# Extract and register the functions
 read_sheet_comments = _comment_tools['read_comments']
 create_sheet_comment = _comment_tools['create_comment'] 
 reply_to_sheet_comment = _comment_tools['reply_to_comment']
 resolve_sheet_comment = _comment_tools['resolve_comment']
-
-# Ensure the functions are available at module level for MCP discovery
-__all__ = [
-    'list_spreadsheets', 'get_spreadsheet_info', 'read_sheet_values', 
-    'modify_sheet_values', 'create_spreadsheet', 'create_sheet',
-    'read_sheet_comments', 'create_sheet_comment', 'reply_to_sheet_comment', 'resolve_sheet_comment'
-]
 
 
