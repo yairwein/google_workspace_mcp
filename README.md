@@ -37,7 +37,7 @@
 ### A quick plug for AI-Enhanced Docs
 
 > **This README was crafted with AI assistance, and here's why that matters**
-> 
+>
 > As a solo developer building open source tools that may only ever serve my own needs, comprehensive documentation often wouldn't happen without AI help. Using agentic dev tools like **Roo** & **Claude Code** that understand the entire codebase, AI doesn't just regurgitate generic content - it extracts real implementation details and creates accurate, specific documentation.
 >
 > In this case, Sonnet 4 took a pass & a human (me) verified them 6/28/25.
@@ -175,34 +175,47 @@ docker run -p 8000:8000 -v $(pwd):/app workspace-mcp --transport streamable-http
 The server supports two transport modes:
 
 #### Stdio Mode (Default - Recommended for Claude Desktop)
-**Option 1: Auto-install (Recommended)**
+
+**Easiest Setup (Recommended)**
 ```bash
 python install_claude.py
 ```
 
-**Option 2: Manual Configuration**
+This script automatically:
+- Prompts you for your Google OAuth credentials (Client ID and Secret)
+- Creates the Claude Desktop config file in the correct location
+- Sets up all necessary environment variables
+- No manual file editing required!
+
+After running the script, just restart Claude Desktop and you're ready to go.
+
+**Manual Claude Configuration (Alternative)**
 1. Open Claude Desktop Settings → Developer → Edit Config
-2. This creates/opens the config file at:
-   - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-   - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
-3. Add the server configuration:
+   1. **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+   2. **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+2. Add the server configuration:
+   ```json
+   {
+     "mcpServers": {
+       "google_workspace": {
+         "command": "uvx",
+         "args": ["workspace-mcp"],
+         "env": {
+           "GOOGLE_OAUTH_CLIENT_ID": "your-client-id.apps.googleusercontent.com",
+           "GOOGLE_OAUTH_CLIENT_SECRET": "your-client-secret",
+           "OAUTHLIB_INSECURE_TRANSPORT": "1"
+         }
+       }
+     }
+   }
+   ```
 
-```json
-{
-  "mcpServers": {
-    "google_workspace": {
-      "command": "uvx",
-      "args": ["workspace-mcp"],
-      "env": {
-        "GOOGLE_OAUTH_CLIENT_ID": "your-client-id.apps.googleusercontent.com",
-        "GOOGLE_OAUTH_CLIENT_SECRET": "your-client-secret"
-      }
-    }
-  }
-}
-```
+**Get Google OAuth Credentials** (if you don't have them):
+- Go to [Google Cloud Console](https://console.cloud.google.com/)
+- Create a new project and enable APIs: Calendar, Drive, Gmail, Docs, Sheets, Slides, Forms, Chat
+- Create OAuth 2.0 Client ID (Web application) with redirect URI: `http://localhost:8000/oauth2callback`
 
-**Alternative (Development Installation)**:
+**Development Installation (For Contributors)**:
 ```json
 {
   "mcpServers": {
@@ -212,7 +225,8 @@ python install_claude.py
       "cwd": "/path/to/google_workspace_mcp",
       "env": {
         "GOOGLE_OAUTH_CLIENT_ID": "your-client-id.apps.googleusercontent.com",
-        "GOOGLE_OAUTH_CLIENT_SECRET": "your-client-secret"
+        "GOOGLE_OAUTH_CLIENT_SECRET": "your-client-secret",
+        "OAUTHLIB_INSECURE_TRANSPORT": "1"
       }
     }
   }
