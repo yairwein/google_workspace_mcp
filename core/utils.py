@@ -36,12 +36,7 @@ def check_credentials_directory_permissions(credentials_dir: str = None) -> None
             except (PermissionError, OSError) as e:
                 raise PermissionError(f"Cannot write to existing credentials directory '{os.path.abspath(credentials_dir)}': {e}")
         else:
-            # Directory doesn't exist, check if we can create it
-            parent_dir = os.path.dirname(os.path.abspath(credentials_dir)) or "."
-            if not os.access(parent_dir, os.W_OK):
-                raise PermissionError(f"Cannot create credentials directory '{os.path.abspath(credentials_dir)}': insufficient permissions in parent directory '{parent_dir}'")
-
-            # Test creating the directory
+            # Directory doesn't exist, try to create it and its parent directories
             try:
                 os.makedirs(credentials_dir, exist_ok=True)
                 # Test writing to the new directory
