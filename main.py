@@ -35,9 +35,9 @@ except Exception as e:
 
 def safe_print(text):
     try:
-        print(text)
+        print(text, file=sys.stderr)
     except UnicodeEncodeError:
-        print(text.encode('ascii', errors='replace').decode())
+        print(text.encode('ascii', errors='replace').decode(), file=sys.stderr)
 
 def main():
     """
@@ -73,7 +73,7 @@ def main():
         safe_print(f"   🔐 OAuth Callback: {base_uri}:{port}/oauth2callback")
     safe_print(f"   👤 Mode: {'Single-user' if args.single_user else 'Multi-user'}")
     safe_print(f"   🐍 Python: {sys.version.split()[0]}")
-    print()
+    print(file=sys.stderr)
 
     # Import tool modules to register them with the MCP server via decorators
     tool_imports = {
@@ -104,29 +104,29 @@ def main():
     for tool in tools_to_import:
         tool_imports[tool]()
         safe_print(f"   {tool_icons[tool]} {tool.title()} - Google {tool.title()} API integration")
-    print()
+    print(file=sys.stderr)
 
     safe_print(f"📊 Configuration Summary:")
     safe_print(f"   🔧 Tools Enabled: {len(tools_to_import)}/{len(tool_imports)}")
     safe_print(f"   🔑 Auth Method: OAuth 2.0 with PKCE")
     safe_print(f"   📝 Log Level: {logging.getLogger().getEffectiveLevel()}")
-    print()
+    print(file=sys.stderr)
 
     # Set global single-user mode flag
     if args.single_user:
         os.environ['MCP_SINGLE_USER_MODE'] = '1'
         safe_print("🔐 Single-user mode enabled")
-        print()
+        print(file=sys.stderr)
 
     # Check credentials directory permissions before starting
     try:
         safe_print("🔍 Checking credentials directory permissions...")
         check_credentials_directory_permissions()
         safe_print("✅ Credentials directory permissions verified")
-        print()
+        print(file=sys.stderr)
     except (PermissionError, OSError) as e:
         safe_print(f"❌ Credentials directory permission check failed: {e}")
-        print("   Please ensure the service has write permissions to create/access the .credentials directory")
+        print("   Please ensure the service has write permissions to create/access the .credentials directory", file=sys.stderr)
         logger.error(f"Failed credentials directory permission check: {e}")
         sys.exit(1)
 
@@ -141,12 +141,12 @@ def main():
             # Start minimal OAuth callback server for stdio mode
             from auth.oauth_callback_server import ensure_oauth_callback_available
             if ensure_oauth_callback_available('stdio', port, base_uri):
-                print(f"   OAuth callback server started on {base_uri}:{port}/oauth2callback")
+                print(f"   OAuth callback server started on {base_uri}:{port}/oauth2callback", file=sys.stderr)
             else:
                 safe_print("   ⚠️  Warning: Failed to start OAuth callback server")
 
-        print("   Ready for MCP connections!")
-        print()
+        print("   Ready for MCP connections!", file=sys.stderr)
+        print(file=sys.stderr)
 
         if args.transport == 'streamable-http':
             # The server is already configured with port and server_url in core/server.py
