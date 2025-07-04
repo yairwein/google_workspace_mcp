@@ -53,9 +53,9 @@ A production-ready MCP server that integrates all major Google Workspace service
 - **📅 Google Calendar**: Full calendar management with event CRUD operations
 - **📁 Google Drive**: File operations with native Microsoft Office format support (.docx, .xlsx)
 - **📧 Gmail**: Complete email management with search, send, and draft capabilities
-- **📄 Google Docs**: Document operations including content extraction and creation
-- **📊 Google Sheets**: Comprehensive spreadsheet management with flexible cell operations
-- **🖼️ Google Slides**: Presentation management with slide creation, updates, and content manipulation
+- **📄 Google Docs**: Document operations including content extraction, creation, and comment management
+- **📊 Google Sheets**: Comprehensive spreadsheet management with flexible cell operations and comment management
+- **🖼️ Google Slides**: Presentation management with slide creation, updates, content manipulation, and comment management
 - **📝 Google Forms**: Form creation, retrieval, publish settings, and response management
 - **💬 Google Chat**: Space management and messaging capabilities
 - **🔄 Multiple Transports**: HTTP with SSE fallback, OpenAPI compatibility via `mcpo`
@@ -290,6 +290,10 @@ When calling a tool:
 | `get_doc_content` | Extract document text |
 | `list_docs_in_folder` | List docs in folder |
 | `create_doc` | Create new documents |
+| `read_doc_comments` | Read all comments and replies |
+| `create_doc_comment` | Create new comments |
+| `reply_to_comment` | Reply to existing comments |
+| `resolve_comment` | Resolve comments |
 
 ### 📊 Google Sheets ([`sheets_tools.py`](gsheets/sheets_tools.py))
 
@@ -301,6 +305,24 @@ When calling a tool:
 | `modify_sheet_values` | Write/update/clear cells |
 | `create_spreadsheet` | Create new spreadsheets |
 | `create_sheet` | Add sheets to existing files |
+| `read_sheet_comments` | Read all comments and replies |
+| `create_sheet_comment` | Create new comments |
+| `reply_to_sheet_comment` | Reply to existing comments |
+| `resolve_sheet_comment` | Resolve comments |
+
+### 🖼️ Google Slides ([`slides_tools.py`](gslides/slides_tools.py))
+
+| Tool | Description |
+|------|-------------|
+| `create_presentation` | Create new presentations |
+| `get_presentation` | Retrieve presentation details |
+| `batch_update_presentation` | Apply multiple updates at once |
+| `get_page` | Get specific slide information |
+| `get_page_thumbnail` | Generate slide thumbnails |
+| `read_presentation_comments` | Read all comments and replies |
+| `create_presentation_comment` | Create new comments |
+| `reply_to_presentation_comment` | Reply to existing comments |
+| `resolve_presentation_comment` | Resolve comments |
 
 ### 📝 Google Forms ([`forms_tools.py`](gforms/forms_tools.py))
 
