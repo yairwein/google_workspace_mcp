@@ -34,6 +34,14 @@
 
 ---
 
+### A quick plug for AI-Enhanced Docs
+
+> **This README was crafted with AI assistance, and here's why that matters**
+> 
+> As a solo developer building open source tools that may only ever serve my own needs, comprehensive documentation often wouldn't happen without AI help. Using agentic dev tools like **Roo** & **Claude Code** that understand the entire codebase, AI doesn't just regurgitate generic content - it extracts real implementation details and creates accurate, specific documentation.
+>
+> In this case, Sonnet 4 took a pass & a human (me) verified them 6/28/25.
+
 
 ## 🌐 Overview
 
@@ -45,9 +53,9 @@ A production-ready MCP server that integrates all major Google Workspace service
 - **📅 Google Calendar**: Full calendar management with event CRUD operations
 - **📁 Google Drive**: File operations with native Microsoft Office format support (.docx, .xlsx)
 - **📧 Gmail**: Complete email management with search, send, and draft capabilities
-- **📄 Google Docs**: Document operations including content extraction and creation
-- **📊 Google Sheets**: Comprehensive spreadsheet management with flexible cell operations
-- **🖼️ Google Slides**: Presentation management with slide creation, updates, and content manipulation
+- **📄 Google Docs**: Document operations including content extraction, creation, and comment management
+- **📊 Google Sheets**: Comprehensive spreadsheet management with flexible cell operations and comment management
+- **🖼️ Google Slides**: Presentation management with slide creation, updates, content manipulation, and comment management
 - **📝 Google Forms**: Form creation, retrieval, publish settings, and response management
 - **💬 Google Chat**: Space management and messaging capabilities
 - **🔄 Multiple Transports**: HTTP with SSE fallback, OpenAPI compatibility via `mcpo`
@@ -60,9 +68,13 @@ A production-ready MCP server that integrates all major Google Workspace service
 
 ### Simplest Start (uvx - Recommended)
 
-> Run instantly without manual installation - you must set the `GOOGLE_CLIENT_SECRETS` environment variable with the path to your `client_secret.json` when using uvx as you won't have a repo directory to pull from.
+> Run instantly without manual installation - you must configure OAuth credentials when using uvx. You can use either environment variables (recommended for production) or set the `GOOGLE_CLIENT_SECRET_PATH` (or legacy `GOOGLE_CLIENT_SECRETS`) environment variable to point to your `client_secret.json` file.
 
 ```bash
+# Set OAuth credentials via environment variables (recommended)
+export GOOGLE_OAUTH_CLIENT_ID="your-client-id.apps.googleusercontent.com"
+export GOOGLE_OAUTH_CLIENT_SECRET="your-client-secret"
+
 # Start the server with all Google Workspace tools
 uvx workspace-mcp
 
@@ -96,9 +108,31 @@ uv run main.py
 1. **Google Cloud Setup**:
    - Create OAuth 2.0 credentials (web application) in [Google Cloud Console](https://console.cloud.google.com/)
    - Enable APIs: Calendar, Drive, Gmail, Docs, Sheets, Slides, Forms, Chat
-   - Download credentials as `client_secret.json` in project root
-     - To use a different location for `client_secret.json`, you can set the `GOOGLE_CLIENT_SECRETS` environment variable with that path
    - Add redirect URI: `http://localhost:8000/oauth2callback`
+   - Configure credentials using one of these methods:
+
+     **Option A: Environment Variables (Recommended for Production)**
+     ```bash
+     export GOOGLE_OAUTH_CLIENT_ID="your-client-id.apps.googleusercontent.com"
+     export GOOGLE_OAUTH_CLIENT_SECRET="your-client-secret"
+     export GOOGLE_OAUTH_REDIRECT_URI="http://localhost:8000/oauth2callback"  # Optional
+     ```
+
+     **Option B: File-based (Traditional)**
+     - Download credentials as `client_secret.json` in project root
+     - To use a different location, set `GOOGLE_CLIENT_SECRET_PATH` (or legacy `GOOGLE_CLIENT_SECRETS`) environment variable with the file path
+
+   **Credential Loading Priority**:
+   1. Environment variables (`GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`)
+   2. File specified by `GOOGLE_CLIENT_SECRET_PATH` or `GOOGLE_CLIENT_SECRETS` environment variable
+   3. Default file (`client_secret.json` in project root)
+
+   **Why Environment Variables?**
+   - ✅ Containerized deployments (Docker, Kubernetes)
+   - ✅ Cloud platforms (Heroku, Railway, etc.)
+   - ✅ CI/CD pipelines
+   - ✅ No secrets in version control
+   - ✅ Easy credential rotation
 
 2. **Environment**:
    ```bash
@@ -158,7 +192,11 @@ python install_claude.py
   "mcpServers": {
     "google_workspace": {
       "command": "uvx",
-      "args": ["workspace-mcp"]
+      "args": ["workspace-mcp"],
+      "env": {
+        "GOOGLE_OAUTH_CLIENT_ID": "your-client-id.apps.googleusercontent.com",
+        "GOOGLE_OAUTH_CLIENT_SECRET": "your-client-secret"
+      }
     }
   }
 }
@@ -171,7 +209,11 @@ python install_claude.py
     "google_workspace": {
       "command": "uv",
       "args": ["run", "main.py"],
-      "cwd": "/path/to/google_workspace_mcp"
+      "cwd": "/path/to/google_workspace_mcp",
+      "env": {
+        "GOOGLE_OAUTH_CLIENT_ID": "your-client-id.apps.googleusercontent.com",
+        "GOOGLE_OAUTH_CLIENT_SECRET": "your-client-secret"
+      }
     }
   }
 }
@@ -250,6 +292,10 @@ When calling a tool:
 | `get_doc_content` | Extract document text |
 | `list_docs_in_folder` | List docs in folder |
 | `create_doc` | Create new documents |
+| `read_doc_comments` | Read all comments and replies |
+| `create_doc_comment` | Create new comments |
+| `reply_to_comment` | Reply to existing comments |
+| `resolve_comment` | Resolve comments |
 
 ### 📊 Google Sheets ([`sheets_tools.py`](gsheets/sheets_tools.py))
 
@@ -261,6 +307,24 @@ When calling a tool:
 | `modify_sheet_values` | Write/update/clear cells |
 | `create_spreadsheet` | Create new spreadsheets |
 | `create_sheet` | Add sheets to existing files |
+| `read_sheet_comments` | Read all comments and replies |
+| `create_sheet_comment` | Create new comments |
+| `reply_to_sheet_comment` | Reply to existing comments |
+| `resolve_sheet_comment` | Resolve comments |
+
+### 🖼️ Google Slides ([`slides_tools.py`](gslides/slides_tools.py))
+
+| Tool | Description |
+|------|-------------|
+| `create_presentation` | Create new presentations |
+| `get_presentation` | Retrieve presentation details |
+| `batch_update_presentation` | Apply multiple updates at once |
+| `get_page` | Get specific slide information |
+| `get_page_thumbnail` | Generate slide thumbnails |
+| `read_presentation_comments` | Read all comments and replies |
+| `create_presentation_comment` | Create new comments |
+| `reply_to_presentation_comment` | Reply to existing comments |
+| `resolve_presentation_comment` | Resolve comments |
 
 ### 📝 Google Forms ([`forms_tools.py`](gforms/forms_tools.py))
 
