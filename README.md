@@ -137,14 +137,14 @@ uv run main.py
 2. **Environment**:
    ```bash
    export OAUTHLIB_INSECURE_TRANSPORT=1  # Development only
-   export USER_GOOGLE_EMAIL=your.email@gmail.com  # Optional: Default email for auth
+   export USER_GOOGLE_EMAIL=your.email@gmail.com  # Optional: Default email for auth - use this for single user setups and you won't need to set your email in system prompt for magic auth
    ```
 
 3. **Server Configuration**:
    The server's base URL and port can be customized using environment variables:
    - `WORKSPACE_MCP_BASE_URI`: Sets the base URI for the server (default: http://localhost). This affects the server_url used for Gemini native function calling and the OAUTH_REDIRECT_URI.
    - `WORKSPACE_MCP_PORT`: Sets the port the server listens on (default: 8000). This affects the server_url, port, and OAUTH_REDIRECT_URI.
-   - `USER_GOOGLE_EMAIL`: Optional default email for authentication flows. If set, you won't need to specify your email when calling `start_google_auth`.
+   - `USER_GOOGLE_EMAIL`: Optional default email for authentication flows. If set, the LLM won't need to specify your email when calling `start_google_auth`.
 
 ### Start the Server
 
