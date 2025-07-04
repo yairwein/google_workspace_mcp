@@ -8,17 +8,21 @@ from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 
-def check_credentials_directory_permissions(credentials_dir: str = ".credentials") -> None:
+def check_credentials_directory_permissions(credentials_dir: str = None) -> None:
     """
     Check if the service has appropriate permissions to create and write to the .credentials directory.
 
     Args:
-        credentials_dir: Path to the credentials directory (default: ".credentials")
+        credentials_dir: Path to the credentials directory (default: uses get_default_credentials_dir())
 
     Raises:
         PermissionError: If the service lacks necessary permissions
         OSError: If there are other file system issues
     """
+    if credentials_dir is None:
+        from auth.google_auth import get_default_credentials_dir
+        credentials_dir = get_default_credentials_dir()
+
     try:
         # Check if directory exists
         if os.path.exists(credentials_dir):
