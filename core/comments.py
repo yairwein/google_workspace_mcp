@@ -37,99 +37,93 @@ def create_comment_tools(app_name: str, file_id_param: str):
     reply_func_name = f"reply_to_{app_name}_comment"
     resolve_func_name = f"resolve_{app_name}_comment"
 
-    # Create read comments function
+    # Create functions without decorators first, then apply decorators with proper names
     if file_id_param == "document_id":
-        @server.tool()
         @require_google_service("drive", "drive_read")
         @handle_http_errors(read_func_name)
         async def read_comments(service, user_google_email: str, document_id: str) -> str:
-            """Read all comments from a Google Slide, Sheet or Doc."""
+            """Read all comments from a Google Document."""
             return await _read_comments_impl(service, app_name, document_id)
 
-        @server.tool()
         @require_google_service("drive", "drive_file")
         @handle_http_errors(create_func_name)
         async def create_comment(service, user_google_email: str, document_id: str, comment_content: str) -> str:
-            """Create a new comment on a Google Slide, Sheet or Doc."""
+            """Create a new comment on a Google Document."""
             return await _create_comment_impl(service, app_name, document_id, comment_content)
 
-        @server.tool()
         @require_google_service("drive", "drive_file")
         @handle_http_errors(reply_func_name)
         async def reply_to_comment(service, user_google_email: str, document_id: str, comment_id: str, reply_content: str) -> str:
             """Reply to a specific comment in a Google Document."""
             return await _reply_to_comment_impl(service, app_name, document_id, comment_id, reply_content)
 
-        @server.tool()
         @require_google_service("drive", "drive_file")
         @handle_http_errors(resolve_func_name)
         async def resolve_comment(service, user_google_email: str, document_id: str, comment_id: str) -> str:
-            """Resolve a comment in a Google Slide, Sheet or Doc."""
+            """Resolve a comment in a Google Document."""
             return await _resolve_comment_impl(service, app_name, document_id, comment_id)
 
     elif file_id_param == "spreadsheet_id":
-        @server.tool()
         @require_google_service("drive", "drive_read")
         @handle_http_errors(read_func_name)
         async def read_comments(service, user_google_email: str, spreadsheet_id: str) -> str:
-            """Read all comments from a Google Slide, Sheet or Doc."""
+            """Read all comments from a Google Spreadsheet."""
             return await _read_comments_impl(service, app_name, spreadsheet_id)
 
-        @server.tool()
         @require_google_service("drive", "drive_file")
         @handle_http_errors(create_func_name)
         async def create_comment(service, user_google_email: str, spreadsheet_id: str, comment_content: str) -> str:
-            """Create a new comment on a Google Slide, Sheet or Doc."""
+            """Create a new comment on a Google Spreadsheet."""
             return await _create_comment_impl(service, app_name, spreadsheet_id, comment_content)
 
-        @server.tool()
         @require_google_service("drive", "drive_file")
         @handle_http_errors(reply_func_name)
         async def reply_to_comment(service, user_google_email: str, spreadsheet_id: str, comment_id: str, reply_content: str) -> str:
-            """Reply to a specific comment in a Google Slide, Sheet or Doc."""
+            """Reply to a specific comment in a Google Spreadsheet."""
             return await _reply_to_comment_impl(service, app_name, spreadsheet_id, comment_id, reply_content)
 
-        @server.tool()
         @require_google_service("drive", "drive_file")
         @handle_http_errors(resolve_func_name)
         async def resolve_comment(service, user_google_email: str, spreadsheet_id: str, comment_id: str) -> str:
-            """Resolve a comment in a Google Slide, Sheet or Doc."""
+            """Resolve a comment in a Google Spreadsheet."""
             return await _resolve_comment_impl(service, app_name, spreadsheet_id, comment_id)
 
     elif file_id_param == "presentation_id":
-        @server.tool()
         @require_google_service("drive", "drive_read")
         @handle_http_errors(read_func_name)
         async def read_comments(service, user_google_email: str, presentation_id: str) -> str:
-            """Read all comments from a Google Slide, Sheet or Doc."""
+            """Read all comments from a Google Presentation."""
             return await _read_comments_impl(service, app_name, presentation_id)
 
-        @server.tool()
         @require_google_service("drive", "drive_file")
         @handle_http_errors(create_func_name)
         async def create_comment(service, user_google_email: str, presentation_id: str, comment_content: str) -> str:
-            """Create a new comment on a Google Slide, Sheet or Doc."""
+            """Create a new comment on a Google Presentation."""
             return await _create_comment_impl(service, app_name, presentation_id, comment_content)
 
-        @server.tool()
         @require_google_service("drive", "drive_file")
         @handle_http_errors(reply_func_name)
         async def reply_to_comment(service, user_google_email: str, presentation_id: str, comment_id: str, reply_content: str) -> str:
-            """Reply to a specific comment in a Google Slide, Sheet or Doc."""
+            """Reply to a specific comment in a Google Presentation."""
             return await _reply_to_comment_impl(service, app_name, presentation_id, comment_id, reply_content)
 
-        @server.tool()
         @require_google_service("drive", "drive_file")
         @handle_http_errors(resolve_func_name)
         async def resolve_comment(service, user_google_email: str, presentation_id: str, comment_id: str) -> str:
-            """Resolve a comment in a Google Slide, Sheet or Doc."""
+            """Resolve a comment in a Google Presentation."""
             return await _resolve_comment_impl(service, app_name, presentation_id, comment_id)
 
-    # Set the proper function names for MCP registration
+    # Set the proper function names and register with server
     read_comments.__name__ = read_func_name
     create_comment.__name__ = create_func_name
     reply_to_comment.__name__ = reply_func_name
     resolve_comment.__name__ = resolve_func_name
+
+    # Register tools with the server using the proper names
+    server.tool()(read_comments)
+    server.tool()(create_comment)
+    server.tool()(reply_to_comment)
+    server.tool()(resolve_comment)
 
     return {
         'read_comments': read_comments,
