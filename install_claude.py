@@ -184,7 +184,7 @@ def main():
             with open(config_path, 'r') as f:
                 existing_config = json.load(f)
 
-            if "mcpServers" in existing_config and "google_workspace" in existing_config["mcpServers"]:
+            if "mcpServers" in existing_config and "Google Workspace" in existing_config["mcpServers"]:
                 print(f"\n⚠️  Google Workspace MCP is already configured in {config_path}")
                 if not prompt_yes_no("Do you want to reconfigure it?", default=True):
                     print("Installation cancelled.")
@@ -206,7 +206,7 @@ def main():
         if "mcpServers" not in existing_config:
             existing_config["mcpServers"] = {}
 
-        existing_config["mcpServers"]["google_workspace"] = server_config
+        existing_config["mcpServers"]["Google Workspace"] = server_config
 
         # Create directory if needed
         config_path.parent.mkdir(parents=True, exist_ok=True)
