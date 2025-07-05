@@ -55,6 +55,9 @@ USER app
 
 # Expose port (use default of 8000 if PORT not set)
 EXPOSE 8000
+# Expose additional port if PORT environment variable is set to a different value
+ARG PORT
+EXPOSE ${PORT:-8000}
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
