@@ -112,7 +112,7 @@
       "default": "8000"
     },
     "OAUTHLIB_INSECURE_TRANSPORT": {
-      "type": "string",
+      "type": "int",
       "title": "OAuth Insecure Transport",
       "description": "Allow OAuth over HTTP for development (set to '1' for development only)",
       "required": false,
