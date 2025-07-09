@@ -11,7 +11,7 @@
 
 **This is the single most feature-complete Google Workspace MCP server**
 
-*Full natural language control over Google Calendar, Drive, Gmail, Docs, Sheets, Slides, Forms, and Chat through all MCP clients, AI assistants and developer tools*
+*Full natural language control over Google Calendar, Drive, Gmail, Docs, Sheets, Slides, Forms, Tasks, and Chat through all MCP clients, AI assistants and developer tools*
 
 </div>
 
@@ -57,6 +57,7 @@ A production-ready MCP server that integrates all major Google Workspace service
 - **📊 Google Sheets**: Comprehensive spreadsheet management with flexible cell operations and comment management
 - **🖼️ Google Slides**: Presentation management with slide creation, updates, content manipulation, and comment management
 - **📝 Google Forms**: Form creation, retrieval, publish settings, and response management
+- **✓ Google Tasks**: Complete task and task list management with hierarchy, due dates, and status tracking
 - **💬 Google Chat**: Space management and messaging capabilities
 - **🔄 Multiple Transports**: HTTP with SSE fallback, OpenAPI compatibility via `mcpo`
 - **⚡ High Performance**: Service caching, thread-safe sessions, FastMCP integration
@@ -79,7 +80,7 @@ export GOOGLE_OAUTH_CLIENT_SECRET="your-client-secret"
 uvx workspace-mcp
 
 # Start with specific tools only
-uvx workspace-mcp --tools gmail drive calendar
+uvx workspace-mcp --tools gmail drive calendar tasks
 
 # Start in HTTP mode for debugging
 uvx workspace-mcp --transport streamable-http
@@ -107,7 +108,7 @@ uv run main.py
 
 1. **Google Cloud Setup**:
    - Create OAuth 2.0 credentials (web application) in [Google Cloud Console](https://console.cloud.google.com/)
-   - Enable APIs: Calendar, Drive, Gmail, Docs, Sheets, Slides, Forms, Chat
+   - Enable APIs: Calendar, Drive, Gmail, Docs, Sheets, Slides, Forms, Tasks, Chat
    - Add redirect URI: `http://localhost:8000/oauth2callback`
    - Configure credentials using one of these methods:
 
@@ -159,7 +160,7 @@ uv run main.py --transport streamable-http
 uv run main.py --single-user
 
 # Selective tool registration (only register specific tools)
-uv run main.py --tools gmail drive calendar
+uv run main.py --tools gmail drive calendar tasks
 uv run main.py --tools sheets docs
 uv run main.py --single-user --tools gmail  # Can combine with other flags
 
@@ -168,7 +169,7 @@ docker build -t workspace-mcp .
 docker run -p 8000:8000 -v $(pwd):/app workspace-mcp --transport streamable-http
 ```
 
-**Available Tools for `--tools` flag**: `gmail`, `drive`, `calendar`, `docs`, `sheets`, `forms`, `chat`
+**Available Tools for `--tools` flag**: `gmail`, `drive`, `calendar`, `docs`, `sheets`, `forms`, `tasks`, `chat`
 
 ### Connect to Claude Desktop
 
@@ -212,7 +213,7 @@ After running the script, just restart Claude Desktop and you're ready to go.
 
 **Get Google OAuth Credentials** (if you don't have them):
 - Go to [Google Cloud Console](https://console.cloud.google.com/)
-- Create a new project and enable APIs: Calendar, Drive, Gmail, Docs, Sheets, Slides, Forms, Chat
+- Create a new project and enable APIs: Calendar, Drive, Gmail, Docs, Sheets, Slides, Forms, Tasks, Chat
 - Create OAuth 2.0 Client ID (Web application) with redirect URI: `http://localhost:8000/oauth2callback`
 
 **Development Installation (For Contributors)**:
@@ -349,6 +350,23 @@ When calling a tool:
 | `set_publish_settings` | Configure form template and authentication settings |
 | `get_form_response` | Get individual form response details |
 | `list_form_responses` | List all responses to a form with pagination |
+
+### ✓ Google Tasks ([`tasks_tools.py`](gtasks/tasks_tools.py))
+
+| Tool | Description |
+|------|-------------|
+| `list_task_lists` | List all task lists with pagination support |
+| `get_task_list` | Retrieve details of a specific task list |
+| `create_task_list` | Create new task lists with custom titles |
+| `update_task_list` | Modify existing task list titles |
+| `delete_task_list` | Remove task lists and all contained tasks |
+| `list_tasks` | List tasks in a specific list with filtering options |
+| `get_task` | Retrieve detailed information about a specific task |
+| `create_task` | Create new tasks with title, notes, due dates, and hierarchy |
+| `update_task` | Modify task properties including title, notes, status, and due dates |
+| `delete_task` | Remove tasks from task lists |
+| `move_task` | Reposition tasks within lists or move between lists |
+| `clear_completed_tasks` | Hide all completed tasks from a list |
 
 ### 💬 Google Chat ([`chat_tools.py`](gchat/chat_tools.py))
 
