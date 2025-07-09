@@ -49,6 +49,9 @@ from auth.scopes import (
     SLIDES_SCOPE,
     SLIDES_READONLY_SCOPE,
     SLIDES_SCOPES,
+    TASKS_SCOPE,
+    TASKS_READONLY_SCOPE,
+    TASKS_SCOPES,
     SCOPES
 )
 

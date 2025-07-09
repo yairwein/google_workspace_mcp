@@ -40,7 +40,7 @@ def safe_print(text):
         # Running as MCP server, suppress output to avoid JSON parsing errors
         logger.debug(f"[MCP Server] {text}")
         return
-    
+
     try:
         print(text, file=sys.stderr)
     except UnicodeEncodeError:
@@ -56,7 +56,7 @@ def main():
     parser.add_argument('--single-user', action='store_true',
                         help='Run in single-user mode - bypass session mapping and use any credentials from the credentials directory')
     parser.add_argument('--tools', nargs='*',
-                        choices=['gmail', 'drive', 'calendar', 'docs', 'sheets', 'chat', 'forms', 'slides'],
+                        choices=['gmail', 'drive', 'calendar', 'docs', 'sheets', 'chat', 'forms', 'slides', 'tasks'],
                         help='Specify which tools to register. If not provided, all tools are registered.')
     parser.add_argument('--transport', choices=['stdio', 'streamable-http'], default='stdio',
                         help='Transport mode: stdio (default) or streamable-http')
@@ -91,7 +91,8 @@ def main():
         'sheets': lambda: __import__('gsheets.sheets_tools'),
         'chat': lambda: __import__('gchat.chat_tools'),
         'forms': lambda: __import__('gforms.forms_tools'),
-        'slides': lambda: __import__('gslides.slides_tools')
+        'slides': lambda: __import__('gslides.slides_tools'),
+        'tasks': lambda: __import__('gtasks.tasks_tools')
     }
 
     tool_icons = {
@@ -102,7 +103,8 @@ def main():
         'sheets': '📊',
         'chat': '💬',
         'forms': '📝',
-        'slides': '🖼️'
+        'slides': '🖼️',
+        'tasks': '✓'
     }
 
     # Import specified tools or all tools if none specified

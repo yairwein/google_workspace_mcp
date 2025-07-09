@@ -18,7 +18,8 @@ from auth.scopes import (
     SHEETS_READONLY_SCOPE, SHEETS_WRITE_SCOPE,
     CHAT_READONLY_SCOPE, CHAT_WRITE_SCOPE, CHAT_SPACES_SCOPE,
     FORMS_BODY_SCOPE, FORMS_BODY_READONLY_SCOPE, FORMS_RESPONSES_READONLY_SCOPE,
-    SLIDES_SCOPE, SLIDES_READONLY_SCOPE
+    SLIDES_SCOPE, SLIDES_READONLY_SCOPE,
+    TASKS_SCOPE, TASKS_READONLY_SCOPE
 )
 
 # Service configuration mapping
@@ -30,7 +31,8 @@ SERVICE_CONFIGS = {
     "sheets": {"service": "sheets", "version": "v4"},
     "chat": {"service": "chat", "version": "v1"},
     "forms": {"service": "forms", "version": "v1"},
-    "slides": {"service": "slides", "version": "v1"}
+    "slides": {"service": "slides", "version": "v1"},
+    "tasks": {"service": "tasks", "version": "v1"}
 }
 
 
@@ -72,6 +74,10 @@ SCOPE_GROUPS = {
     # Slides scopes
     "slides": SLIDES_SCOPE,
     "slides_read": SLIDES_READONLY_SCOPE,
+
+    # Tasks scopes
+    "tasks": TASKS_SCOPE,
+    "tasks_read": TASKS_READONLY_SCOPE,
 }
 
 # Service cache: {cache_key: (service, cached_time, user_email)}
