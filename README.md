@@ -45,11 +45,11 @@
 > In this case, Sonnet 4 took a pass & a human (me) verified them 6/28/25.
 
 
-## 🌐 Overview
+## Overview
 
 A production-ready MCP server that integrates all major Google Workspace services with AI assistants. Built with FastMCP for optimal performance, featuring advanced authentication handling, service caching, and streamlined development patterns.
 
-## ✨ Features
+## Features
 
 - **🔐 Advanced OAuth 2.0**: Secure authentication with automatic token refresh, transport-aware callback handling, session management, and centralized scope management
 - **📅 Google Calendar**: Full calendar management with event CRUD operations
