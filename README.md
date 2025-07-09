@@ -351,7 +351,7 @@ When calling a tool:
 | `get_form_response` | Get individual form response details |
 | `list_form_responses` | List all responses to a form with pagination |
 
-### ✓ Google Tasks ([`tasks_tools.py`](gTasks/tasks_tools.py))
+### ✓ Google Tasks ([`tasks_tools.py`](gtasks/tasks_tools.py))
 
 | Tool | Description |
 |------|-------------|
