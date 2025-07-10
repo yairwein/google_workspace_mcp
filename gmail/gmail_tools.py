@@ -13,7 +13,6 @@ from email.mime.text import MIMEText
 
 from mcp import types
 from fastapi import Body
-from googleapiclient.errors import HttpError
 
 from auth.service_decorator import require_google_service
 from core.utils import handle_http_errors
