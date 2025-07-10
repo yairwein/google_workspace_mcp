@@ -12,6 +12,7 @@ from typing import List, Optional, Dict, Any
 
 from mcp import types
 from googleapiclient.errors import HttpError
+from googleapiclient.discovery import build
 
 from auth.service_decorator import require_google_service
 from core.utils import handle_http_errors
@@ -268,7 +269,6 @@ async def create_event(
     if attachments:
         # Accept both file URLs and file IDs. If a URL, extract the fileId.
         event_body["attachments"] = []
-        from googleapiclient.discovery import build
         drive_service = None
         try:
             drive_service = service._http and build("drive", "v3", http=service._http)

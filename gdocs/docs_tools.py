@@ -9,7 +9,6 @@ import io
 from typing import List
 
 from mcp import types
-from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaIoBaseDownload
 
 # Auth & server utilities
