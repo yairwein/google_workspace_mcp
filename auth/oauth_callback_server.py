@@ -10,11 +10,12 @@ import asyncio
 import logging
 import threading
 import time
-from typing import Optional, Dict, Any
 import socket
+import uvicorn
 
 from fastapi import FastAPI, Request
-import uvicorn
+from typing import Optional
+from urllib.parse import urlparse
 
 from auth.google_auth import handle_auth_callback, check_client_secrets
 from auth.scopes import OAUTH_STATE_TO_SESSION_ID_MAP, SCOPES
@@ -107,7 +108,6 @@ class MinimalOAuthServer:
         # Check if port is available
         # Extract hostname from base_uri (e.g., "http://localhost" -> "localhost")
         try:
-            from urllib.parse import urlparse
             parsed_uri = urlparse(self.base_uri)
             hostname = parsed_uri.hostname or 'localhost'
         except Exception:
