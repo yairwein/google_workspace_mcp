@@ -10,6 +10,7 @@
 [![Verified on MseeP](https://mseep.ai/badge.svg)](https://mseep.ai/app/eebbc4a6-0f8c-41b2-ace8-038e5516dba0)
 
 **This is the single most feature-complete Google Workspace MCP server**
+- now with 1-click Claude installation
 
 *Full natural language control over Google Calendar, Drive, Gmail, Docs, Sheets, Slides, Forms, Tasks, and Chat through all MCP clients, AI assistants and developer tools.*
 
@@ -85,6 +86,7 @@ A production-ready MCP server that integrates all major Google Workspace service
 #### Required Configuration
 <details>
 <summary>Environment - you will configure these in Claude itself, see screenshot:</summary>
+
 | Variable | Purpose |
 |----------|---------|
 | `GOOGLE_OAUTH_CLIENT_ID` | OAuth client ID from Google Cloud |
