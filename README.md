@@ -9,8 +9,7 @@
 [![Website](https://img.shields.io/badge/Website-workspacemcp.com-green.svg)](https://workspacemcp.com)
 [![Verified on MseeP](https://mseep.ai/badge.svg)](https://mseep.ai/app/eebbc4a6-0f8c-41b2-ace8-038e5516dba0)
 
-**This is the single most feature-complete Google Workspace MCP server**
-- now with 1-click Claude installation
+**This is the single most feature-complete Google Workspace MCP server** now with 1-click Claude installation
 
 *Full natural language control over Google Calendar, Drive, Gmail, Docs, Sheets, Slides, Forms, Tasks, and Chat through all MCP clients, AI assistants and developer tools.*
 
