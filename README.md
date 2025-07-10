@@ -77,7 +77,6 @@ A production-ready MCP server that integrates all major Google Workspace service
 2. **Install:** Double-click the file – Claude Desktop opens and prompts you to **Install**
 3. **Configure:** In Claude Desktop → **Settings → Extensions → Google Workspace MCP**, paste your Google OAuth credentials
 4. **Use it:** Start a new Claude chat and call any Google Workspace tool 🎉
-</details>
 
 >
 **Why DXT?**
