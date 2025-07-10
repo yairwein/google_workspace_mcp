@@ -97,6 +97,7 @@ Claude Desktop stores these securely in the OS keychain; set them once in the ex
 
 <div align="center">
   <video width="832" src="https://github.com/user-attachments/assets/83cca4b3-5e94-448b-acb3-6e3a27341d3a"></video>
+</div>
 ---
 
 ### 2. Advanced / Cross-Platform Installation
