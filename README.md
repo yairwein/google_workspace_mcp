@@ -9,7 +9,7 @@
 [![Website](https://img.shields.io/badge/Website-workspacemcp.com-green.svg)](https://workspacemcp.com)
 [![Verified on MseeP](https://mseep.ai/badge.svg)](https://mseep.ai/app/eebbc4a6-0f8c-41b2-ace8-038e5516dba0)
 
-**This is the single most feature-complete Google Workspace MCP server**
+**This is the single most feature-complete Google Workspace MCP server** now with 1-click Claude installation
 
 *Full natural language control over Google Calendar, Drive, Gmail, Docs, Sheets, Slides, Forms, Tasks, and Chat through all MCP clients, AI assistants and developer tools.*
 
@@ -80,11 +80,12 @@ A production-ready MCP server that integrates all major Google Workspace service
 
 >
 **Why DXT?**
-> Desktop Extensions (`.dxt`) bundle the server, dependencies, and manifest so users go from download → working MCP in **three clicks** – no terminal, no JSON editing, no version conflicts.
+> Desktop Extensions (`.dxt`) bundle the server, dependencies, and manifest so users go from download → working MCP in **one click** – no terminal, no JSON editing, no version conflicts.
 
 #### Required Configuration
 <details>
 <summary>Environment - you will configure these in Claude itself, see screenshot:</summary>
+
 | Variable | Purpose |
 |----------|---------|
 | `GOOGLE_OAUTH_CLIENT_ID` | OAuth client ID from Google Cloud |
@@ -94,8 +95,10 @@ A production-ready MCP server that integrates all major Google Workspace service
 
 Claude Desktop stores these securely in the OS keychain; set them once in the extension pane.
 </details>
-Screenshot here
 
+<div align="center">
+  <video width="832" src="https://github.com/user-attachments/assets/83cca4b3-5e94-448b-acb3-6e3a27341d3a"></video>
+</div>
 ---
 
 ### 2. Advanced / Cross-Platform Installation
