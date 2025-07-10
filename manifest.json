@@ -123,7 +123,7 @@
       "sensitive": false,
       "default": "http://localhost:8000/oauth2callback",
       "validation": {
-        "pattern": "^https?://[a-zA-Z0-9.-]+:[0-9]+/oauth2callback$"
+        "pattern": "^https?://[a-zA-Z0-9.-]+(:[0-9]+)?/oauth2callback$"
       }
     },
     "GOOGLE_CLIENT_SECRET_PATH": {
