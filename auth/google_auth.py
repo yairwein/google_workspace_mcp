@@ -1,14 +1,16 @@
 # auth/google_auth.py
 
-import os
-import json
-import logging
 import asyncio
-from typing import List, Optional, Tuple, Dict, Any, Callable
+import json
+import jwt
+import logging
 import os
 
+from datetime import datetime
+from typing import List, Optional, Tuple, Dict, Any
+
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import Flow, InstalledAppFlow
+from google_auth_oauthlib.flow import Flow
 from google.auth.transport.requests import Request
 from google.auth.exceptions import RefreshError
 from googleapiclient.discovery import build
@@ -161,8 +163,6 @@ def load_credentials_from_file(
         expiry = None
         if creds_data.get("expiry"):
             try:
-                from datetime import datetime
-
                 expiry = datetime.fromisoformat(creds_data["expiry"])
             except (ValueError, TypeError) as e:
                 logger.warning(
@@ -789,8 +789,6 @@ async def get_authenticated_google_service(
         # Try to get email from credentials if needed for validation
         if credentials and credentials.id_token:
             try:
-                import jwt
-
                 # Decode without verification (just to get email for logging)
                 decoded_token = jwt.decode(
                     credentials.id_token, options={"verify_signature": False}
