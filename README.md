@@ -11,7 +11,9 @@
 
 **This is the single most feature-complete Google Workspace MCP server**
 
-*Full natural language control over Google Calendar, Drive, Gmail, Docs, Sheets, Slides, Forms, Tasks, and Chat through all MCP clients, AI assistants and developer tools*
+*Full natural language control over Google Calendar, Drive, Gmail, Docs, Sheets, Slides, Forms, Tasks, and Chat through all MCP clients, AI assistants and developer tools.*
+
+###### Support for all free Google accounts (Gmail, Docs, Drive etc) & Google Workspace plans (Starter, Standard, Plus, Enterprise, Non Profit etc) with their expanded app options like Chat & Spaces.
 
 </div>
 
@@ -43,11 +45,11 @@
 > In this case, Sonnet 4 took a pass & a human (me) verified them 6/28/25.
 
 
-## 🌐 Overview
+## Overview
 
 A production-ready MCP server that integrates all major Google Workspace services with AI assistants. Built with FastMCP for optimal performance, featuring advanced authentication handling, service caching, and streamlined development patterns.
 
-## ✨ Features
+## Features
 
 - **🔐 Advanced OAuth 2.0**: Secure authentication with automatic token refresh, transport-aware callback handling, session management, and centralized scope management
 - **📅 Google Calendar**: Full calendar management with event CRUD operations
