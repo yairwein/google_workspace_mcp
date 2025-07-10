@@ -80,7 +80,7 @@ A production-ready MCP server that integrates all major Google Workspace service
 
 >
 **Why DXT?**
-> Desktop Extensions (`.dxt`) bundle the server, dependencies, and manifest so users go from download → working MCP in **three clicks** – no terminal, no JSON editing, no version conflicts.
+> Desktop Extensions (`.dxt`) bundle the server, dependencies, and manifest so users go from download → working MCP in **one click** – no terminal, no JSON editing, no version conflicts.
 
 #### Required Configuration
 <details>
@@ -94,8 +94,9 @@ A production-ready MCP server that integrates all major Google Workspace service
 
 Claude Desktop stores these securely in the OS keychain; set them once in the extension pane.
 </details>
-Screenshot here
 
+<div align="center">
+  <video width="832" src="https://github.com/user-attachments/assets/83cca4b3-5e94-448b-acb3-6e3a27341d3a"></video>
 ---
 
 ### 2. Advanced / Cross-Platform Installation
