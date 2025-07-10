@@ -82,7 +82,7 @@ def set_transport_mode(mode: str):
 
 def get_oauth_redirect_uri_for_current_mode() -> str:
     """Get OAuth redirect URI based on current transport mode."""
-    return get_oauth_redirect_uri(_current_transport_mode, WORKSPACE_MCP_PORT, WORKSPACE_MCP_BASE_URI)
+    return get_oauth_redirect_uri(WORKSPACE_MCP_PORT, WORKSPACE_MCP_BASE_URI)
 
 # Health check endpoint
 @server.custom_route("/health", methods=["GET"])

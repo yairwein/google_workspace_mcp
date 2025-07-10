@@ -181,16 +181,15 @@ class MinimalOAuthServer:
 # Global instance for stdio mode
 _minimal_oauth_server: Optional[MinimalOAuthServer] = None
 
-def get_oauth_redirect_uri(transport_mode: str = "stdio", port: int = 8000, base_uri: str = "http://localhost") -> str:
+def get_oauth_redirect_uri(port: int = 8000, base_uri: str = "http://localhost") -> str:
     """
     Get the appropriate OAuth redirect URI.
 
     Priority:
     1. GOOGLE_OAUTH_REDIRECT_URI environment variable
-    2. Constructed from transport mode, port, and base URI
+    2. Constructed from port and base URI
 
     Args:
-        transport_mode: "stdio" or "streamable-http"
         port: Port number (default 8000)
         base_uri: Base URI (default "http://localhost")
 
