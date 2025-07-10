@@ -24,7 +24,17 @@
         "${__dirname}",
         "python",
         "${__dirname}/main.py"
-      ]
+      ],
+      "env": {
+        "GOOGLE_OAUTH_CLIENT_ID": "${user_config.GOOGLE_OAUTH_CLIENT_ID}",
+        "GOOGLE_OAUTH_CLIENT_SECRET": "${user_config.GOOGLE_OAUTH_CLIENT_SECRET}",
+        "GOOGLE_OAUTH_REDIRECT_URI": "${user_config.GOOGLE_OAUTH_REDIRECT_URI}",
+        "GOOGLE_CLIENT_SECRET_PATH": "${user_config.GOOGLE_CLIENT_SECRET_PATH}",
+        "GOOGLE_CLIENT_SECRETS": "${user_config.GOOGLE_CLIENT_SECRETS}",
+        "WORKSPACE_MCP_BASE_URI": "${user_config.WORKSPACE_MCP_BASE_URI}",
+        "WORKSPACE_MCP_PORT": "${user_config.WORKSPACE_MCP_PORT}",
+        "OAUTHLIB_INSECURE_TRANSPORT": "${user_config.OAUTHLIB_INSECURE_TRANSPORT}"
+      }
     }
   },
   "tools": [
