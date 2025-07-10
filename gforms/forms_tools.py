@@ -6,10 +6,9 @@ This module provides MCP tools for interacting with Google Forms API.
 
 import logging
 import asyncio
-from typing import List, Optional, Dict, Any
+from typing import Optional, Dict, Any
 
 from mcp import types
-from googleapiclient.errors import HttpError
 
 from auth.service_decorator import require_google_service
 from core.server import server
@@ -47,10 +46,10 @@ async def create_form(
             "title": title
         }
     }
-    
+
     if description:
         form_body["info"]["description"] = description
-        
+
     if document_title:
         form_body["info"]["document_title"] = document_title
 
@@ -61,7 +60,7 @@ async def create_form(
     form_id = created_form.get("formId")
     edit_url = f"https://docs.google.com/forms/d/{form_id}/edit"
     responder_url = created_form.get("responderUri", f"https://docs.google.com/forms/d/{form_id}/viewform")
-    
+
     confirmation_message = f"Successfully created form '{created_form.get('info', {}).get('title', title)}' for {user_google_email}. Form ID: {form_id}. Edit URL: {edit_url}. Responder URL: {responder_url}"
     logger.info(f"Form created successfully for {user_google_email}. ID: {form_id}")
     return confirmation_message
@@ -95,10 +94,10 @@ async def get_form(
     title = form_info.get("title", "No Title")
     description = form_info.get("description", "No Description")
     document_title = form_info.get("documentTitle", title)
-    
+
     edit_url = f"https://docs.google.com/forms/d/{form_id}/edit"
     responder_url = form.get("responderUri", f"https://docs.google.com/forms/d/{form_id}/viewform")
-    
+
     items = form.get("items", [])
     questions_summary = []
     for i, item in enumerate(items, 1):
@@ -106,9 +105,9 @@ async def get_form(
         item_type = item.get("questionItem", {}).get("question", {}).get("required", False)
         required_text = " (Required)" if item_type else ""
         questions_summary.append(f"  {i}. {item_title}{required_text}")
-    
+
     questions_text = "\n".join(questions_summary) if questions_summary else "  No questions found"
-    
+
     result = f"""Form Details for {user_google_email}:
 - Title: "{title}"
 - Description: "{description}"
@@ -118,7 +117,7 @@ async def get_form(
 - Responder URL: {responder_url}
 - Questions ({len(items)} total):
 {questions_text}"""
-    
+
     logger.info(f"Successfully retrieved form for {user_google_email}. ID: {form_id}")
     return result
 
@@ -190,7 +189,7 @@ async def get_form_response(
     response_id = response.get("responseId", "Unknown")
     create_time = response.get("createTime", "Unknown")
     last_submitted_time = response.get("lastSubmittedTime", "Unknown")
-    
+
     answers = response.get("answers", {})
     answer_details = []
     for question_id, answer_data in answers.items():
@@ -200,9 +199,9 @@ async def get_form_response(
             answer_details.append(f"  Question ID {question_id}: {answer_text}")
         else:
             answer_details.append(f"  Question ID {question_id}: No answer provided")
-    
+
     answers_text = "\n".join(answer_details) if answer_details else "  No answers found"
-    
+
     result = f"""Form Response Details for {user_google_email}:
 - Form ID: {form_id}
 - Response ID: {response_id}
@@ -210,7 +209,7 @@ async def get_form_response(
 - Last Submitted: {last_submitted_time}
 - Answers:
 {answers_text}"""
-    
+
     logger.info(f"Successfully retrieved response for {user_google_email}. Response ID: {response_id}")
     return result
 
@@ -252,7 +251,7 @@ async def list_form_responses(
 
     responses = responses_result.get("responses", [])
     next_page_token = responses_result.get("nextPageToken")
-    
+
     if not responses:
         return f"No responses found for form {form_id} for {user_google_email}."
 
@@ -261,19 +260,19 @@ async def list_form_responses(
         response_id = response.get("responseId", "Unknown")
         create_time = response.get("createTime", "Unknown")
         last_submitted_time = response.get("lastSubmittedTime", "Unknown")
-        
+
         answers_count = len(response.get("answers", {}))
         response_details.append(
             f"  {i}. Response ID: {response_id} | Created: {create_time} | Last Submitted: {last_submitted_time} | Answers: {answers_count}"
         )
 
     pagination_info = f"\nNext page token: {next_page_token}" if next_page_token else "\nNo more pages."
-    
+
     result = f"""Form Responses for {user_google_email}:
 - Form ID: {form_id}
 - Total responses returned: {len(responses)}
 - Responses:
 {chr(10).join(response_details)}{pagination_info}"""
-    
+
     logger.info(f"Successfully retrieved {len(responses)} responses for {user_google_email}. Form ID: {form_id}")
     return result

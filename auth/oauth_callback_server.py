@@ -5,15 +5,17 @@ In streamable-http mode: Uses the existing FastAPI server
 In stdio mode: Starts a minimal HTTP server just for OAuth callbacks
 """
 
+import os
 import asyncio
 import logging
 import threading
 import time
-from typing import Optional, Dict, Any
 import socket
+import uvicorn
 
 from fastapi import FastAPI, Request
-import uvicorn
+from typing import Optional
+from urllib.parse import urlparse
 
 from auth.google_auth import handle_auth_callback, check_client_secrets
 from auth.scopes import OAUTH_STATE_TO_SESSION_ID_MAP, SCOPES
@@ -73,10 +75,11 @@ class MinimalOAuthServer:
                     logger.warning(f"OAuth callback: No MCP session ID found for state '{state}'. Auth will not be tied to a specific session.")
 
                 # Exchange code for credentials
+                redirect_uri = get_oauth_redirect_uri(port=self.port, base_uri=self.base_uri)
                 verified_user_id, credentials = handle_auth_callback(
                     scopes=SCOPES,
                     authorization_response=str(request.url),
-                    redirect_uri=f"{self.base_uri}:{self.port}/oauth2callback",
+                    redirect_uri=redirect_uri,
                     session_id=mcp_session_id
                 )
 
@@ -105,7 +108,6 @@ class MinimalOAuthServer:
         # Check if port is available
         # Extract hostname from base_uri (e.g., "http://localhost" -> "localhost")
         try:
-            from urllib.parse import urlparse
             parsed_uri = urlparse(self.base_uri)
             hostname = parsed_uri.hostname or 'localhost'
         except Exception:
@@ -179,19 +181,31 @@ class MinimalOAuthServer:
 # Global instance for stdio mode
 _minimal_oauth_server: Optional[MinimalOAuthServer] = None
 
-def get_oauth_redirect_uri(transport_mode: str = "stdio", port: int = 8000, base_uri: str = "http://localhost") -> str:
+def get_oauth_redirect_uri(port: int = 8000, base_uri: str = "http://localhost") -> str:
     """
-    Get the appropriate OAuth redirect URI based on transport mode.
+    Get the appropriate OAuth redirect URI.
+
+    Priority:
+    1. GOOGLE_OAUTH_REDIRECT_URI environment variable
+    2. Constructed from port and base URI
 
     Args:
-        transport_mode: "stdio" or "streamable-http"
         port: Port number (default 8000)
         base_uri: Base URI (default "http://localhost")
 
     Returns:
         OAuth redirect URI
     """
-    return f"{base_uri}:{port}/oauth2callback"
+    # Highest priority: Use the environment variable if it's set
+    env_redirect_uri = os.getenv("GOOGLE_OAUTH_REDIRECT_URI")
+    if env_redirect_uri:
+        logger.info(f"Using redirect URI from GOOGLE_OAUTH_REDIRECT_URI: {env_redirect_uri}")
+        return env_redirect_uri
+
+    # Fallback to constructing the URI based on server settings
+    constructed_uri = f"{base_uri}:{port}/oauth2callback"
+    logger.info(f"Constructed redirect URI: {constructed_uri}")
+    return constructed_uri
 
 def ensure_oauth_callback_available(transport_mode: str = "stdio", port: int = 8000, base_uri: str = "http://localhost") -> bool:
     """
