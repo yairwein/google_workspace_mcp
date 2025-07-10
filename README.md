@@ -37,13 +37,15 @@
 ---
 
 ### A quick plug for AI-Enhanced Docs
+<details>
+<summary>But why?</summary>
 
-> **This README was crafted with AI assistance, and here's why that matters**
+**This README was written with AI assistance, and here's why that matters**
 >
-> As a solo developer building open source tools that may only ever serve my own needs, comprehensive documentation often wouldn't happen without AI help. Using agentic dev tools like **Roo** & **Claude Code** that understand the entire codebase, AI doesn't just regurgitate generic content - it extracts real implementation details and creates accurate, specific documentation.
+> As a solo dev building open source tools that many never see outside use, comprehensive documentation often wouldn't happen without AI help. Using agentic dev tools like **Roo** & **Claude Code** that understand the entire codebase, AI doesn't just regurgitate generic content - it extracts real implementation details and creates accurate, specific documentation.
 >
-> In this case, Sonnet 4 took a pass & a human (me) verified them 6/28/25.
-
+> In this case, Sonnet 4 took a pass & a human (me) verified them 7/10/25.
+</details>
 
 ## Overview
 
@@ -61,7 +63,7 @@ A production-ready MCP server that integrates all major Google Workspace service
 - **📝 Google Forms**: Form creation, retrieval, publish settings, and response management
 - **✓ Google Tasks**: Complete task and task list management with hierarchy, due dates, and status tracking
 - **💬 Google Chat**: Space management and messaging capabilities
-- **🔄 Multiple Transports**: HTTP with SSE fallback, OpenAPI compatibility via `mcpo`
+- **🔄 All Transports**: Stdio, Streamable HTTP & SSE, OpenAPI compatibility via `mcpo`
 - **⚡ High Performance**: Service caching, thread-safe sessions, FastMCP integration
 - **🧩 Developer Friendly**: Minimal boilerplate, automatic service injection, centralized configuration
 
@@ -69,7 +71,46 @@ A production-ready MCP server that integrates all major Google Workspace service
 
 ## 🚀 Quick Start
 
-### Simplest Start (uvx - Recommended)
+### 1. One-Click Claude Desktop Install (Recommended)
+
+1. **Download:** Grab the latest `google_workspace_mcp.dxt` from the “Releases” page
+2. **Install:** Double-click the file – Claude Desktop opens and prompts you to **Install**
+3. **Configure:** In Claude Desktop → **Settings → Extensions → Google Workspace MCP**, paste your Google OAuth credentials
+4. **Use it:** Start a new Claude chat and call any Google Workspace tool 🎉
+</details>
+
+>
+**Why DXT?**
+> Desktop Extensions (`.dxt`) bundle the server, dependencies, and manifest so users go from download → working MCP in **three clicks** – no terminal, no JSON editing, no version conflicts.
+
+#### Required Configuration
+<details>
+<summary>Environment - you will configure these in Claude itself, see screenshot:</summary>
+| Variable | Purpose |
+|----------|---------|
+| `GOOGLE_OAUTH_CLIENT_ID` | OAuth client ID from Google Cloud |
+| `GOOGLE_OAUTH_CLIENT_SECRET` | OAuth client secret |
+| `USER_GOOGLE_EMAIL` *(optional)* | Default email for single-user auth |
+| `OAUTHLIB_INSECURE_TRANSPORT=1` | Development only (allows `http://` redirect) |
+
+Claude Desktop stores these securely in the OS keychain; set them once in the extension pane.
+</details>
+Screenshot here
+
+---
+
+### 2. Advanced / Cross-Platform Installation
+
+If you’re developing, deploying to servers, or using another MCP-capable client, keep reading.
+
+#### Instant CLI (uvx)
+
+```bash
+# Requires Python 3.11+ and uvx
+export GOOGLE_OAUTH_CLIENT_ID="xxx"
+export GOOGLE_OAUTH_CLIENT_SECRET="yyy"
+uvx workspace-mcp --tools gmail drive calendar
+```
 
 > Run instantly without manual installation - you must configure OAuth credentials when using uvx. You can use either environment variables (recommended for production) or set the `GOOGLE_CLIENT_SECRET_PATH` (or legacy `GOOGLE_CLIENT_SECRETS`) environment variable to point to your `client_secret.json` file.
 
@@ -180,7 +221,8 @@ The server supports two transport modes:
 
 #### Stdio Mode (Default - Recommended for Claude Desktop)
 
-**Easiest Setup (Recommended)**
+**Guided Setup (Recommended if not using DXT)**
+
 ```bash
 python install_claude.py
 ```
