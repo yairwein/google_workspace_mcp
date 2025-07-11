@@ -269,8 +269,12 @@ After running the script, just restart Claude Desktop and you're ready to go.
   "mcpServers": {
     "google_workspace": {
       "command": "uv",
-      "args": ["run", "main.py"],
-      "cwd": "/path/to/google_workspace_mcp",
+      "args": [
+        "run",
+        "--directory",
+        "/users/taylorwilsdon/tmp/google_workspace_mcp",
+        "main.py"
+      ],
       "env": {
         "GOOGLE_OAUTH_CLIENT_ID": "your-client-id.apps.googleusercontent.com",
         "GOOGLE_OAUTH_CLIENT_SECRET": "your-client-secret",

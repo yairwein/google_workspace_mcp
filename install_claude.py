@@ -142,8 +142,7 @@ def create_server_config(options: Dict, env_vars: Dict, client_secret_path: Opti
 
     if options.get("dev_mode"):
         config["command"] = "uv"
-        config["args"] = ["run", "main.py"]
-        config["cwd"] = options["cwd"]
+        config["args"] = ["run", "--directory", options["cwd"], "main.py"]
     else:
         config["command"] = "uvx"
         config["args"] = ["workspace-mcp"]
