@@ -272,7 +272,7 @@ After running the script, just restart Claude Desktop and you're ready to go.
       "args": [
         "run",
         "--directory",
-        "/users/taylorwilsdon/tmp/google_workspace_mcp",
+        "/path/to/repo/google_workspace_mcp",
         "main.py"
       ],
       "env": {
