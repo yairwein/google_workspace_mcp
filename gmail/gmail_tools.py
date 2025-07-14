@@ -1,3 +1,4 @@
+"""
 Google Gmail MCP Tools
 
 This module provides MCP tools for interacting with the Gmail API.
