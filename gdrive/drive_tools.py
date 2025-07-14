@@ -15,7 +15,7 @@ import io
 import httpx
 
 from auth.service_decorator import require_google_service
-from core.utils import extract_office_xml_text, handle_http_errors
+from core.utils import extract_office_xml_text, handle_http_errors, retry_on_ssl_error
 from core.server import server
 
 logger = logging.getLogger(__name__)
@@ -78,6 +78,7 @@ def _build_drive_list_params(
 @server.tool()
 @require_google_service("drive", "drive_read")
 @handle_http_errors("search_drive_files")
+@retry_on_ssl_error()
 async def search_drive_files(
     service,
     user_google_email: str,
@@ -145,6 +146,7 @@ async def search_drive_files(
 @server.tool()
 @require_google_service("drive", "drive_read")
 @handle_http_errors("get_drive_file_content")
+@retry_on_ssl_error()
 async def get_drive_file_content(
     service,
     user_google_email: str,
@@ -235,6 +237,7 @@ async def get_drive_file_content(
 @server.tool()
 @require_google_service("drive", "drive_read")
 @handle_http_errors("list_drive_items")
+@retry_on_ssl_error()
 async def list_drive_items(
     service,
     user_google_email: str,
@@ -291,6 +294,7 @@ async def list_drive_items(
 @server.tool()
 @require_google_service("drive", "drive_file")
 @handle_http_errors("create_drive_file")
+@retry_on_ssl_error()
 async def create_drive_file(
     service,
     user_google_email: str,

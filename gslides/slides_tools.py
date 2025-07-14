@@ -13,7 +13,7 @@ from googleapiclient.errors import HttpError
 
 from auth.service_decorator import require_google_service
 from core.server import server
-from core.utils import handle_http_errors
+from core.utils import handle_http_errors, retry_on_ssl_error
 from core.comments import create_comment_tools
 
 logger = logging.getLogger(__name__)
@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 @server.tool()
 @require_google_service("slides", "slides")
 @handle_http_errors("create_presentation")
+@retry_on_ssl_error()
 async def create_presentation(
     service,
     user_google_email: str,
@@ -63,6 +64,7 @@ async def create_presentation(
 @server.tool()
 @require_google_service("slides", "slides_read")
 @handle_http_errors("get_presentation")
+@retry_on_ssl_error()
 async def get_presentation(
     service,
     user_google_email: str,
@@ -111,6 +113,7 @@ Slides Breakdown:
 @server.tool()
 @require_google_service("slides", "slides")
 @handle_http_errors("batch_update_presentation")
+@retry_on_ssl_error()
 async def batch_update_presentation(
     service,
     user_google_email: str,
@@ -168,6 +171,7 @@ async def batch_update_presentation(
 @server.tool()
 @require_google_service("slides", "slides_read")
 @handle_http_errors("get_page")
+@retry_on_ssl_error()
 async def get_page(
     service,
     user_google_email: str,
@@ -230,6 +234,7 @@ Page Elements:
 @server.tool()
 @require_google_service("slides", "slides_read")
 @handle_http_errors("get_page_thumbnail")
+@retry_on_ssl_error()
 async def get_page_thumbnail(
     service,
     user_google_email: str,

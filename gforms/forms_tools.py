@@ -12,7 +12,7 @@ from mcp import types
 
 from auth.service_decorator import require_google_service
 from core.server import server
-from core.utils import handle_http_errors
+from core.utils import handle_http_errors, retry_on_ssl_error
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 @server.tool()
 @require_google_service("forms", "forms")
 @handle_http_errors("create_form")
+@retry_on_ssl_error()
 async def create_form(
     service,
     user_google_email: str,
@@ -69,6 +70,7 @@ async def create_form(
 @server.tool()
 @require_google_service("forms", "forms")
 @handle_http_errors("get_form")
+@retry_on_ssl_error()
 async def get_form(
     service,
     user_google_email: str,
@@ -125,6 +127,7 @@ async def get_form(
 @server.tool()
 @require_google_service("forms", "forms")
 @handle_http_errors("set_publish_settings")
+@retry_on_ssl_error()
 async def set_publish_settings(
     service,
     user_google_email: str,
@@ -163,6 +166,7 @@ async def set_publish_settings(
 @server.tool()
 @require_google_service("forms", "forms")
 @handle_http_errors("get_form_response")
+@retry_on_ssl_error()
 async def get_form_response(
     service,
     user_google_email: str,
@@ -217,6 +221,7 @@ async def get_form_response(
 @server.tool()
 @require_google_service("forms", "forms")
 @handle_http_errors("list_form_responses")
+@retry_on_ssl_error()
 async def list_form_responses(
     service,
     user_google_email: str,

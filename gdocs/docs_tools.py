@@ -13,7 +13,7 @@ from googleapiclient.http import MediaIoBaseDownload
 
 # Auth & server utilities
 from auth.service_decorator import require_google_service, require_multiple_services
-from core.utils import extract_office_xml_text, handle_http_errors
+from core.utils import extract_office_xml_text, handle_http_errors, retry_on_ssl_error
 from core.server import server
 from core.comments import create_comment_tools
 
@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 @server.tool()
 @require_google_service("drive", "drive_read")
 @handle_http_errors("search_docs")
+@retry_on_ssl_error()
 async def search_docs(
     service,
     user_google_email: str,
@@ -62,6 +63,7 @@ async def search_docs(
     {"service_type": "docs", "scopes": "docs_read", "param_name": "docs_service"}
 ])
 @handle_http_errors("get_doc_content")
+@retry_on_ssl_error()
 async def get_doc_content(
     drive_service,
     docs_service,
@@ -159,6 +161,7 @@ async def get_doc_content(
 @server.tool()
 @require_google_service("drive", "drive_read")
 @handle_http_errors("list_docs_in_folder")
+@retry_on_ssl_error()
 async def list_docs_in_folder(
     service,
     user_google_email: str,
@@ -191,6 +194,7 @@ async def list_docs_in_folder(
 @server.tool()
 @require_google_service("docs", "docs_write")
 @handle_http_errors("create_doc")
+@retry_on_ssl_error()
 async def create_doc(
     service,
     user_google_email: str,
