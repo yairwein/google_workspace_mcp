@@ -7,6 +7,8 @@ This module provides MCP tools for interacting with the Gmail API.
 import logging
 import asyncio
 import base64
+import ssl
+import time
 from typing import Optional, List, Dict, Literal
 
 from email.mime.text import MIMEText
@@ -487,15 +489,26 @@ async def get_gmail_thread_content(
     logger.info(
         f"[get_gmail_thread_content] Invoked. Thread ID: '{thread_id}', Email: '{user_google_email}'"
     )
-
-    # Fetch the complete thread with all messages
-    thread_response = await asyncio.to_thread(
-        service.users()
-        .threads()
-        .get(userId="me", id=thread_id, format="full")
-        .execute
-    )
-
+    max_retries = 3
+    base_delay = 1
+    for attempt in range(max_retries):
+        try:
+            # Fetch the complete thread with all messages
+            thread_response = await asyncio.to_thread(
+                service.users()
+                .threads()
+                .get(userId="me", id=thread_id, format="full")
+                .execute
+            )
+            break
+        except ssl.SSLError as e:
+            if attempt < max_retries - 1:
+                delay = base_delay * (2 ** attempt)
+                logger.warning(f"SSL error on attempt {attempt + 1}: {e}. Retrying in {delay} seconds...")
+                await asyncio.sleep(delay)
+            else:
+                logger.error(f"SSL error on final attempt: {e}. Raising exception.")
+                raise
     messages = thread_response.get("messages", [])
     if not messages:
         return f"No messages found in thread '{thread_id}'."
@@ -555,6 +568,7 @@ async def get_gmail_thread_content(
 
     content_text = "\n".join(content_lines)
     return content_text
+
 
 
 @server.tool()
