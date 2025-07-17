@@ -123,8 +123,7 @@ def _format_gmail_results_plain(messages: list, query: str) -> str:
         "💡 USAGE:",
         "  • Pass the Message IDs **as a list** to get_gmail_messages_content_batch()",
         "    e.g. get_gmail_messages_content_batch(message_ids=[...])",
-        "  • Pass the Thread IDs to get_gmail_thread_content() (single) _or_",
-        "    get_gmail_threads_content_batch() (coming soon)"
+        "  • Pass the Thread IDs to get_gmail_thread_content() (single) or get_gmail_threads_content_batch() (batch)"
     ])
 
     return "\n".join(lines)
@@ -555,6 +554,171 @@ async def get_gmail_thread_content(
 
     content_text = "\n".join(content_lines)
     return content_text
+
+
+@server.tool()
+@require_google_service("gmail", "gmail_read")
+@handle_http_errors("get_gmail_threads_content_batch")
+async def get_gmail_threads_content_batch(
+    service,
+    thread_ids: List[str],
+    user_google_email: str,
+) -> str:
+    """
+    Retrieves the content of multiple Gmail threads in a single batch request.
+    Supports up to 100 threads per request using Google's batch API.
+
+    Args:
+        thread_ids (List[str]): List of Gmail thread IDs to retrieve (max 100).
+        user_google_email (str): The user's Google email address. Required.
+
+    Returns:
+        str: A formatted list of thread contents with separators.
+    """
+    logger.info(
+        f"[get_gmail_threads_content_batch] Invoked. Thread count: {len(thread_ids)}, Email: '{user_google_email}'"
+    )
+
+    if not thread_ids:
+        raise Exception("No thread IDs provided")
+
+    output_threads = []
+
+    # Process in chunks of 100 (Gmail batch limit)
+    for chunk_start in range(0, len(thread_ids), 100):
+        chunk_ids = thread_ids[chunk_start:chunk_start + 100]
+        results: Dict[str, Dict] = {}
+
+        def _batch_callback(request_id, response, exception):
+            """Callback for batch requests"""
+            results[request_id] = {"data": response, "error": exception}
+
+        # Try to use batch API
+        try:
+            batch = service.new_batch_http_request(callback=_batch_callback)
+
+            for tid in chunk_ids:
+                req = service.users().threads().get(
+                    userId="me",
+                    id=tid,
+                    format="full"
+                )
+                batch.add(req, request_id=tid)
+
+            # Execute batch request
+            await asyncio.to_thread(batch.execute)
+
+        except Exception as batch_error:
+            # Fallback to asyncio.gather if batch API fails
+            logger.warning(
+                f"[get_gmail_threads_content_batch] Batch API failed, falling back to asyncio.gather: {batch_error}"
+            )
+
+            async def fetch_thread(tid: str):
+                try:
+                    thread = await asyncio.to_thread(
+                        service.users().threads().get(
+                            userId="me",
+                            id=tid,
+                            format="full"
+                        ).execute
+                    )
+                    return tid, thread, None
+                except Exception as e:
+                    return tid, None, e
+
+            # Fetch all threads in parallel
+            fetch_results = await asyncio.gather(
+                *[fetch_thread(tid) for tid in chunk_ids],
+                return_exceptions=False
+            )
+
+            # Convert to results format
+            for tid, thread, error in fetch_results:
+                results[tid] = {"data": thread, "error": error}
+
+        # Process results for this chunk
+        for tid in chunk_ids:
+            entry = results.get(tid, {"data": None, "error": "No result"})
+
+            if entry["error"]:
+                output_threads.append(
+                    f"⚠️ Thread {tid}: {entry['error']}\n"
+                )
+            else:
+                thread = entry["data"]
+                if not thread:
+                    output_threads.append(
+                        f"⚠️ Thread {tid}: No data returned\n"
+                    )
+                    continue
+
+                messages = thread.get("messages", [])
+                if not messages:
+                    output_threads.append(f"No messages found in thread '{tid}'.")
+                    continue
+
+                # Extract thread subject from the first message
+                first_message = messages[0]
+                first_headers = {
+                    h["name"]: h["value"]
+                    for h in first_message.get("payload", {}).get("headers", [])
+                }
+                thread_subject = first_headers.get("Subject", "(no subject)")
+
+                # Build the thread content
+                content_lines = [
+                    f"Thread ID: {tid}",
+                    f"Subject: {thread_subject}",
+                    f"Messages: {len(messages)}",
+                    "",
+                ]
+
+                # Process each message in the thread
+                for i, message in enumerate(messages, 1):
+                    # Extract headers
+                    headers = {
+                        h["name"]: h["value"]
+                        for h in message.get("payload", {}).get("headers", [])
+                    }
+
+                    sender = headers.get("From", "(unknown sender)")
+                    date = headers.get("Date", "(unknown date)")
+                    subject = headers.get("Subject", "(no subject)")
+
+                    # Extract message body
+                    payload = message.get("payload", {})
+                    body_data = _extract_message_body(payload)
+
+                    # Add message to content
+                    content_lines.extend(
+                        [
+                            f"=== Message {i} ===",
+                            f"From: {sender}",
+                            f"Date: {date}",
+                        ]
+                    )
+
+                    # Only show subject if it's different from thread subject
+                    if subject != thread_subject:
+                        content_lines.append(f"Subject: {subject}")
+
+                    content_lines.extend(
+                        [
+                            "",
+                            body_data or "[No text/plain body found]",
+                            "",
+                        ]
+                    )
+                
+                output_threads.append("\n".join(content_lines))
+
+
+    # Combine all threads with separators
+    final_output = f"Retrieved {len(thread_ids)} threads:\n\n"
+    final_output += "\n---\n\n".join(output_threads)
+
+    return final_output
 
 
 @server.tool()
