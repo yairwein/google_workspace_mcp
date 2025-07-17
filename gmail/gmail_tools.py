@@ -666,7 +666,6 @@ async def get_gmail_threads_content_batch(
     return header + "\n\n" + "\n---\n\n".join(output_threads)
 
 
-
 @server.tool()
 @handle_http_errors("list_gmail_labels", is_read_only=True)
 @require_google_service("gmail", "gmail_read")
