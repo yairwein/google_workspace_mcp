@@ -574,7 +574,7 @@ async def get_gmail_thread_content(
 
 @server.tool()
 @require_google_service("gmail", "gmail_read")
-@handle_http_errors("get_gmail_threads_content_batch")
+@handle_http_errors("get_gmail_threads_content_batch", is_read_only=True)
 async def get_gmail_threads_content_batch(
     service,
     thread_ids: List[str],
