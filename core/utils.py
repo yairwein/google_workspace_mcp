@@ -10,28 +10,14 @@ import functools
 
 from typing import List, Optional
 
+from googleapiclient.errors import HttpError
+
 logger = logging.getLogger(__name__)
 
-def retry_on_ssl_error(max_retries=3, base_delay=1):
-    """
-    A decorator to retry a function call on ssl.SSLError with exponential backoff.
-    """
-    def decorator(func):
-        @functools.wraps(func)
-        async def wrapper(*args, **kwargs):
-            for attempt in range(max_retries):
-                try:
-                    return await func(*args, **kwargs)
-                except ssl.SSLError as e:
-                    if attempt < max_retries - 1:
-                        delay = base_delay * (2 ** attempt)
-                        logger.warning(f"SSL error in {func.__name__} on attempt {attempt + 1}: {e}. Retrying in {delay} seconds...")
-                        await asyncio.sleep(delay)
-                    else:
-                        logger.error(f"SSL error in {func.__name__} on final attempt: {e}. Raising exception.")
-                        raise
-        return wrapper
-    return decorator
+
+class TransientNetworkError(Exception):
+    """Custom exception for transient network errors after retries."""
+    pass
 
 
 def check_credentials_directory_permissions(credentials_dir: str = None) -> None:
@@ -186,38 +172,57 @@ def extract_office_xml_text(file_bytes: bytes, mime_type: str) -> Optional[str]:
         logger.error(f"Failed to extract office XML text for {mime_type}: {e}", exc_info=True)
         return None
 
-import functools
-from googleapiclient.errors import HttpError
-
-def handle_http_errors(tool_name: str):
+def handle_http_errors(tool_name: str, is_read_only: bool = False):
     """
-    A decorator to handle Google API HttpErrors in a standardized way.
+    A decorator to handle Google API HttpErrors and transient SSL errors in a standardized way.
 
     It wraps a tool function, catches HttpError, logs a detailed error message,
     and raises a generic Exception with a user-friendly message.
 
+    If is_read_only is True, it will also catch ssl.SSLError and retry with
+    exponential backoff. After exhausting retries, it raises a TransientNetworkError.
+
     Args:
         tool_name (str): The name of the tool being decorated (e.g., 'list_calendars').
-                         This is used for logging purposes.
+        is_read_only (bool): If True, the operation is considered safe to retry on
+                             transient network errors. Defaults to False.
     """
     def decorator(func):
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):
-            try:
-                return await func(*args, **kwargs)
-            except HttpError as error:
-                user_google_email = kwargs.get('user_google_email', 'N/A')
-                message = (
-                    f"API error in {tool_name}: {error}. "
-                    f"You might need to re-authenticate for user '{user_google_email}'. "
-                    f"LLM: Try 'start_google_auth' with the user's email and the appropriate service_name."
-                )
-                logger.error(message, exc_info=True)
-                raise Exception(message)
-            except Exception as e:
-                # Catch any other unexpected errors
-                message = f"An unexpected error occurred in {tool_name}: {e}"
-                logger.exception(message)
-                raise Exception(message)
+            max_retries = 3
+            base_delay = 1
+
+            for attempt in range(max_retries):
+                try:
+                    return await func(*args, **kwargs)
+                except ssl.SSLError as e:
+                    if is_read_only and attempt < max_retries - 1:
+                        delay = base_delay * (2 ** attempt)
+                        logger.warning(f"SSL error in {tool_name} on attempt {attempt + 1}: {e}. Retrying in {delay} seconds...")
+                        await asyncio.sleep(delay)
+                    else:
+                        logger.error(f"SSL error in {tool_name} on final attempt: {e}. Raising exception.")
+                        raise TransientNetworkError(
+                            f"A transient SSL error occurred in '{tool_name}' after {max_retries} attempts. "
+                            "This is likely a temporary network or certificate issue. Please try again shortly."
+                        ) from e
+                except HttpError as error:
+                    user_google_email = kwargs.get('user_google_email', 'N/A')
+                    message = (
+                        f"API error in {tool_name}: {error}. "
+                        f"You might need to re-authenticate for user '{user_google_email}'. "
+                        f"LLM: Try 'start_google_auth' with the user's email and the appropriate service_name."
+                    )
+                    logger.error(message, exc_info=True)
+                    raise Exception(message) from error
+                except TransientNetworkError:
+                    # Re-raise without wrapping to preserve the specific error type
+                    raise
+                except Exception as e:
+                    # Catch any other unexpected errors
+                    message = f"An unexpected error occurred in {tool_name}: {e}"
+                    logger.exception(message)
+                    raise Exception(message) from e
         return wrapper
     return decorator

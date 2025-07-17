@@ -7,9 +7,6 @@ This module provides MCP tools for interacting with the Gmail API.
 import logging
 import asyncio
 import base64
-import ssl
-import time
-import functools
 from typing import Optional, List, Dict, Literal
 
 from email.mime.text import MIMEText
@@ -18,7 +15,7 @@ from mcp import types
 from fastapi import Body
 
 from auth.service_decorator import require_google_service
-from core.utils import handle_http_errors, retry_on_ssl_error
+from core.utils import handle_http_errors
 from core.server import (
     GMAIL_READONLY_SCOPE,
     GMAIL_SEND_SCOPE,
@@ -134,9 +131,8 @@ def _format_gmail_results_plain(messages: list, query: str) -> str:
 
 
 @server.tool()
+@handle_http_errors("search_gmail_messages", is_read_only=True)
 @require_google_service("gmail", "gmail_read")
-@handle_http_errors("search_gmail_messages")
-@retry_on_ssl_error()
 async def search_gmail_messages(
     service, query: str, user_google_email: str, page_size: int = 10
 ) -> str:
@@ -168,9 +164,8 @@ async def search_gmail_messages(
 
 
 @server.tool()
+@handle_http_errors("get_gmail_message_content", is_read_only=True)
 @require_google_service("gmail", "gmail_read")
-@handle_http_errors("get_gmail_message_content")
-@retry_on_ssl_error()
 async def get_gmail_message_content(
     service, message_id: str, user_google_email: str
 ) -> str:
@@ -237,9 +232,8 @@ async def get_gmail_message_content(
 
 
 @server.tool()
+@handle_http_errors("get_gmail_messages_content_batch", is_read_only=True)
 @require_google_service("gmail", "gmail_read")
-@handle_http_errors("get_gmail_messages_content_batch")
-@retry_on_ssl_error()
 async def get_gmail_messages_content_batch(
     service,
     message_ids: List[str],
@@ -391,9 +385,8 @@ async def get_gmail_messages_content_batch(
 
 
 @server.tool()
-@require_google_service("gmail", GMAIL_SEND_SCOPE)
 @handle_http_errors("send_gmail_message")
-@retry_on_ssl_error()
+@require_google_service("gmail", GMAIL_SEND_SCOPE)
 async def send_gmail_message(
     service,
     user_google_email: str,
@@ -429,9 +422,8 @@ async def send_gmail_message(
 
 
 @server.tool()
-@require_google_service("gmail", GMAIL_COMPOSE_SCOPE)
 @handle_http_errors("draft_gmail_message")
-@retry_on_ssl_error()
+@require_google_service("gmail", GMAIL_COMPOSE_SCOPE)
 async def draft_gmail_message(
     service,
     user_google_email: str,
@@ -477,9 +469,8 @@ async def draft_gmail_message(
 
 
 @server.tool()
+@handle_http_errors("get_gmail_thread_content", is_read_only=True)
 @require_google_service("gmail", "gmail_read")
-@handle_http_errors("get_gmail_thread_content")
-@retry_on_ssl_error()
 async def get_gmail_thread_content(
     service, thread_id: str, user_google_email: str
 ) -> str:
@@ -566,9 +557,8 @@ async def get_gmail_thread_content(
 
 
 @server.tool()
+@handle_http_errors("list_gmail_labels", is_read_only=True)
 @require_google_service("gmail", "gmail_read")
-@handle_http_errors("list_gmail_labels")
-@retry_on_ssl_error()
 async def list_gmail_labels(service, user_google_email: str) -> str:
     """
     Lists all labels in the user's Gmail account.
@@ -615,9 +605,8 @@ async def list_gmail_labels(service, user_google_email: str) -> str:
 
 
 @server.tool()
-@require_google_service("gmail", GMAIL_LABELS_SCOPE)
 @handle_http_errors("manage_gmail_label")
-@retry_on_ssl_error()
+@require_google_service("gmail", GMAIL_LABELS_SCOPE)
 async def manage_gmail_label(
     service,
     user_google_email: str,
@@ -690,9 +679,8 @@ async def manage_gmail_label(
 
 
 @server.tool()
-@require_google_service("gmail", GMAIL_MODIFY_SCOPE)
 @handle_http_errors("modify_gmail_message_labels")
-@retry_on_ssl_error()
+@require_google_service("gmail", GMAIL_MODIFY_SCOPE)
 async def modify_gmail_message_labels(
     service,
     user_google_email: str,

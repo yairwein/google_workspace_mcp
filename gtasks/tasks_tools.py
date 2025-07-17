@@ -13,7 +13,7 @@ from googleapiclient.errors import HttpError
 
 from auth.service_decorator import require_google_service
 from core.server import server
-from core.utils import handle_http_errors, retry_on_ssl_error
+from core.utils import handle_http_errors
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,6 @@ logger = logging.getLogger(__name__)
 @server.tool()
 @require_google_service("tasks", "tasks_read")
 @handle_http_errors("list_task_lists")
-@retry_on_ssl_error()
 async def list_task_lists(
     service,
     user_google_email: str,
@@ -82,7 +81,6 @@ async def list_task_lists(
 @server.tool()
 @require_google_service("tasks", "tasks_read")
 @handle_http_errors("get_task_list")
-@retry_on_ssl_error()
 async def get_task_list(
     service,
     user_google_email: str,
@@ -127,7 +125,6 @@ async def get_task_list(
 @server.tool()
 @require_google_service("tasks", "tasks")
 @handle_http_errors("create_task_list")
-@retry_on_ssl_error()
 async def create_task_list(
     service,
     user_google_email: str,
@@ -176,7 +173,6 @@ async def create_task_list(
 @server.tool()
 @require_google_service("tasks", "tasks")
 @handle_http_errors("update_task_list")
-@retry_on_ssl_error()
 async def update_task_list(
     service,
     user_google_email: str,
@@ -227,7 +223,6 @@ async def update_task_list(
 @server.tool()
 @require_google_service("tasks", "tasks")
 @handle_http_errors("delete_task_list")
-@retry_on_ssl_error()
 async def delete_task_list(
     service,
     user_google_email: str,
@@ -268,7 +263,6 @@ async def delete_task_list(
 @server.tool()
 @require_google_service("tasks", "tasks_read")
 @handle_http_errors("list_tasks")
-@retry_on_ssl_error()
 async def list_tasks(
     service,
     user_google_email: str,
@@ -375,7 +369,6 @@ async def list_tasks(
 @server.tool()
 @require_google_service("tasks", "tasks_read")
 @handle_http_errors("get_task")
-@retry_on_ssl_error()
 async def get_task(
     service,
     user_google_email: str,
@@ -437,7 +430,6 @@ async def get_task(
 @server.tool()
 @require_google_service("tasks", "tasks")
 @handle_http_errors("create_task")
-@retry_on_ssl_error()
 async def create_task(
     service,
     user_google_email: str,
@@ -513,7 +505,6 @@ async def create_task(
 @server.tool()
 @require_google_service("tasks", "tasks")
 @handle_http_errors("update_task")
-@retry_on_ssl_error()
 async def update_task(
     service,
     user_google_email: str,
@@ -596,7 +587,6 @@ async def update_task(
 @server.tool()
 @require_google_service("tasks", "tasks")
 @handle_http_errors("delete_task")
-@retry_on_ssl_error()
 async def delete_task(
     service,
     user_google_email: str,
@@ -639,7 +629,6 @@ async def delete_task(
 @server.tool()
 @require_google_service("tasks", "tasks")
 @handle_http_errors("move_task")
-@retry_on_ssl_error()
 async def move_task(
     service,
     user_google_email: str,
@@ -719,7 +708,6 @@ async def move_task(
 @server.tool()
 @require_google_service("tasks", "tasks")
 @handle_http_errors("clear_completed_tasks")
-@retry_on_ssl_error()
 async def clear_completed_tasks(
     service,
     user_google_email: str,

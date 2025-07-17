@@ -15,7 +15,7 @@ from googleapiclient.errors import HttpError
 from googleapiclient.discovery import build
 
 from auth.service_decorator import require_google_service
-from core.utils import handle_http_errors, retry_on_ssl_error
+from core.utils import handle_http_errors
 
 from core.server import server
 
@@ -80,9 +80,8 @@ def _correct_time_format_for_api(
 
 
 @server.tool()
+@handle_http_errors("list_calendars", is_read_only=True)
 @require_google_service("calendar", "calendar_read")
-@handle_http_errors("list_calendars")
-@retry_on_ssl_error()
 async def list_calendars(service, user_google_email: str) -> str:
     """
     Retrieves a list of calendars accessible to the authenticated user.
@@ -115,9 +114,8 @@ async def list_calendars(service, user_google_email: str) -> str:
 
 
 @server.tool()
+@handle_http_errors("get_events", is_read_only=True)
 @require_google_service("calendar", "calendar_read")
-@handle_http_errors("get_events")
-@retry_on_ssl_error()
 async def get_events(
     service,
     user_google_email: str,
@@ -204,9 +202,8 @@ async def get_events(
 
 
 @server.tool()
-@require_google_service("calendar", "calendar_events")
 @handle_http_errors("create_event")
-@retry_on_ssl_error()
+@require_google_service("calendar", "calendar_events")
 async def create_event(
     service,
     user_google_email: str,
@@ -329,9 +326,8 @@ async def create_event(
 
 
 @server.tool()
-@require_google_service("calendar", "calendar_events")
 @handle_http_errors("modify_event")
-@retry_on_ssl_error()
+@require_google_service("calendar", "calendar_events")
 async def modify_event(
     service,
     user_google_email: str,
@@ -450,9 +446,8 @@ async def modify_event(
 
 
 @server.tool()
-@require_google_service("calendar", "calendar_events")
 @handle_http_errors("delete_event")
-@retry_on_ssl_error()
+@require_google_service("calendar", "calendar_events")
 async def delete_event(service, user_google_email: str, event_id: str, calendar_id: str = "primary") -> str:
     """
     Deletes an existing event.
@@ -505,9 +500,8 @@ async def delete_event(service, user_google_email: str, event_id: str, calendar_
 
 
 @server.tool()
+@handle_http_errors("get_event", is_read_only=True)
 @require_google_service("calendar", "calendar_read")
-@handle_http_errors("get_event")
-@retry_on_ssl_error()
 async def get_event(
     service,
     user_google_email: str,
