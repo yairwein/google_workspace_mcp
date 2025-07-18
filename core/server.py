@@ -17,7 +17,41 @@ from auth.oauth_responses import create_error_response, create_success_response,
 # Import shared configuration
 from auth.scopes import (
     OAUTH_STATE_TO_SESSION_ID_MAP,
-    SCOPES
+    SCOPES,
+    USERINFO_EMAIL_SCOPE,  # noqa: F401
+    OPENID_SCOPE,  # noqa: F401
+    CALENDAR_READONLY_SCOPE,  # noqa: F401
+    CALENDAR_EVENTS_SCOPE,  # noqa: F401
+    DRIVE_READONLY_SCOPE,  # noqa: F401
+    DRIVE_FILE_SCOPE,  # noqa: F401
+    GMAIL_READONLY_SCOPE,  # noqa: F401
+    GMAIL_SEND_SCOPE,  # noqa: F401
+    GMAIL_COMPOSE_SCOPE,  # noqa: F401
+    GMAIL_MODIFY_SCOPE,  # noqa: F401
+    GMAIL_LABELS_SCOPE,  # noqa: F401
+    BASE_SCOPES,  # noqa: F401
+    CALENDAR_SCOPES,  # noqa: F401
+    DRIVE_SCOPES,  # noqa: F401
+    GMAIL_SCOPES,  # noqa: F401
+    DOCS_READONLY_SCOPE,  # noqa: F401
+    DOCS_WRITE_SCOPE,  # noqa: F401
+    CHAT_READONLY_SCOPE,  # noqa: F401
+    CHAT_WRITE_SCOPE,  # noqa: F401
+    CHAT_SPACES_SCOPE,  # noqa: F401
+    CHAT_SCOPES,  # noqa: F401
+    SHEETS_READONLY_SCOPE,  # noqa: F401
+    SHEETS_WRITE_SCOPE,  # noqa: F401
+    SHEETS_SCOPES,  # noqa: F401
+    FORMS_BODY_SCOPE,  # noqa: F401
+    FORMS_BODY_READONLY_SCOPE,  # noqa: F401
+    FORMS_RESPONSES_READONLY_SCOPE,  # noqa: F401
+    FORMS_SCOPES,  # noqa: F401
+    SLIDES_SCOPE,  # noqa: F401
+    SLIDES_READONLY_SCOPE,  # noqa: F401
+    SLIDES_SCOPES,  # noqa: F401
+    TASKS_SCOPE,  # noqa: F401
+    TASKS_READONLY_SCOPE,  # noqa: F401
+    TASKS_SCOPES,  # noqa: F401
 )
 
 # Configure logging
