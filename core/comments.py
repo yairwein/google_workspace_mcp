@@ -7,10 +7,7 @@ All Google Workspace apps (Docs, Sheets, Slides) use the Drive API for comment o
 
 import logging
 import asyncio
-from typing import Dict, Any
 
-from mcp import types
-from googleapiclient.errors import HttpError
 
 from auth.service_decorator import require_google_service
 from core.server import server

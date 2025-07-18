@@ -1,10 +1,9 @@
 import io
 import logging
 import os
-import tempfile
-import zipfile, xml.etree.ElementTree as ET
+import zipfile
+import xml.etree.ElementTree as ET
 import ssl
-import time
 import asyncio
 import functools
 
@@ -70,7 +69,7 @@ def check_credentials_directory_permissions(credentials_dir: str = None) -> None
                 try:
                     if os.path.exists(credentials_dir):
                         os.rmdir(credentials_dir)
-                except:
+                except (PermissionError, OSError):
                     pass
                 raise PermissionError(
                     f"Cannot create or write to credentials directory '{os.path.abspath(credentials_dir)}': {e}"
