@@ -8,7 +8,6 @@ import asyncio
 import io
 from typing import List
 
-from mcp import types
 from googleapiclient.http import MediaIoBaseDownload
 
 # Auth & server utilities
@@ -94,7 +93,7 @@ async def get_doc_content(
 
     # Step 3: Process based on mimeType
     if mime_type == "application/vnd.google-apps.document":
-        logger.info(f"[get_doc_content] Processing as native Google Doc.")
+        logger.info("[get_doc_content] Processing as native Google Doc.")
         doc_data = await asyncio.to_thread(
             docs_service.documents().get(documentId=document_id).execute
         )

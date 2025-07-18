@@ -6,10 +6,6 @@ from datetime import datetime, timedelta
 
 from google.auth.exceptions import RefreshError
 from auth.google_auth import get_authenticated_google_service, GoogleAuthenticationError
-
-logger = logging.getLogger(__name__)
-
-# Import scope constants
 from auth.scopes import (
     GMAIL_READONLY_SCOPE, GMAIL_SEND_SCOPE, GMAIL_COMPOSE_SCOPE, GMAIL_MODIFY_SCOPE, GMAIL_LABELS_SCOPE,
     DRIVE_READONLY_SCOPE, DRIVE_FILE_SCOPE,
@@ -21,6 +17,8 @@ from auth.scopes import (
     SLIDES_SCOPE, SLIDES_READONLY_SCOPE,
     TASKS_SCOPE, TASKS_READONLY_SCOPE
 )
+
+logger = logging.getLogger(__name__)
 
 # Service configuration mapping
 SERVICE_CONFIGS = {
@@ -391,7 +389,6 @@ def clear_service_cache(user_email: Optional[str] = None) -> int:
 
 def get_cache_stats() -> Dict[str, Any]:
     """Get service cache statistics."""
-    now = datetime.now()
     valid_entries = 0
     expired_entries = 0
 

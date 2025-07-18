@@ -11,13 +11,11 @@ from typing import Optional, List, Dict, Literal
 
 from email.mime.text import MIMEText
 
-from mcp import types
 from fastapi import Body
 
 from auth.service_decorator import require_google_service
 from core.utils import handle_http_errors
 from core.server import (
-    GMAIL_READONLY_SCOPE,
     GMAIL_SEND_SCOPE,
     GMAIL_COMPOSE_SCOPE,
     GMAIL_MODIFY_SCOPE,

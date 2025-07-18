@@ -8,8 +8,6 @@ import logging
 import asyncio
 from typing import List, Optional
 
-from mcp import types
-from googleapiclient.errors import HttpError
 
 from auth.service_decorator import require_google_service
 from core.server import server

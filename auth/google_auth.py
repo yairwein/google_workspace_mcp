@@ -555,7 +555,7 @@ def get_credentials(
     # Check for single-user mode
     if os.getenv("MCP_SINGLE_USER_MODE") == "1":
         logger.info(
-            f"[get_credentials] Single-user mode: bypassing session mapping, finding any credentials"
+            "[get_credentials] Single-user mode: bypassing session mapping, finding any credentials"
         )
         credentials = _find_any_credentials(credentials_base_dir)
         if not credentials:

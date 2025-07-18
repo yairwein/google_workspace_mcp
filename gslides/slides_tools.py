@@ -6,10 +6,8 @@ This module provides MCP tools for interacting with Google Slides API.
 
 import logging
 import asyncio
-from typing import List, Optional, Dict, Any
+from typing import List, Dict, Any
 
-from mcp import types
-from googleapiclient.errors import HttpError
 
 from auth.service_decorator import require_google_service
 from core.server import server

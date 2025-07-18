@@ -10,7 +10,6 @@ import asyncio
 import re
 from typing import List, Optional, Dict, Any
 
-from mcp import types
 from googleapiclient.errors import HttpError
 from googleapiclient.discovery import build
 
@@ -300,7 +299,7 @@ async def create_event(
                             title = filename
                             logger.info(f"[create_event] Using filename '{filename}' as attachment title")
                         else:
-                            logger.info(f"[create_event] No filename found, using generic title")
+                            logger.info("[create_event] No filename found, using generic title")
                     except Exception as e:
                         logger.warning(f"Could not fetch metadata for file {file_id}: {e}")
                 event_body["attachments"].append({
@@ -397,7 +396,7 @@ async def modify_event(
         # might handle this more robustly or require start/end with timezone.
         # For now, we'll log a warning and skip applying timezone if start/end are missing.
         logger.warning(
-            f"[modify_event] Timezone provided but start_time and end_time are missing. Timezone will not be applied unless start/end times are also provided."
+            "[modify_event] Timezone provided but start_time and end_time are missing. Timezone will not be applied unless start/end times are also provided."
         )
 
     if not event_body:
@@ -416,7 +415,7 @@ async def modify_event(
             lambda: service.events().get(calendarId=calendar_id, eventId=event_id).execute()
         )
         logger.info(
-            f"[modify_event] Successfully verified event exists before update"
+            "[modify_event] Successfully verified event exists before update"
         )
     except HttpError as get_error:
         if get_error.resp.status == 404:
@@ -475,7 +474,7 @@ async def delete_event(service, user_google_email: str, event_id: str, calendar_
             lambda: service.events().get(calendarId=calendar_id, eventId=event_id).execute()
         )
         logger.info(
-            f"[delete_event] Successfully verified event exists before deletion"
+            "[delete_event] Successfully verified event exists before deletion"
         )
     except HttpError as get_error:
         if get_error.resp.status == 404:
