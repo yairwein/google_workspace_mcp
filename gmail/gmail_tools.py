@@ -839,3 +839,53 @@ async def modify_gmail_message_labels(
         actions.append(f"Removed labels: {', '.join(remove_label_ids)}")
 
     return f"Message labels updated successfully!\nMessage ID: {message_id}\n{'; '.join(actions)}"
+
+
+@server.tool()
+@handle_http_errors("batch_modify_gmail_message_labels")
+@require_google_service("gmail", GMAIL_MODIFY_SCOPE)
+async def batch_modify_gmail_message_labels(
+    service,
+    user_google_email: str,
+    message_ids: List[str],
+    add_label_ids: Optional[List[str]] = None,
+    remove_label_ids: Optional[List[str]] = None,
+) -> str:
+    """
+    Adds or removes labels from multiple Gmail messages in a single batch request.
+
+    Args:
+        user_google_email (str): The user's Google email address. Required.
+        message_ids (List[str]): A list of message IDs to modify.
+        add_label_ids (Optional[List[str]]): List of label IDs to add to the messages.
+        remove_label_ids (Optional[List[str]]): List of label IDs to remove from the messages.
+
+    Returns:
+        str: Confirmation message of the label changes applied to the messages.
+    """
+    logger.info(
+        f"[batch_modify_gmail_message_labels] Invoked. Email: '{user_google_email}', Message IDs: '{message_ids}'"
+    )
+
+    if not add_label_ids and not remove_label_ids:
+        raise Exception(
+            "At least one of add_label_ids or remove_label_ids must be provided."
+        )
+
+    body = {"ids": message_ids}
+    if add_label_ids:
+        body["addLabelIds"] = add_label_ids
+    if remove_label_ids:
+        body["removeLabelIds"] = remove_label_ids
+
+    await asyncio.to_thread(
+        service.users().messages().batchModify(userId="me", body=body).execute
+    )
+
+    actions = []
+    if add_label_ids:
+        actions.append(f"Added labels: {', '.join(add_label_ids)}")
+    if remove_label_ids:
+        actions.append(f"Removed labels: {', '.join(remove_label_ids)}")
+
+    return f"Labels updated for {len(message_ids)} messages: {'; '.join(actions)}"
