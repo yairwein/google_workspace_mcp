@@ -6,10 +6,8 @@ This module provides MCP tools for interacting with Google Drive API.
 import logging
 import asyncio
 import re
-from typing import List, Optional, Dict, Any
+from typing import Optional, Dict, Any
 
-from mcp import types
-from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 import io
 import httpx

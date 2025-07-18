@@ -172,7 +172,7 @@ class MinimalOAuthServer:
                 self.server_thread.join(timeout=3.0)
 
             self.is_running = False
-            logger.info(f"Minimal OAuth server stopped")
+            logger.info("Minimal OAuth server stopped")
 
         except Exception as e:
             logger.error(f"Error stopping minimal OAuth server: {e}", exc_info=True)

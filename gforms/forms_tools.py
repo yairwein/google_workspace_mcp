@@ -8,7 +8,6 @@ import logging
 import asyncio
 from typing import Optional, Dict, Any
 
-from mcp import types
 
 from auth.service_decorator import require_google_service
 from core.server import server

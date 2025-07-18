@@ -115,9 +115,9 @@ def main():
         safe_print(f"   {tool_icons[tool]} {tool.title()} - Google {tool.title()} API integration")
     safe_print("")
 
-    safe_print(f"📊 Configuration Summary:")
+    safe_print("📊 Configuration Summary:")
     safe_print(f"   🔧 Tools Enabled: {len(tools_to_import)}/{len(tool_imports)}")
-    safe_print(f"   🔑 Auth Method: OAuth 2.0 with PKCE")
+    safe_print("   🔑 Auth Method: OAuth 2.0 with PKCE")
     safe_print(f"   📝 Log Level: {logging.getLogger().getEffectiveLevel()}")
     safe_print("")
 

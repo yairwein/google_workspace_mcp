@@ -7,7 +7,6 @@ import logging
 import asyncio
 from typing import Optional
 
-from mcp import types
 from googleapiclient.errors import HttpError
 
 # Auth & server utilities
