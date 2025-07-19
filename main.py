@@ -5,7 +5,7 @@ import sys
 from importlib import metadata
 
 # Local imports
-from core.server import server, set_transport_mode
+from core.server import server, set_transport_mode, initialize_oauth21_auth, shutdown_oauth21_auth
 from core.utils import check_credentials_directory_permissions
 
 logging.basicConfig(
@@ -143,6 +143,24 @@ def main():
         # Set transport mode for OAuth callback handling
         set_transport_mode(args.transport)
 
+        # Initialize OAuth 2.1 authentication if available
+        import asyncio
+        auth_layer = None
+        try:
+            if args.transport == 'streamable-http':
+                # Only initialize OAuth 2.1 for HTTP transport
+                auth_layer = asyncio.run(initialize_oauth21_auth())
+                if auth_layer and auth_layer.config.is_oauth2_enabled():
+                    safe_print("🔐 OAuth 2.1 authentication initialized")
+                    safe_print(f"   Discovery endpoints available at {base_uri}:{port}/.well-known/")
+                else:
+                    safe_print("🔐 Using legacy authentication only")
+            else:
+                safe_print("🔐 OAuth 2.1 not available in stdio mode (using legacy auth)")
+        except Exception as e:
+            safe_print(f"⚠️  OAuth 2.1 initialization failed: {e}")
+            safe_print("   Falling back to legacy authentication")
+
         if args.transport == 'streamable-http':
             safe_print(f"🚀 Starting server on {base_uri}:{port}")
         else:
@@ -164,6 +182,13 @@ def main():
             server.run()
     except KeyboardInterrupt:
         safe_print("\n👋 Server shutdown requested")
+        # Clean up OAuth 2.1 authentication
+        try:
+            if auth_layer:
+                asyncio.run(shutdown_oauth21_auth())
+        except Exception as e:
+            safe_print(f"⚠️  Error during OAuth 2.1 shutdown: {e}")
+        
         # Clean up OAuth callback server if running
         from auth.oauth_callback_server import cleanup_oauth_callback_server
         cleanup_oauth_callback_server()
