@@ -100,8 +100,11 @@ async def get_doc_content(
                 includeTabsContent=True
             ).execute
         )
-        def extract_text_from_elements(elements, tab_name=None):
+        def extract_text_from_elements(elements, tab_name=None, depth=0):
             """Extract text from document elements (paragraphs, tables, etc.)"""
+            # Prevent infinite recursion by limiting depth
+            if depth > 5:
+                return ""
             text_lines = []
             if tab_name:
                 text_lines.append(f"\n--- TAB: {tab_name} ---\n")
@@ -125,7 +128,7 @@ async def get_doc_content(
                         row_cells = row.get('tableCells', [])
                         for cell in row_cells:
                             cell_content = cell.get('content', [])
-                            cell_text = extract_text_from_elements(cell_content)
+                            cell_text = extract_text_from_elements(cell_content, depth=depth + 1)
                             if cell_text.strip():
                                 text_lines.append(cell_text)
             return "".join(text_lines)
