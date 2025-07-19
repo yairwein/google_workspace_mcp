@@ -100,6 +100,9 @@ async def get_doc_content(
                 includeTabsContent=True
             ).execute
         )
+        # Tab header format constant
+        TAB_HEADER_FORMAT = "\n--- TAB: {tab_name} ---\n"
+        
         def extract_text_from_elements(elements, tab_name=None, depth=0):
             """Extract text from document elements (paragraphs, tables, etc.)"""
             # Prevent infinite recursion by limiting depth
@@ -107,7 +110,7 @@ async def get_doc_content(
                 return ""
             text_lines = []
             if tab_name:
-                text_lines.append(f"\n--- TAB: {tab_name} ---\n")
+                text_lines.append(TAB_HEADER_FORMAT.format(tab_name=tab_name))
 
             for element in elements:
                 if 'paragraph' in element:
@@ -138,7 +141,10 @@ async def get_doc_content(
             tab_text = ""
 
             if 'documentTab' in tab:
-                tab_title = tab.get('documentTab', {}).get('title', f'Untitled Tab (Level {level})')
+                tab_title = tab.get('documentTab', {}).get('title', 'Untitled Tab')
+                # Add indentation for nested tabs to show hierarchy
+                if level > 0:
+                    tab_title = "    " * level + tab_title
                 tab_body = tab.get('documentTab', {}).get('body', {}).get('content', [])
                 tab_text += extract_text_from_elements(tab_body, tab_title)
 
