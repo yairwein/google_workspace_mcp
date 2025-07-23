@@ -26,6 +26,9 @@ from core.server import (
 
 logger = logging.getLogger(__name__)
 
+GMAIL_BATCH_SIZE = 25
+GMAIL_REQUEST_DELAY = 0.1
+
 
 def _extract_message_body(payload):
     """
@@ -111,7 +114,7 @@ def _format_gmail_results_plain(messages: list, query: str) -> str:
         if not msg or not isinstance(msg, dict):
             lines.extend([
                 f"  {i}. Message: Invalid message data",
-                f"     Error: Message object is null or malformed",
+                "     Error: Message object is null or malformed",
                 "",
             ])
             continue
@@ -189,7 +192,7 @@ async def search_gmail_messages(
 
     # Handle potential null response (but empty dict {} is valid)
     if response is None:
-        logger.warning(f"[search_gmail_messages] Null response from Gmail API")
+        logger.warning("[search_gmail_messages] Null response from Gmail API")
         return f"No response received from Gmail API for query: '{query}'"
 
     messages = response.get("messages", [])
@@ -285,7 +288,7 @@ async def get_gmail_messages_content_batch(
     Supports up to 25 messages per batch to prevent SSL connection exhaustion.
 
     Args:
-        message_ids (List[str]): List of Gmail message IDs to retrieve (max 100).
+        message_ids (List[str]): List of Gmail message IDs to retrieve (max 25 per batch).
         user_google_email (str): The user's Google email address. Required.
         format (Literal["full", "metadata"]): Message format. "full" includes body, "metadata" only headers.
 
@@ -302,10 +305,8 @@ async def get_gmail_messages_content_batch(
     output_messages = []
 
     # Process in smaller chunks to prevent SSL connection exhaustion
-    # Reduced from 100 to 25 to limit concurrent SSL connections
-    BATCH_SIZE = 25
-    for chunk_start in range(0, len(message_ids), BATCH_SIZE):
-        chunk_ids = message_ids[chunk_start : chunk_start + BATCH_SIZE]
+    for chunk_start in range(0, len(message_ids), GMAIL_BATCH_SIZE):
+        chunk_ids = message_ids[chunk_start : chunk_start + GMAIL_BATCH_SIZE]
         results: Dict[str, Dict] = {}
 
         def _batch_callback(request_id, response, exception):
@@ -390,7 +391,7 @@ async def get_gmail_messages_content_batch(
                 mid_result, msg_data, error = await fetch_message_with_retry(mid)
                 results[mid_result] = {"data": msg_data, "error": error}
                 # Brief delay between requests to allow connection cleanup
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(GMAIL_REQUEST_DELAY)
 
         # Process results for this chunk
         for mid in chunk_ids:
@@ -635,7 +636,7 @@ async def get_gmail_threads_content_batch(
     Supports up to 25 threads per batch to prevent SSL connection exhaustion.
 
     Args:
-        thread_ids (List[str]): A list of Gmail thread IDs to retrieve. The function will automatically batch requests in chunks of 100.
+        thread_ids (List[str]): A list of Gmail thread IDs to retrieve. The function will automatically batch requests in chunks of 25.
         user_google_email (str): The user's Google email address. Required.
 
     Returns:
@@ -655,10 +656,8 @@ async def get_gmail_threads_content_batch(
         results[request_id] = {"data": response, "error": exception}
 
     # Process in smaller chunks to prevent SSL connection exhaustion
-    # Reduced from 100 to 25 to limit concurrent SSL connections
-    BATCH_SIZE = 25
-    for chunk_start in range(0, len(thread_ids), BATCH_SIZE):
-        chunk_ids = thread_ids[chunk_start : chunk_start + BATCH_SIZE]
+    for chunk_start in range(0, len(thread_ids), GMAIL_BATCH_SIZE):
+        chunk_ids = thread_ids[chunk_start : chunk_start + GMAIL_BATCH_SIZE]
         results: Dict[str, Dict] = {}
 
         # Try to use batch API
@@ -710,7 +709,7 @@ async def get_gmail_threads_content_batch(
                 tid_result, thread_data, error = await fetch_thread_with_retry(tid)
                 results[tid_result] = {"data": thread_data, "error": error}
                 # Brief delay between requests to allow connection cleanup
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(GMAIL_REQUEST_DELAY)
 
         # Process results for this chunk
         for tid in chunk_ids:

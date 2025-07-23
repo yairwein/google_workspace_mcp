@@ -6,7 +6,6 @@ This module provides MCP tools for interacting with Google Docs API and managing
 import logging
 import asyncio
 import io
-from typing import List
 
 from googleapiclient.http import MediaIoBaseDownload
 
