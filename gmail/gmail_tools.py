@@ -114,7 +114,7 @@ def _format_gmail_results_plain(messages: list, query: str) -> str:
         if not msg or not isinstance(msg, dict):
             lines.extend([
                 f"  {i}. Message: Invalid message data",
-                f"     Error: Message object is null or malformed",
+                "     Error: Message object is null or malformed",
                 "",
             ])
             continue
@@ -192,7 +192,7 @@ async def search_gmail_messages(
 
     # Handle potential null response (but empty dict {} is valid)
     if response is None:
-        logger.warning(f"[search_gmail_messages] Null response from Gmail API")
+        logger.warning("[search_gmail_messages] Null response from Gmail API")
         return f"No response received from Gmail API for query: '{query}'"
 
     messages = response.get("messages", [])
