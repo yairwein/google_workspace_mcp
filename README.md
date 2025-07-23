@@ -481,6 +481,14 @@ async def your_new_tool(service, param1: str, param2: int = 10):
 
 To use this server as a tool provider within Open WebUI:
 
+### Instant Start (No Config Needed)
+Just copy and paste the below, set your values and you're off!
+```bash
+GOOGLE_OAUTH_CLIENT_ID="your_client_id" GOOGLE_OAUTH_CLIENT_SECRET="your_client_secret" uvx mcpo --port 8000 --api-key "top-secret" -- uvx workspace-mcp
+```
+
+Otherwise:
+
 ### 1. Create MCPO Configuration
 
 Create a file named `config.json` with the following structure to have `mcpo` make the streamable HTTP endpoint available as an OpenAPI spec tool:
