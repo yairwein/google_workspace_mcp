@@ -2,7 +2,7 @@
   "dxt_version": "0.1",
   "name": "workspace-mcp",
   "display_name": "Google Workspace MCP",
-  "version": "1.1.5",
+  "version": "1.1.9",
   "description": "Full natural language control over Google Calendar, Drive, Gmail, Docs, Sheets, Slides, Forms, Tasks and Chat through all MCP clients, AI assistants and developer tools",
   "long_description": "A production-ready MCP server that integrates all major Google Workspace services with AI assistants. Built with FastMCP for optimal performance, featuring advanced authentication handling, service caching, and streamlined development patterns.",
   "author": {
