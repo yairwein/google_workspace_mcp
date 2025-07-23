@@ -7,6 +7,7 @@ This module provides MCP tools for interacting with the Gmail API.
 import logging
 import asyncio
 import base64
+import ssl
 from typing import Optional, List, Dict, Literal
 
 from email.mime.text import MIMEText
@@ -106,14 +107,40 @@ def _format_gmail_results_plain(messages: list, query: str) -> str:
     ]
 
     for i, msg in enumerate(messages, 1):
-        message_url = _generate_gmail_web_url(msg["id"])
-        thread_url = _generate_gmail_web_url(msg["threadId"])
+        # Handle potential null/undefined message objects
+        if not msg or not isinstance(msg, dict):
+            lines.extend([
+                f"  {i}. Message: Invalid message data",
+                f"     Error: Message object is null or malformed",
+                "",
+            ])
+            continue
+
+        # Handle potential null/undefined values from Gmail API
+        message_id = msg.get("id")
+        thread_id = msg.get("threadId")
+
+        # Convert None, empty string, or missing values to "unknown"
+        if not message_id:
+            message_id = "unknown"
+        if not thread_id:
+            thread_id = "unknown"
+
+        if message_id != "unknown":
+            message_url = _generate_gmail_web_url(message_id)
+        else:
+            message_url = "N/A"
+
+        if thread_id != "unknown":
+            thread_url = _generate_gmail_web_url(thread_id)
+        else:
+            thread_url = "N/A"
 
         lines.extend(
             [
-                f"  {i}. Message ID: {msg['id']}",
+                f"  {i}. Message ID: {message_id}",
                 f"     Web Link: {message_url}",
-                f"     Thread ID: {msg['threadId']}",
+                f"     Thread ID: {thread_id}",
                 f"     Thread Link: {thread_url}",
                 "",
             ]
@@ -159,7 +186,17 @@ async def search_gmail_messages(
         .list(userId="me", q=query, maxResults=page_size)
         .execute
     )
+
+    # Handle potential null response (but empty dict {} is valid)
+    if response is None:
+        logger.warning(f"[search_gmail_messages] Null response from Gmail API")
+        return f"No response received from Gmail API for query: '{query}'"
+
     messages = response.get("messages", [])
+    # Additional safety check for null messages array
+    if messages is None:
+        messages = []
+
     formatted_output = _format_gmail_results_plain(messages, query)
 
     logger.info(f"[search_gmail_messages] Found {len(messages)} messages")
@@ -245,7 +282,7 @@ async def get_gmail_messages_content_batch(
 ) -> str:
     """
     Retrieves the content of multiple Gmail messages in a single batch request.
-    Supports up to 100 messages per request using Google's batch API.
+    Supports up to 25 messages per batch to prevent SSL connection exhaustion.
 
     Args:
         message_ids (List[str]): List of Gmail message IDs to retrieve (max 100).
@@ -264,9 +301,11 @@ async def get_gmail_messages_content_batch(
 
     output_messages = []
 
-    # Process in chunks of 100 (Gmail batch limit)
-    for chunk_start in range(0, len(message_ids), 100):
-        chunk_ids = message_ids[chunk_start : chunk_start + 100]
+    # Process in smaller chunks to prevent SSL connection exhaustion
+    # Reduced from 100 to 25 to limit concurrent SSL connections
+    BATCH_SIZE = 25
+    for chunk_start in range(0, len(message_ids), BATCH_SIZE):
+        chunk_ids = message_ids[chunk_start : chunk_start + BATCH_SIZE]
         results: Dict[str, Dict] = {}
 
         def _batch_callback(request_id, response, exception):
@@ -301,44 +340,57 @@ async def get_gmail_messages_content_batch(
             await asyncio.to_thread(batch.execute)
 
         except Exception as batch_error:
-            # Fallback to asyncio.gather if batch API fails
+            # Fallback to sequential processing instead of parallel to prevent SSL exhaustion
             logger.warning(
-                f"[get_gmail_messages_content_batch] Batch API failed, falling back to asyncio.gather: {batch_error}"
+                f"[get_gmail_messages_content_batch] Batch API failed, falling back to sequential processing: {batch_error}"
             )
 
-            async def fetch_message(mid: str):
-                try:
-                    if format == "metadata":
-                        msg = await asyncio.to_thread(
-                            service.users()
-                            .messages()
-                            .get(
-                                userId="me",
-                                id=mid,
-                                format="metadata",
-                                metadataHeaders=["Subject", "From"],
+            async def fetch_message_with_retry(mid: str, max_retries: int = 3):
+                """Fetch a single message with exponential backoff retry for SSL errors"""
+                for attempt in range(max_retries):
+                    try:
+                        if format == "metadata":
+                            msg = await asyncio.to_thread(
+                                service.users()
+                                .messages()
+                                .get(
+                                    userId="me",
+                                    id=mid,
+                                    format="metadata",
+                                    metadataHeaders=["Subject", "From"],
+                                )
+                                .execute
                             )
-                            .execute
-                        )
-                    else:
-                        msg = await asyncio.to_thread(
-                            service.users()
-                            .messages()
-                            .get(userId="me", id=mid, format="full")
-                            .execute
-                        )
-                    return mid, msg, None
-                except Exception as e:
-                    return mid, None, e
+                        else:
+                            msg = await asyncio.to_thread(
+                                service.users()
+                                .messages()
+                                .get(userId="me", id=mid, format="full")
+                                .execute
+                            )
+                        return mid, msg, None
+                    except ssl.SSLError as ssl_error:
+                        if attempt < max_retries - 1:
+                            # Exponential backoff: 1s, 2s, 4s
+                            delay = 2 ** attempt
+                            logger.warning(
+                                f"[get_gmail_messages_content_batch] SSL error for message {mid} on attempt {attempt + 1}: {ssl_error}. Retrying in {delay}s..."
+                            )
+                            await asyncio.sleep(delay)
+                        else:
+                            logger.error(
+                                f"[get_gmail_messages_content_batch] SSL error for message {mid} on final attempt: {ssl_error}"
+                            )
+                            return mid, None, ssl_error
+                    except Exception as e:
+                        return mid, None, e
 
-            # Fetch all messages in parallel
-            fetch_results = await asyncio.gather(
-                *[fetch_message(mid) for mid in chunk_ids], return_exceptions=False
-            )
-
-            # Convert to results format
-            for mid, msg, error in fetch_results:
-                results[mid] = {"data": msg, "error": error}
+            # Process messages sequentially with small delays to prevent connection exhaustion
+            for mid in chunk_ids:
+                mid_result, msg_data, error = await fetch_message_with_retry(mid)
+                results[mid_result] = {"data": msg_data, "error": error}
+                # Brief delay between requests to allow connection cleanup
+                await asyncio.sleep(0.1)
 
         # Process results for this chunk
         for mid in chunk_ids:
@@ -580,7 +632,7 @@ async def get_gmail_threads_content_batch(
 ) -> str:
     """
     Retrieves the content of multiple Gmail threads in a single batch request.
-    Supports up to 100 threads per request using Google's batch API.
+    Supports up to 25 threads per batch to prevent SSL connection exhaustion.
 
     Args:
         thread_ids (List[str]): A list of Gmail thread IDs to retrieve. The function will automatically batch requests in chunks of 100.
@@ -602,9 +654,11 @@ async def get_gmail_threads_content_batch(
         """Callback for batch requests"""
         results[request_id] = {"data": response, "error": exception}
 
-    # Process in chunks of 100 (Gmail batch limit)
-    for chunk_start in range(0, len(thread_ids), 100):
-        chunk_ids = thread_ids[chunk_start : chunk_start + 100]
+    # Process in smaller chunks to prevent SSL connection exhaustion
+    # Reduced from 100 to 25 to limit concurrent SSL connections
+    BATCH_SIZE = 25
+    for chunk_start in range(0, len(thread_ids), BATCH_SIZE):
+        chunk_ids = thread_ids[chunk_start : chunk_start + BATCH_SIZE]
         results: Dict[str, Dict] = {}
 
         # Try to use batch API
@@ -619,31 +673,44 @@ async def get_gmail_threads_content_batch(
             await asyncio.to_thread(batch.execute)
 
         except Exception as batch_error:
-            # Fallback to asyncio.gather if batch API fails
+            # Fallback to sequential processing instead of parallel to prevent SSL exhaustion
             logger.warning(
-                f"[get_gmail_threads_content_batch] Batch API failed, falling back to asyncio.gather: {batch_error}"
+                f"[get_gmail_threads_content_batch] Batch API failed, falling back to sequential processing: {batch_error}"
             )
 
-            async def fetch_thread(tid: str):
-                try:
-                    thread = await asyncio.to_thread(
-                        service.users()
-                        .threads()
-                        .get(userId="me", id=tid, format="full")
-                        .execute
-                    )
-                    return tid, thread, None
-                except Exception as e:
-                    return tid, None, e
+            async def fetch_thread_with_retry(tid: str, max_retries: int = 3):
+                """Fetch a single thread with exponential backoff retry for SSL errors"""
+                for attempt in range(max_retries):
+                    try:
+                        thread = await asyncio.to_thread(
+                            service.users()
+                            .threads()
+                            .get(userId="me", id=tid, format="full")
+                            .execute
+                        )
+                        return tid, thread, None
+                    except ssl.SSLError as ssl_error:
+                        if attempt < max_retries - 1:
+                            # Exponential backoff: 1s, 2s, 4s
+                            delay = 2 ** attempt
+                            logger.warning(
+                                f"[get_gmail_threads_content_batch] SSL error for thread {tid} on attempt {attempt + 1}: {ssl_error}. Retrying in {delay}s..."
+                            )
+                            await asyncio.sleep(delay)
+                        else:
+                            logger.error(
+                                f"[get_gmail_threads_content_batch] SSL error for thread {tid} on final attempt: {ssl_error}"
+                            )
+                            return tid, None, ssl_error
+                    except Exception as e:
+                        return tid, None, e
 
-            # Fetch all threads in parallel
-            fetch_results = await asyncio.gather(
-                *[fetch_thread(tid) for tid in chunk_ids], return_exceptions=False
-            )
-
-            # Convert to results format
-            for tid, thread, error in fetch_results:
-                results[tid] = {"data": thread, "error": error}
+            # Process threads sequentially with small delays to prevent connection exhaustion
+            for tid in chunk_ids:
+                tid_result, thread_data, error = await fetch_thread_with_retry(tid)
+                results[tid_result] = {"data": thread_data, "error": error}
+                # Brief delay between requests to allow connection cleanup
+                await asyncio.sleep(0.1)
 
         # Process results for this chunk
         for tid in chunk_ids:
