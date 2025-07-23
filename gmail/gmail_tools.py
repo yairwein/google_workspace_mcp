@@ -7,8 +7,8 @@ This module provides MCP tools for interacting with the Gmail API.
 import logging
 import asyncio
 import base64
-import ssl
 from typing import Optional, List, Dict, Literal
+import ssl
 
 from email.mime.text import MIMEText
 
