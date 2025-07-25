@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "workspace-mcp"
-version = "1.1.10"
+version = "1.1.11"
 description = "Comprehensive, highly performant Google Workspace Streamable HTTP & SSE MCP Server for Calendar, Gmail, Docs, Sheets, Slides & Drive"
 readme = "README.md"
 keywords = [ "mcp", "google", "workspace", "llm", "ai", "claude", "model", "context", "protocol", "server"]
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
- "fastapi>=0.115.12",
+ "fastapi",
  "fastmcp>=2.3.3",
  "google-api-python-client>=2.168.0",
  "google-auth-httplib2>=0.2.0",
