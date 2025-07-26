@@ -122,11 +122,11 @@ async def get_events(
     time_min: Optional[str] = None,
     time_max: Optional[str] = None,
     max_results: int = 25,
-    query: Optional[str] = None,  # <--- New parameter
+    query: Optional[str] = None,
 ) -> str:
     """
     Retrieves a list of events from a specified Google Calendar within a given time range.
-    Can also search for events by keyword.
+    You can also search for events by keyword by supplying the optional "query" param. 
 
     Args:
         user_google_email (str): The user's Google email address. Required.
@@ -178,11 +178,11 @@ async def get_events(
     }
 
     if query:
-        request_params["q"] = query  # <--- Pass the query parameter
+        request_params["q"] = query
 
     events_result = await asyncio.to_thread(
         lambda: service.events()
-        .list(**request_params) # <--- Use dynamic parameters
+        .list(**request_params)
         .execute()
     )
     items = events_result.get("items", [])
