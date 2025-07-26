@@ -379,6 +379,16 @@ async def start_auth_flow(
         f"[start_auth_flow] Initiating auth for {user_display_name} with global SCOPES."
     )
 
+    # Import here to avoid circular imports
+    from auth.oauth_callback_server import ensure_oauth_callback_available
+    from core.server import _current_transport_mode, WORKSPACE_MCP_PORT, WORKSPACE_MCP_BASE_URI
+
+    # Ensure OAuth callback server is available before generating URLs
+    success, error_msg = ensure_oauth_callback_available(_current_transport_mode, WORKSPACE_MCP_PORT, WORKSPACE_MCP_BASE_URI)
+    if not success:
+        error_detail = f" ({error_msg})" if error_msg else ""
+        raise Exception(f"Cannot initiate OAuth flow - callback server unavailable{error_detail}. Please ensure the OAuth callback server can start before attempting authentication.")
+
     try:
         if "OAUTHLIB_INSECURE_TRANSPORT" not in os.environ and (
             "localhost" in redirect_uri or "127.0.0.1" in redirect_uri
