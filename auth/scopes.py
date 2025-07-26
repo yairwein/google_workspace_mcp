@@ -5,13 +5,8 @@ This module centralizes OAuth scope definitions for Google Workspace integration
 Separated from service_decorator.py to avoid circular imports.
 """
 import logging
-from typing import Dict
 
 logger = logging.getLogger(__name__)
-
-# Temporary map to associate OAuth state with MCP session ID
-# This should ideally be a more robust cache in a production system (e.g., Redis)
-OAUTH_STATE_TO_SESSION_ID_MAP: Dict[str, str] = {}
 
 # Individual OAuth Scope Constants
 USERINFO_EMAIL_SCOPE = 'https://www.googleapis.com/auth/userinfo.email'
