@@ -153,10 +153,10 @@ def main():
             if success:
                 safe_print(f"   OAuth callback server started on {base_uri}:{port}/oauth2callback")
             else:
+                warning_msg = f"   ⚠️  Warning: Failed to start OAuth callback server"
                 if error_msg:
-                    safe_print(f"   ⚠️  Warning: Failed to start OAuth callback server: {error_msg}")
-                else:
-                    safe_print("   ⚠️  Warning: Failed to start OAuth callback server")
+                    warning_msg += f": {error_msg}"
+                safe_print(warning_msg)
 
         safe_print("   Ready for MCP connections!")
         safe_print("")
