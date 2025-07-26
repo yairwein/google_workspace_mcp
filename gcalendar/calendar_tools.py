@@ -122,9 +122,11 @@ async def get_events(
     time_min: Optional[str] = None,
     time_max: Optional[str] = None,
     max_results: int = 25,
+    query: Optional[str] = None,
 ) -> str:
     """
     Retrieves a list of events from a specified Google Calendar within a given time range.
+    You can also search for events by keyword by supplying the optional "query" param. 
 
     Args:
         user_google_email (str): The user's Google email address. Required.
@@ -132,12 +134,13 @@ async def get_events(
         time_min (Optional[str]): The start of the time range (inclusive) in RFC3339 format (e.g., '2024-05-12T10:00:00Z' or '2024-05-12'). If omitted, defaults to the current time.
         time_max (Optional[str]): The end of the time range (exclusive) in RFC3339 format. If omitted, events starting from `time_min` onwards are considered (up to `max_results`).
         max_results (int): The maximum number of events to return. Defaults to 25.
+        query (Optional[str]): A keyword to search for within event fields (summary, description, location).
 
     Returns:
         str: A formatted list of events (summary, start and end times, link) within the specified range.
     """
     logger.info(
-        f"[get_events] Raw time parameters - time_min: '{time_min}', time_max: '{time_max}'"
+        f"[get_events] Raw time parameters - time_min: '{time_min}', time_max: '{time_max}', query: '{query}'"
     )
 
     # Ensure time_min and time_max are correctly formatted for the API
@@ -161,19 +164,25 @@ async def get_events(
         )
 
     logger.info(
-        f"[get_events] Final API parameters - calendarId: '{calendar_id}', timeMin: '{effective_time_min}', timeMax: '{effective_time_max}', maxResults: {max_results}"
+        f"[get_events] Final API parameters - calendarId: '{calendar_id}', timeMin: '{effective_time_min}', timeMax: '{effective_time_max}', maxResults: {max_results}, query: '{query}'"
     )
+
+    # Build the request parameters dynamically
+    request_params = {
+        "calendarId": calendar_id,
+        "timeMin": effective_time_min,
+        "timeMax": effective_time_max,
+        "maxResults": max_results,
+        "singleEvents": True,
+        "orderBy": "startTime",
+    }
+
+    if query:
+        request_params["q"] = query
 
     events_result = await asyncio.to_thread(
         lambda: service.events()
-        .list(
-            calendarId=calendar_id,
-            timeMin=effective_time_min,
-            timeMax=effective_time_max,
-            maxResults=max_results,
-            singleEvents=True,
-            orderBy="startTime",
-        )
+        .list(**request_params)
         .execute()
     )
     items = events_result.get("items", [])
