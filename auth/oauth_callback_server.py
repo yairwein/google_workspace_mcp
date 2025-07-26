@@ -18,7 +18,7 @@ from typing import Optional
 from urllib.parse import urlparse
 
 from auth.google_auth import handle_auth_callback, check_client_secrets
-from auth.scopes import OAUTH_STATE_TO_SESSION_ID_MAP, SCOPES
+from auth.scopes import SCOPES
 from auth.oauth_responses import create_error_response, create_success_response, create_server_error_response
 
 logger = logging.getLogger(__name__)
@@ -68,11 +68,7 @@ class MinimalOAuthServer:
 
                 logger.info(f"OAuth callback: Received code (state: {state}). Attempting to exchange for tokens.")
 
-                mcp_session_id: Optional[str] = OAUTH_STATE_TO_SESSION_ID_MAP.pop(state, None)
-                if mcp_session_id:
-                    logger.info(f"OAuth callback: Retrieved MCP session ID '{mcp_session_id}' for state '{state}'.")
-                else:
-                    logger.warning(f"OAuth callback: No MCP session ID found for state '{state}'. Auth will not be tied to a specific session.")
+                # Session ID tracking removed - not needed
 
                 # Exchange code for credentials
                 redirect_uri = get_oauth_redirect_uri(port=self.port, base_uri=self.base_uri)
@@ -80,11 +76,10 @@ class MinimalOAuthServer:
                     scopes=SCOPES,
                     authorization_response=str(request.url),
                     redirect_uri=redirect_uri,
-                    session_id=mcp_session_id
+                    session_id=None
                 )
 
-                log_session_part = f" (linked to session: {mcp_session_id})" if mcp_session_id else ""
-                logger.info(f"OAuth callback: Successfully authenticated user: {verified_user_id} (state: {state}){log_session_part}.")
+                logger.info(f"OAuth callback: Successfully authenticated user: {verified_user_id} (state: {state}).")
 
                 # Return success page using shared template
                 return create_success_response(verified_user_id)
