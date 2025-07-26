@@ -36,7 +36,6 @@ class MinimalOAuthServer:
         self.server = None
         self.server_thread = None
         self.is_running = False
-        self._running_lock = threading.Lock()
 
         # Setup the callback route
         self._setup_callback_route()
