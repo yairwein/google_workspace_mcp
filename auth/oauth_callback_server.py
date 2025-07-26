@@ -131,6 +131,7 @@ class MinimalOAuthServer:
 
             except Exception as e:
                 logger.error(f"Minimal OAuth server error: {e}", exc_info=True)
+                self.is_running = False
 
         # Start server in background thread
         self.server_thread = threading.Thread(target=run_server, daemon=True)
