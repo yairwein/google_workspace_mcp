@@ -193,8 +193,12 @@ async def start_google_auth(
 
     # Ensure OAuth callback is available for current transport mode
     redirect_uri = get_oauth_redirect_uri_for_current_mode()
-    if not ensure_oauth_callback_available(_current_transport_mode, WORKSPACE_MCP_PORT, WORKSPACE_MCP_BASE_URI):
-        raise Exception("Failed to start OAuth callback server. Please try again.")
+    success, error_msg = ensure_oauth_callback_available(_current_transport_mode, WORKSPACE_MCP_PORT, WORKSPACE_MCP_BASE_URI)
+    if not success:
+        if error_msg:
+            raise Exception(f"Failed to start OAuth callback server: {error_msg}")
+        else:
+            raise Exception("Failed to start OAuth callback server. Please try again.")
 
     auth_result = await start_auth_flow(
         user_google_email=user_google_email,

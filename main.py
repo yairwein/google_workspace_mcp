@@ -149,10 +149,14 @@ def main():
             safe_print("🚀 Starting server in stdio mode")
             # Start minimal OAuth callback server for stdio mode
             from auth.oauth_callback_server import ensure_oauth_callback_available
-            if ensure_oauth_callback_available('stdio', port, base_uri):
+            success, error_msg = ensure_oauth_callback_available('stdio', port, base_uri)
+            if success:
                 safe_print(f"   OAuth callback server started on {base_uri}:{port}/oauth2callback")
             else:
-                safe_print("   ⚠️  Warning: Failed to start OAuth callback server")
+                warning_msg = f"   ⚠️  Warning: Failed to start OAuth callback server"
+                if error_msg:
+                    warning_msg += f": {error_msg}"
+                safe_print(warning_msg)
 
         safe_print("   Ready for MCP connections!")
         safe_print("")

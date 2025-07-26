@@ -89,16 +89,16 @@ class MinimalOAuthServer:
                 logger.error(error_message_detail, exc_info=True)
                 return create_server_error_response(str(e))
 
-    def start(self) -> bool:
+    def start(self) -> tuple[bool, str]:
         """
         Start the minimal OAuth server.
 
         Returns:
-            True if started successfully, False otherwise
+            Tuple of (success: bool, error_message: str)
         """
         if self.is_running:
             logger.info("Minimal OAuth server is already running")
-            return True
+            return True, ""
 
         # Check if port is available
         # Extract hostname from base_uri (e.g., "http://localhost" -> "localhost")
@@ -112,8 +112,9 @@ class MinimalOAuthServer:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.bind((hostname, self.port))
         except OSError:
-            logger.error(f"Port {self.port} is already in use on {hostname}. Cannot start minimal OAuth server.")
-            return False
+            error_msg = f"Port {self.port} is already in use on {hostname}. Cannot start minimal OAuth server."
+            logger.error(error_msg)
+            return False, error_msg
 
         def run_server():
             """Run the server in a separate thread."""
@@ -130,6 +131,7 @@ class MinimalOAuthServer:
 
             except Exception as e:
                 logger.error(f"Minimal OAuth server error: {e}", exc_info=True)
+                self.is_running = False
 
         # Start server in background thread
         self.server_thread = threading.Thread(target=run_server, daemon=True)
@@ -145,13 +147,14 @@ class MinimalOAuthServer:
                     if result == 0:
                         self.is_running = True
                         logger.info(f"Minimal OAuth server started on {hostname}:{self.port}")
-                        return True
+                        return True, ""
             except Exception:
                 pass
             time.sleep(0.1)
 
-        logger.error(f"Failed to start minimal OAuth server on {hostname}:{self.port}")
-        return False
+        error_msg = f"Failed to start minimal OAuth server on {hostname}:{self.port} - server did not respond within {max_wait}s"
+        logger.error(error_msg)
+        return False, error_msg
 
     def stop(self):
         """Stop the minimal OAuth server."""
@@ -202,7 +205,7 @@ def get_oauth_redirect_uri(port: int = 8000, base_uri: str = "http://localhost")
     logger.info(f"Constructed redirect URI: {constructed_uri}")
     return constructed_uri
 
-def ensure_oauth_callback_available(transport_mode: str = "stdio", port: int = 8000, base_uri: str = "http://localhost") -> bool:
+def ensure_oauth_callback_available(transport_mode: str = "stdio", port: int = 8000, base_uri: str = "http://localhost") -> tuple[bool, str]:
     """
     Ensure OAuth callback endpoint is available for the given transport mode.
 
@@ -215,14 +218,14 @@ def ensure_oauth_callback_available(transport_mode: str = "stdio", port: int = 8
         base_uri: Base URI (default "http://localhost")
 
     Returns:
-        True if callback endpoint is available, False otherwise
+        Tuple of (success: bool, error_message: str)
     """
     global _minimal_oauth_server
 
     if transport_mode == "streamable-http":
         # In streamable-http mode, the main FastAPI server should handle callbacks
         logger.debug("Using existing FastAPI server for OAuth callbacks (streamable-http mode)")
-        return True
+        return True, ""
 
     elif transport_mode == "stdio":
         # In stdio mode, start minimal server if not already running
@@ -232,19 +235,21 @@ def ensure_oauth_callback_available(transport_mode: str = "stdio", port: int = 8
 
         if not _minimal_oauth_server.is_running:
             logger.info("Starting minimal OAuth server for stdio mode")
-            result = _minimal_oauth_server.start()
-            if result:
+            success, error_msg = _minimal_oauth_server.start()
+            if success:
                 logger.info(f"Minimal OAuth server successfully started on {base_uri}:{port}")
+                return True, ""
             else:
-                logger.error(f"Failed to start minimal OAuth server on {base_uri}:{port}")
-            return result
+                logger.error(f"Failed to start minimal OAuth server on {base_uri}:{port}: {error_msg}")
+                return False, error_msg
         else:
             logger.info("Minimal OAuth server is already running")
-            return True
+            return True, ""
 
     else:
-        logger.error(f"Unknown transport mode: {transport_mode}")
-        return False
+        error_msg = f"Unknown transport mode: {transport_mode}"
+        logger.error(error_msg)
+        return False, error_msg
 
 def cleanup_oauth_callback_server():
     """Clean up the minimal OAuth server if it was started."""
