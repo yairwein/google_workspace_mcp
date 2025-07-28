@@ -91,7 +91,7 @@ def get_api_enablement_message(error_details: str, service_type: Optional[str] =
             f"{service_display_name} API is not enabled for your project"
             f"{f' ({project_id})' if project_id else ''}.\n\n"
             f"Enable it here: {enable_link}\n\n"
-            f"After enabling, wait a few moments for the change to propagate, then try again."
+            f"After enabling, wait 1-2 minutes for the change to propagate, then try again."
             f"IMPORTANT - LLM: share the link provided as a clickable hyperlink and instruct the user to enable the required API."
         )
 
