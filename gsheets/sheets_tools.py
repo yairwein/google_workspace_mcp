@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 @server.tool()
-@handle_http_errors("list_spreadsheets", is_read_only=True)
+@handle_http_errors("list_spreadsheets", is_read_only=True, service_type="sheets")
 @require_google_service("drive", "drive_read")
 async def list_spreadsheets(
     service,
@@ -68,7 +68,7 @@ async def list_spreadsheets(
 
 
 @server.tool()
-@handle_http_errors("get_spreadsheet_info", is_read_only=True)
+@handle_http_errors("get_spreadsheet_info", is_read_only=True, service_type="sheets")
 @require_google_service("sheets", "sheets_read")
 async def get_spreadsheet_info(
     service,
@@ -118,7 +118,7 @@ async def get_spreadsheet_info(
 
 
 @server.tool()
-@handle_http_errors("read_sheet_values", is_read_only=True)
+@handle_http_errors("read_sheet_values", is_read_only=True, service_type="sheets")
 @require_google_service("sheets", "sheets_read")
 async def read_sheet_values(
     service,
@@ -168,7 +168,7 @@ async def read_sheet_values(
 
 
 @server.tool()
-@handle_http_errors("modify_sheet_values")
+@handle_http_errors("modify_sheet_values", service_type="sheets")
 @require_google_service("sheets", "sheets_write")
 async def modify_sheet_values(
     service,
@@ -239,7 +239,7 @@ async def modify_sheet_values(
 
 
 @server.tool()
-@handle_http_errors("create_spreadsheet")
+@handle_http_errors("create_spreadsheet", service_type="sheets")
 @require_google_service("sheets", "sheets_write")
 async def create_spreadsheet(
     service,
@@ -288,7 +288,7 @@ async def create_spreadsheet(
 
 
 @server.tool()
-@handle_http_errors("create_sheet")
+@handle_http_errors("create_sheet", service_type="sheets")
 @require_google_service("sheets", "sheets_write")
 async def create_sheet(
     service,

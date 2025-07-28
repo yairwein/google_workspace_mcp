@@ -18,7 +18,7 @@ from core.comments import create_comment_tools
 logger = logging.getLogger(__name__)
 
 @server.tool()
-@handle_http_errors("search_docs", is_read_only=True)
+@handle_http_errors("search_docs", is_read_only=True, service_type="docs")
 @require_google_service("drive", "drive_read")
 async def search_docs(
     service,
@@ -55,7 +55,7 @@ async def search_docs(
     return "\n".join(output)
 
 @server.tool()
-@handle_http_errors("get_doc_content", is_read_only=True)
+@handle_http_errors("get_doc_content", is_read_only=True, service_type="docs")
 @require_multiple_services([
     {"service_type": "drive", "scopes": "drive_read", "param_name": "drive_service"},
     {"service_type": "docs", "scopes": "docs_read", "param_name": "docs_service"}
@@ -214,7 +214,7 @@ async def get_doc_content(
     return header + body_text
 
 @server.tool()
-@handle_http_errors("list_docs_in_folder", is_read_only=True)
+@handle_http_errors("list_docs_in_folder", is_read_only=True, service_type="docs")
 @require_google_service("drive", "drive_read")
 async def list_docs_in_folder(
     service,
@@ -246,7 +246,7 @@ async def list_docs_in_folder(
     return "\n".join(out)
 
 @server.tool()
-@handle_http_errors("create_doc")
+@handle_http_errors("create_doc", service_type="docs")
 @require_google_service("docs", "docs_write")
 async def create_doc(
     service,
