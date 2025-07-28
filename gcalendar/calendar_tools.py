@@ -8,6 +8,7 @@ import datetime
 import logging
 import asyncio
 import re
+import uuid
 from typing import List, Optional, Dict, Any
 
 from googleapiclient.errors import HttpError
@@ -224,6 +225,7 @@ async def create_event(
     attendees: Optional[List[str]] = None,
     timezone: Optional[str] = None,
     attachments: Optional[List[str]] = None,
+    add_google_meet: bool = False,
 ) -> str:
     """
     Creates a new event.
@@ -239,6 +241,7 @@ async def create_event(
         attendees (Optional[List[str]]): Attendee email addresses.
         timezone (Optional[str]): Timezone (e.g., "America/New_York").
         attachments (Optional[List[str]]): List of Google Drive file URLs or IDs to attach to the event.
+        add_google_meet (bool): Whether to add a Google Meet video conference to the event. Defaults to False.
 
     Returns:
         str: Confirmation message of the successful event creation with event link.
@@ -273,6 +276,18 @@ async def create_event(
             event_body["end"]["timeZone"] = timezone
     if attendees:
         event_body["attendees"] = [{"email": email} for email in attendees]
+
+    if add_google_meet:
+        request_id = str(uuid.uuid4())
+        event_body["conferenceData"] = {
+            "createRequest": {
+                "requestId": request_id,
+                "conferenceSolutionKey": {
+                    "type": "hangoutsMeet"
+                }
+            }
+        }
+        logger.info(f"[create_event] Adding Google Meet conference with request ID: {request_id}")
 
     if attachments:
         # Accept both file URLs and file IDs. If a URL, extract the fileId.
@@ -318,15 +333,31 @@ async def create_event(
                 })
         created_event = await asyncio.to_thread(
             lambda: service.events().insert(
-                calendarId=calendar_id, body=event_body, supportsAttachments=True
+                calendarId=calendar_id, body=event_body, supportsAttachments=True,
+                conferenceDataVersion=1 if add_google_meet else 0
             ).execute()
         )
     else:
         created_event = await asyncio.to_thread(
-            lambda: service.events().insert(calendarId=calendar_id, body=event_body).execute()
+            lambda: service.events().insert(
+                calendarId=calendar_id, body=event_body,
+                conferenceDataVersion=1 if add_google_meet else 0
+            ).execute()
         )
     link = created_event.get("htmlLink", "No link available")
     confirmation_message = f"Successfully created event '{created_event.get('summary', summary)}' for {user_google_email}. Link: {link}"
+    
+    # Add Google Meet information if conference was created
+    if add_google_meet and "conferenceData" in created_event:
+        conference_data = created_event["conferenceData"]
+        if "entryPoints" in conference_data:
+            for entry_point in conference_data["entryPoints"]:
+                if entry_point.get("entryPointType") == "video":
+                    meet_link = entry_point.get("uri", "")
+                    if meet_link:
+                        confirmation_message += f" Google Meet: {meet_link}"
+                        break
+    
     logger.info(
             f"Event created successfully for {user_google_email}. ID: {created_event.get('id')}, Link: {link}"
         )
@@ -348,6 +379,7 @@ async def modify_event(
     location: Optional[str] = None,
     attendees: Optional[List[str]] = None,
     timezone: Optional[str] = None,
+    add_google_meet: Optional[bool] = None,
 ) -> str:
     """
     Modifies an existing event.
@@ -363,6 +395,7 @@ async def modify_event(
         location (Optional[str]): New event location.
         attendees (Optional[List[str]]): New attendee email addresses.
         timezone (Optional[str]): New timezone (e.g., "America/New_York").
+        add_google_meet (Optional[bool]): Whether to add or remove Google Meet video conference. If True, adds Google Meet; if False, removes it; if None, leaves unchanged.
 
     Returns:
         str: Confirmation message of the successful event modification with event link.
@@ -418,14 +451,55 @@ async def modify_event(
         f"[modify_event] Attempting to update event with ID: '{event_id}' in calendar '{calendar_id}'"
     )
 
-    # Try to get the event first to verify it exists
+    # Get the existing event to preserve fields that aren't being updated
     try:
-        await asyncio.to_thread(
+        existing_event = await asyncio.to_thread(
             lambda: service.events().get(calendarId=calendar_id, eventId=event_id).execute()
         )
         logger.info(
-            "[modify_event] Successfully verified event exists before update"
+            "[modify_event] Successfully retrieved existing event before update"
         )
+        
+        # Preserve existing fields if not provided in the update
+        if summary is None and 'summary' in existing_event:
+            event_body["summary"] = existing_event["summary"]
+            logger.info(f"[modify_event] Preserving existing summary: {existing_event['summary']}")
+        
+        if description is None and 'description' in existing_event:
+            event_body["description"] = existing_event["description"]
+            logger.info("[modify_event] Preserving existing description")
+            
+        if location is None and 'location' in existing_event:
+            event_body["location"] = existing_event["location"]
+            logger.info("[modify_event] Preserving existing location")
+            
+        if attendees is None and 'attendees' in existing_event:
+            event_body["attendees"] = existing_event["attendees"]
+            logger.info("[modify_event] Preserving existing attendees")
+        
+        # Handle Google Meet conference data
+        if add_google_meet is not None:
+            if add_google_meet:
+                # Add Google Meet
+                request_id = str(uuid.uuid4())
+                event_body["conferenceData"] = {
+                    "createRequest": {
+                        "requestId": request_id,
+                        "conferenceSolutionKey": {
+                            "type": "hangoutsMeet"
+                        }
+                    }
+                }
+                logger.info(f"[modify_event] Adding Google Meet conference with request ID: {request_id}")
+            else:
+                # Remove Google Meet by setting conferenceData to empty
+                event_body["conferenceData"] = {}
+                logger.info("[modify_event] Removing Google Meet conference")
+        elif 'conferenceData' in existing_event:
+            # Preserve existing conference data if not specified
+            event_body["conferenceData"] = existing_event["conferenceData"]
+            logger.info("[modify_event] Preserving existing conference data")
+            
     except HttpError as get_error:
         if get_error.resp.status == 404:
             logger.error(
@@ -441,12 +515,26 @@ async def modify_event(
     # Proceed with the update
     updated_event = await asyncio.to_thread(
         lambda: service.events()
-        .update(calendarId=calendar_id, eventId=event_id, body=event_body)
+        .update(calendarId=calendar_id, eventId=event_id, body=event_body, conferenceDataVersion=1)
         .execute()
     )
 
     link = updated_event.get("htmlLink", "No link available")
     confirmation_message = f"Successfully modified event '{updated_event.get('summary', summary)}' (ID: {event_id}) for {user_google_email}. Link: {link}"
+    
+    # Add Google Meet information if conference was added
+    if add_google_meet is True and "conferenceData" in updated_event:
+        conference_data = updated_event["conferenceData"]
+        if "entryPoints" in conference_data:
+            for entry_point in conference_data["entryPoints"]:
+                if entry_point.get("entryPointType") == "video":
+                    meet_link = entry_point.get("uri", "")
+                    if meet_link:
+                        confirmation_message += f" Google Meet: {meet_link}"
+                        break
+    elif add_google_meet is False:
+        confirmation_message += " (Google Meet removed)"
+    
     logger.info(
         f"Event modified successfully for {user_google_email}. ID: {updated_event.get('id')}, Link: {link}"
     )
