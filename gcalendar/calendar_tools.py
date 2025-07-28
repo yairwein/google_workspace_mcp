@@ -24,6 +24,23 @@ from core.server import server
 logger = logging.getLogger(__name__)
 
 
+def _preserve_existing_fields(event_body: Dict[str, Any], existing_event: Dict[str, Any], field_mappings: Dict[str, Any]) -> None:
+    """
+    Helper function to preserve existing event fields when not explicitly provided.
+
+    Args:
+        event_body: The event body being built for the API call
+        existing_event: The existing event data from the API
+        field_mappings: Dict mapping field names to their new values (None means preserve existing)
+    """
+    for field_name, new_value in field_mappings.items():
+        if new_value is None and field_name in existing_event:
+            event_body[field_name] = existing_event[field_name]
+            logger.info(f"[modify_event] Preserving existing {field_name}")
+        elif new_value is not None:
+            event_body[field_name] = new_value
+
+
 # Helper function to ensure time strings for API calls are correctly formatted
 def _correct_time_format_for_api(
     time_str: Optional[str], param_name: str
@@ -127,7 +144,7 @@ async def get_events(
 ) -> str:
     """
     Retrieves a list of events from a specified Google Calendar within a given time range.
-    You can also search for events by keyword by supplying the optional "query" param. 
+    You can also search for events by keyword by supplying the optional "query" param.
 
     Args:
         user_google_email (str): The user's Google email address. Required.
@@ -346,7 +363,7 @@ async def create_event(
         )
     link = created_event.get("htmlLink", "No link available")
     confirmation_message = f"Successfully created event '{created_event.get('summary', summary)}' for {user_google_email}. Link: {link}"
-    
+
     # Add Google Meet information if conference was created
     if add_google_meet and "conferenceData" in created_event:
         conference_data = created_event["conferenceData"]
@@ -357,7 +374,7 @@ async def create_event(
                     if meet_link:
                         confirmation_message += f" Google Meet: {meet_link}"
                         break
-    
+
     logger.info(
             f"Event created successfully for {user_google_email}. ID: {created_event.get('id')}, Link: {link}"
         )
@@ -459,24 +476,15 @@ async def modify_event(
         logger.info(
             "[modify_event] Successfully retrieved existing event before update"
         )
-        
+
         # Preserve existing fields if not provided in the update
-        if summary is None and 'summary' in existing_event:
-            event_body["summary"] = existing_event["summary"]
-            logger.info(f"[modify_event] Preserving existing summary: {existing_event['summary']}")
-        
-        if description is None and 'description' in existing_event:
-            event_body["description"] = existing_event["description"]
-            logger.info("[modify_event] Preserving existing description")
-            
-        if location is None and 'location' in existing_event:
-            event_body["location"] = existing_event["location"]
-            logger.info("[modify_event] Preserving existing location")
-            
-        if attendees is None and 'attendees' in existing_event:
-            event_body["attendees"] = existing_event["attendees"]
-            logger.info("[modify_event] Preserving existing attendees")
-        
+        _preserve_existing_fields(event_body, existing_event, {
+            "summary": summary,
+            "description": description,
+            "location": location,
+            "attendees": attendees
+        })
+
         # Handle Google Meet conference data
         if add_google_meet is not None:
             if add_google_meet:
@@ -499,7 +507,7 @@ async def modify_event(
             # Preserve existing conference data if not specified
             event_body["conferenceData"] = existing_event["conferenceData"]
             logger.info("[modify_event] Preserving existing conference data")
-            
+
     except HttpError as get_error:
         if get_error.resp.status == 404:
             logger.error(
@@ -521,7 +529,7 @@ async def modify_event(
 
     link = updated_event.get("htmlLink", "No link available")
     confirmation_message = f"Successfully modified event '{updated_event.get('summary', summary)}' (ID: {event_id}) for {user_google_email}. Link: {link}"
-    
+
     # Add Google Meet information if conference was added
     if add_google_meet is True and "conferenceData" in updated_event:
         conference_data = updated_event["conferenceData"]
@@ -534,7 +542,7 @@ async def modify_event(
                         break
     elif add_google_meet is False:
         confirmation_message += " (Google Meet removed)"
-    
+
     logger.info(
         f"Event modified successfully for {user_google_email}. ID: {updated_event.get('id')}, Link: {link}"
     )
