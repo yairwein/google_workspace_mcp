@@ -79,7 +79,7 @@ def _correct_time_format_for_api(
 
 
 @server.tool()
-@handle_http_errors("list_calendars", is_read_only=True)
+@handle_http_errors("list_calendars", is_read_only=True, service_type="calendar")
 @require_google_service("calendar", "calendar_read")
 async def list_calendars(service, user_google_email: str) -> str:
     """
@@ -113,7 +113,7 @@ async def list_calendars(service, user_google_email: str) -> str:
 
 
 @server.tool()
-@handle_http_errors("get_events", is_read_only=True)
+@handle_http_errors("get_events", is_read_only=True, service_type="calendar")
 @require_google_service("calendar", "calendar_read")
 async def get_events(
     service,
@@ -210,7 +210,7 @@ async def get_events(
 
 
 @server.tool()
-@handle_http_errors("create_event")
+@handle_http_errors("create_event", service_type="calendar")
 @require_google_service("calendar", "calendar_events")
 async def create_event(
     service,
@@ -334,7 +334,7 @@ async def create_event(
 
 
 @server.tool()
-@handle_http_errors("modify_event")
+@handle_http_errors("modify_event", service_type="calendar")
 @require_google_service("calendar", "calendar_events")
 async def modify_event(
     service,
@@ -454,7 +454,7 @@ async def modify_event(
 
 
 @server.tool()
-@handle_http_errors("delete_event")
+@handle_http_errors("delete_event", service_type="calendar")
 @require_google_service("calendar", "calendar_events")
 async def delete_event(service, user_google_email: str, event_id: str, calendar_id: str = "primary") -> str:
     """
@@ -508,7 +508,7 @@ async def delete_event(service, user_google_email: str, event_id: str, calendar_
 
 
 @server.tool()
-@handle_http_errors("get_event", is_read_only=True)
+@handle_http_errors("get_event", is_read_only=True, service_type="calendar")
 @require_google_service("calendar", "calendar_read")
 async def get_event(
     service,

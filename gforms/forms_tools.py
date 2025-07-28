@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 @server.tool()
-@handle_http_errors("create_form")
+@handle_http_errors("create_form", service_type="forms")
 @require_google_service("forms", "forms")
 async def create_form(
     service,
@@ -66,7 +66,7 @@ async def create_form(
 
 
 @server.tool()
-@handle_http_errors("get_form", is_read_only=True)
+@handle_http_errors("get_form", is_read_only=True, service_type="forms")
 @require_google_service("forms", "forms")
 async def get_form(
     service,
@@ -122,7 +122,7 @@ async def get_form(
 
 
 @server.tool()
-@handle_http_errors("set_publish_settings")
+@handle_http_errors("set_publish_settings", service_type="forms")
 @require_google_service("forms", "forms")
 async def set_publish_settings(
     service,
@@ -160,7 +160,7 @@ async def set_publish_settings(
 
 
 @server.tool()
-@handle_http_errors("get_form_response", is_read_only=True)
+@handle_http_errors("get_form_response", is_read_only=True, service_type="forms")
 @require_google_service("forms", "forms")
 async def get_form_response(
     service,
@@ -214,7 +214,7 @@ async def get_form_response(
 
 
 @server.tool()
-@handle_http_errors("list_form_responses", is_read_only=True)
+@handle_http_errors("list_form_responses", is_read_only=True, service_type="forms")
 @require_google_service("forms", "forms")
 async def list_form_responses(
     service,
