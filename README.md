@@ -101,48 +101,6 @@ Claude Desktop stores these securely in the OS keychain; set them once in the ex
 </div>
 ---
 
-### 2. Advanced / Cross-Platform Installation
-
-If you’re developing, deploying to servers, or using another MCP-capable client, keep reading.
-
-#### Instant CLI (uvx)
-
-```bash
-# Requires Python 3.10+ and uvx
-export GOOGLE_OAUTH_CLIENT_ID="xxx"
-export GOOGLE_OAUTH_CLIENT_SECRET="yyy"
-uvx workspace-mcp --tools gmail drive calendar
-```
-
-> Run instantly without manual installation - you must configure OAuth credentials when using uvx. You can use either environment variables (recommended for production) or set the `GOOGLE_CLIENT_SECRET_PATH` (or legacy `GOOGLE_CLIENT_SECRETS`) environment variable to point to your `client_secret.json` file.
-
-```bash
-# Set OAuth credentials via environment variables (recommended)
-export GOOGLE_OAUTH_CLIENT_ID="your-client-id.apps.googleusercontent.com"
-export GOOGLE_OAUTH_CLIENT_SECRET="your-client-secret"
-
-# Start the server with all Google Workspace tools
-uvx workspace-mcp
-
-# Start with specific tools only
-uvx workspace-mcp --tools gmail drive calendar tasks
-
-# Start in HTTP mode for debugging
-uvx workspace-mcp --transport streamable-http
-```
-
-*Requires Python 3.10+ and [uvx](https://github.com/astral-sh/uv). The package is available on [PyPI](https://pypi.org/project/workspace-mcp).*
-
-### Development Installation
-
-For development or customization:
-
-```bash
-git clone https://github.com/taylorwilsdon/google_workspace_mcp.git
-cd google_workspace_mcp
-uv run main.py
-```
-
 ### Prerequisites
 
 - **Python 3.10+**
@@ -153,8 +111,33 @@ uv run main.py
 
 1. **Google Cloud Setup**:
    - Create OAuth 2.0 credentials (web application) in [Google Cloud Console](https://console.cloud.google.com/)
-   - Enable APIs: Calendar, Drive, Gmail, Docs, Sheets, Slides, Forms, Tasks, Chat
+   - Create a new project (or use an existing one) for your MCP server.
+   - Navigate to APIs & Services → Credentials.
+   - Click Create Credentials → OAuth Client ID.
+   - Choose Web Application as the application type.
    - Add redirect URI: `http://localhost:8000/oauth2callback`
+
+   - **Enable APIs**:
+   - In the Google Cloud Console, go to APIs & Services → Library.
+   - Search for & enable Calendar, Drive, Gmail, Docs, Sheets, Slides, Forms, Tasks, Chat
+   - Expand the section below marked "API Enablement Links" for direct links to each!
+<details>
+  <summary>API Enablement Links</summary>
+  You can enable each one by clicking the links below (make sure you're logged into the Google Cloud Console and have the correct project selected):
+
+* [Enable Google Calendar API](https://console.cloud.google.com/flows/enableapi?apiid=calendar-json.googleapis.com)
+* [Enable Google Drive API](https://console.cloud.google.com/flows/enableapi?apiid=drive.googleapis.com)
+* [Enable Gmail API](https://console.cloud.google.com/flows/enableapi?apiid=gmail.googleapis.com)
+* [Enable Google Docs API](https://console.cloud.google.com/flows/enableapi?apiid=docs.googleapis.com)
+* [Enable Google Sheets API](https://console.cloud.google.com/flows/enableapi?apiid=sheets.googleapis.com)
+* [Enable Google Slides API](https://console.cloud.google.com/flows/enableapi?apiid=slides.googleapis.com)
+* [Enable Google Forms API](https://console.cloud.google.com/flows/enableapi?apiid=forms.googleapis.com)
+* [Enable Google Tasks API](https://console.cloud.google.com/flows/enableapi?apiid=tasks.googleapis.com)
+* [Enable Google Chat API](https://console.cloud.google.com/flows/enableapi?apiid=chat.googleapis.com)
+
+</details>
+
+1.1. **Credentials**:
    - Configure credentials using one of these methods:
 
      **Option A: Environment Variables (Recommended for Production)**
@@ -258,10 +241,47 @@ After running the script, just restart Claude Desktop and you're ready to go.
    }
    ```
 
-**Get Google OAuth Credentials** (if you don't have them):
-- Go to [Google Cloud Console](https://console.cloud.google.com/)
-- Create a new project and enable APIs: Calendar, Drive, Gmail, Docs, Sheets, Slides, Forms, Tasks, Chat
-- Create OAuth 2.0 Client ID (Web application) with redirect URI: `http://localhost:8000/oauth2callback`
+### 2. Advanced / Cross-Platform Installation
+
+If you’re developing, deploying to servers, or using another MCP-capable client, keep reading.
+
+#### Instant CLI (uvx)
+
+```bash
+# Requires Python 3.10+ and uvx
+export GOOGLE_OAUTH_CLIENT_ID="xxx"
+export GOOGLE_OAUTH_CLIENT_SECRET="yyy"
+uvx workspace-mcp --tools gmail drive calendar
+```
+
+> Run instantly without manual installation - you must configure OAuth credentials when using uvx. You can use either environment variables (recommended for production) or set the `GOOGLE_CLIENT_SECRET_PATH` (or legacy `GOOGLE_CLIENT_SECRETS`) environment variable to point to your `client_secret.json` file.
+
+```bash
+# Set OAuth credentials via environment variables (recommended)
+export GOOGLE_OAUTH_CLIENT_ID="your-client-id.apps.googleusercontent.com"
+export GOOGLE_OAUTH_CLIENT_SECRET="your-client-secret"
+
+# Start the server with all Google Workspace tools
+uvx workspace-mcp
+
+# Start with specific tools only
+uvx workspace-mcp --tools gmail drive calendar tasks
+
+# Start in HTTP mode for debugging
+uvx workspace-mcp --transport streamable-http
+```
+
+*Requires Python 3.10+ and [uvx](https://github.com/astral-sh/uv). The package is available on [PyPI](https://pypi.org/project/workspace-mcp).*
+
+### Development Installation
+
+For development or customization:
+
+```bash
+git clone https://github.com/taylorwilsdon/google_workspace_mcp.git
+cd google_workspace_mcp
+uv run main.py
+```
 
 **Development Installation (For Contributors)**:
 ```json
