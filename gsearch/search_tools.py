@@ -22,7 +22,6 @@ logger = logging.getLogger(__name__)
 async def search_custom(
     service,
     user_google_email: str,
-    cx: str,
     q: str,
     num: int = 10,
     start: int = 1,
@@ -40,7 +39,6 @@ async def search_custom(
 
     Args:
         user_google_email (str): The user's Google email address. Required.
-        cx (str): The Programmable Search Engine ID. Required.
         q (str): The search query. Required.
         num (int): Number of results to return (1-10). Defaults to 10.
         start (int): The index of the first result to return (1-based). Defaults to 1.
@@ -56,12 +54,16 @@ async def search_custom(
     Returns:
         str: Formatted search results including title, link, and snippet for each result.
     """
-    logger.info(f"[search_custom] Invoked. Email: '{user_google_email}', Query: '{q}', CX: '{cx}'")
-
-    # Get API key from environment
+    # Get API key and search engine ID from environment
     api_key = os.environ.get('GOOGLE_PSE_API_KEY')
     if not api_key:
         raise ValueError("GOOGLE_PSE_API_KEY environment variable not set. Please set it to your Google Custom Search API key.")
+    
+    cx = os.environ.get('GOOGLE_PSE_ENGINE_ID')
+    if not cx:
+        raise ValueError("GOOGLE_PSE_ENGINE_ID environment variable not set. Please set it to your Programmable Search Engine ID.")
+
+    logger.info(f"[search_custom] Invoked. Email: '{user_google_email}', Query: '{q}', CX: '{cx}'")
 
     # Build the request parameters
     params = {
@@ -150,25 +152,27 @@ async def search_custom(
 @require_google_service("customsearch", "customsearch")
 async def get_search_engine_info(
     service,
-    user_google_email: str,
-    cx: str
+    user_google_email: str
 ) -> str:
     """
     Retrieves metadata about a Programmable Search Engine.
 
     Args:
         user_google_email (str): The user's Google email address. Required.
-        cx (str): The Programmable Search Engine ID. Required.
 
     Returns:
         str: Information about the search engine including its configuration and available refinements.
     """
-    logger.info(f"[get_search_engine_info] Invoked. Email: '{user_google_email}', CX: '{cx}'")
-
-    # Get API key from environment
+    # Get API key and search engine ID from environment
     api_key = os.environ.get('GOOGLE_PSE_API_KEY')
     if not api_key:
         raise ValueError("GOOGLE_PSE_API_KEY environment variable not set. Please set it to your Google Custom Search API key.")
+    
+    cx = os.environ.get('GOOGLE_PSE_ENGINE_ID')
+    if not cx:
+        raise ValueError("GOOGLE_PSE_ENGINE_ID environment variable not set. Please set it to your Programmable Search Engine ID.")
+
+    logger.info(f"[get_search_engine_info] Invoked. Email: '{user_google_email}', CX: '{cx}'")
 
     # Perform a minimal search to get the search engine context
     params = {
@@ -217,7 +221,6 @@ async def get_search_engine_info(
 async def search_custom_siterestrict(
     service,
     user_google_email: str,
-    cx: str,
     q: str,
     sites: List[str],
     num: int = 10,
@@ -229,7 +232,6 @@ async def search_custom_siterestrict(
 
     Args:
         user_google_email (str): The user's Google email address. Required.
-        cx (str): The Programmable Search Engine ID. Required.
         q (str): The search query. Required.
         sites (List[str]): List of sites/domains to search within.
         num (int): Number of results to return (1-10). Defaults to 10.
@@ -249,7 +251,6 @@ async def search_custom_siterestrict(
     return await search_custom(
         service=service,
         user_google_email=user_google_email,
-        cx=cx,
         q=full_query,
         num=num,
         start=start,

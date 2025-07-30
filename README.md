@@ -93,6 +93,7 @@ A production-ready MCP server that integrates all major Google Workspace service
 | `GOOGLE_OAUTH_CLIENT_SECRET` | OAuth client secret |
 | `USER_GOOGLE_EMAIL` *(optional)* | Default email for single-user auth |
 | `GOOGLE_PSE_API_KEY` *(optional)* | API key for Google Custom Search - see [Custom Search Setup](#google-custom-search-setup) |
+| `GOOGLE_PSE_ENGINE_ID` *(optional)* | Programmable Search Engine ID for Custom Search |
 | `OAUTHLIB_INSECURE_TRANSPORT=1` | Development only (allows `http://` redirect) |
 
 Claude Desktop stores these securely in the OS keychain; set them once in the extension pane.
@@ -171,6 +172,7 @@ Claude Desktop stores these securely in the OS keychain; set them once in the ex
    export OAUTHLIB_INSECURE_TRANSPORT=1  # Development only
    export USER_GOOGLE_EMAIL=your.email@gmail.com  # Optional: Default email for auth - use this for single user setups and you won't need to set your email in system prompt for magic auth
    export GOOGLE_PSE_API_KEY=your-custom-search-api-key  # Optional: Only needed for Google Custom Search tools
+   export GOOGLE_PSE_ENGINE_ID=your-search-engine-id  # Optional: Only needed for Google Custom Search tools
    ```
 
 3. **Server Configuration**:
@@ -195,6 +197,10 @@ To use the Google Custom Search tools, you need to:
    - Enable the Custom Search API
    - Create credentials (API Key)
    - Set the `GOOGLE_PSE_API_KEY` environment variable with your API key
+
+3. **Configure Environment Variables**:
+   - Set `GOOGLE_PSE_API_KEY` to your Custom Search API key
+   - Set `GOOGLE_PSE_ENGINE_ID` to your Search Engine ID (the cx parameter from step 1)
 
 For detailed setup instructions, see the [Custom Search JSON API documentation](https://developers.google.com/custom-search/v1/overview).
 
