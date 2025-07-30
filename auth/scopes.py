@@ -51,6 +51,9 @@ SLIDES_READONLY_SCOPE = 'https://www.googleapis.com/auth/presentations.readonly'
 TASKS_SCOPE = 'https://www.googleapis.com/auth/tasks'
 TASKS_READONLY_SCOPE = 'https://www.googleapis.com/auth/tasks.readonly'
 
+# Google Custom Search API scope
+CUSTOM_SEARCH_SCOPE = 'https://www.googleapis.com/auth/cse'
+
 # Base OAuth scopes required for user identification
 BASE_SCOPES = [
     USERINFO_EMAIL_SCOPE,
@@ -108,5 +111,9 @@ TASKS_SCOPES = [
     TASKS_READONLY_SCOPE
 ]
 
+CUSTOM_SEARCH_SCOPES = [
+    CUSTOM_SEARCH_SCOPE
+]
+
 # Combined scopes for all supported Google Workspace operations
-SCOPES = list(set(BASE_SCOPES + CALENDAR_SCOPES + DRIVE_SCOPES + GMAIL_SCOPES + DOCS_SCOPES + CHAT_SCOPES + SHEETS_SCOPES + FORMS_SCOPES + SLIDES_SCOPES + TASKS_SCOPES))
+SCOPES = list(set(BASE_SCOPES + CALENDAR_SCOPES + DRIVE_SCOPES + GMAIL_SCOPES + DOCS_SCOPES + CHAT_SCOPES + SHEETS_SCOPES + FORMS_SCOPES + SLIDES_SCOPES + TASKS_SCOPES + CUSTOM_SEARCH_SCOPES))
