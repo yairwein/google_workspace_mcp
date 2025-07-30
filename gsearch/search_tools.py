@@ -6,6 +6,7 @@ This module provides MCP tools for interacting with Google Programmable Search E
 
 import logging
 import asyncio
+import os
 from typing import Optional, List, Dict, Any, Literal
 
 from auth.service_decorator import require_google_service
@@ -57,8 +58,14 @@ async def search_custom(
     """
     logger.info(f"[search_custom] Invoked. Email: '{user_google_email}', Query: '{q}', CX: '{cx}'")
 
+    # Get API key from environment
+    api_key = os.environ.get('GOOGLE_PSE_API_KEY')
+    if not api_key:
+        raise ValueError("GOOGLE_PSE_API_KEY environment variable not set. Please set it to your Google Custom Search API key.")
+
     # Build the request parameters
     params = {
+        'key': api_key,
         'cx': cx,
         'q': q,
         'num': num,
@@ -158,8 +165,14 @@ async def get_search_engine_info(
     """
     logger.info(f"[get_search_engine_info] Invoked. Email: '{user_google_email}', CX: '{cx}'")
 
+    # Get API key from environment
+    api_key = os.environ.get('GOOGLE_PSE_API_KEY')
+    if not api_key:
+        raise ValueError("GOOGLE_PSE_API_KEY environment variable not set. Please set it to your Google Custom Search API key.")
+
     # Perform a minimal search to get the search engine context
     params = {
+        'key': api_key,
         'cx': cx,
         'q': 'test',  # Minimal query to get metadata
         'num': 1

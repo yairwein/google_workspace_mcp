@@ -63,6 +63,7 @@ A production-ready MCP server that integrates all major Google Workspace service
 - **📝 Google Forms**: Form creation, retrieval, publish settings, and response management
 - **✓ Google Tasks**: Complete task and task list management with hierarchy, due dates, and status tracking
 - **💬 Google Chat**: Space management and messaging capabilities
+- **🔍 Google Custom Search**: Programmable Search Engine (PSE) integration for custom web searches
 - **🔄 All Transports**: Stdio, Streamable HTTP & SSE, OpenAPI compatibility via `mcpo`
 - **⚡ High Performance**: Service caching, thread-safe sessions, FastMCP integration
 - **🧩 Developer Friendly**: Minimal boilerplate, automatic service injection, centralized configuration
@@ -91,6 +92,7 @@ A production-ready MCP server that integrates all major Google Workspace service
 | `GOOGLE_OAUTH_CLIENT_ID` | OAuth client ID from Google Cloud |
 | `GOOGLE_OAUTH_CLIENT_SECRET` | OAuth client secret |
 | `USER_GOOGLE_EMAIL` *(optional)* | Default email for single-user auth |
+| `GOOGLE_PSE_API_KEY` *(optional)* | API key for Google Custom Search - see [Custom Search Setup](#google-custom-search-setup) |
 | `OAUTHLIB_INSECURE_TRANSPORT=1` | Development only (allows `http://` redirect) |
 
 Claude Desktop stores these securely in the OS keychain; set them once in the extension pane.
@@ -134,6 +136,7 @@ Claude Desktop stores these securely in the OS keychain; set them once in the ex
 * [Enable Google Forms API](https://console.cloud.google.com/flows/enableapi?apiid=forms.googleapis.com)
 * [Enable Google Tasks API](https://console.cloud.google.com/flows/enableapi?apiid=tasks.googleapis.com)
 * [Enable Google Chat API](https://console.cloud.google.com/flows/enableapi?apiid=chat.googleapis.com)
+* [Enable Google Custom Search API](https://console.cloud.google.com/flows/enableapi?apiid=customsearch.googleapis.com)
 
 </details>
 
@@ -167,6 +170,7 @@ Claude Desktop stores these securely in the OS keychain; set them once in the ex
    ```bash
    export OAUTHLIB_INSECURE_TRANSPORT=1  # Development only
    export USER_GOOGLE_EMAIL=your.email@gmail.com  # Optional: Default email for auth - use this for single user setups and you won't need to set your email in system prompt for magic auth
+   export GOOGLE_PSE_API_KEY=your-custom-search-api-key  # Optional: Only needed for Google Custom Search tools
    ```
 
 3. **Server Configuration**:
@@ -175,6 +179,24 @@ Claude Desktop stores these securely in the OS keychain; set them once in the ex
    - `WORKSPACE_MCP_PORT`: Sets the port the server listens on (default: 8000). This affects the server_url, port, and OAUTH_REDIRECT_URI.
    - `USER_GOOGLE_EMAIL`: Optional default email for authentication flows. If set, the LLM won't need to specify your email when calling `start_google_auth`.
    - `GOOGLE_OAUTH_REDIRECT_URI`: Sets an override for OAuth redirect specifically, must include a full address (i.e. include port if necessary). Use this if you want to run your OAuth redirect separately from the MCP. This is not recommended outside of very specific cases
+
+### Google Custom Search Setup
+
+To use the Google Custom Search tools, you need to:
+
+1. **Create a Programmable Search Engine**:
+   - Go to [Programmable Search Engine Control Panel](https://programmablesearchengine.google.com/controlpanel/create)
+   - Configure sites to search (or search the entire web)
+   - Note your Search Engine ID (cx parameter)
+
+2. **Get an API Key**:
+   - Visit [Google Developers Console](https://developers.google.com/custom-search/v1/overview)
+   - Create or select a project
+   - Enable the Custom Search API
+   - Create credentials (API Key)
+   - Set the `GOOGLE_PSE_API_KEY` environment variable with your API key
+
+For detailed setup instructions, see the [Custom Search JSON API documentation](https://developers.google.com/custom-search/v1/overview).
 
 ### Start the Server
 
@@ -198,7 +220,7 @@ docker build -t workspace-mcp .
 docker run -p 8000:8000 -v $(pwd):/app workspace-mcp --transport streamable-http
 ```
 
-**Available Tools for `--tools` flag**: `gmail`, `drive`, `calendar`, `docs`, `sheets`, `forms`, `tasks`, `chat`
+**Available Tools for `--tools` flag**: `gmail`, `drive`, `calendar`, `docs`, `sheets`, `forms`, `tasks`, `chat`, `search`
 
 ### Connect to Claude Desktop
 
@@ -447,6 +469,14 @@ When calling a tool:
 | `get_messages` | Retrieve space messages |
 | `send_message` | Send messages to spaces |
 | `search_messages` | Search across chat history |
+
+### 🔍 Google Custom Search ([`search_tools.py`](gsearch/search_tools.py))
+
+| Tool | Description |
+|------|-------------|
+| `search_custom` | Perform web searches using Programmable Search Engine |
+| `get_search_engine_info` | Retrieve search engine metadata and configuration |
+| `search_custom_siterestrict` | Search within specific sites/domains |
 
 ---
 
