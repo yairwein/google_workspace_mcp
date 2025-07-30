@@ -51,6 +51,8 @@ from auth.scopes import (
     TASKS_SCOPE,  # noqa: F401
     TASKS_READONLY_SCOPE,  # noqa: F401
     TASKS_SCOPES,  # noqa: F401
+    CUSTOM_SEARCH_SCOPE,  # noqa: F401
+    CUSTOM_SEARCH_SCOPES,  # noqa: F401
 )
 
 # Configure logging
