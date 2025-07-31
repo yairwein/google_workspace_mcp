@@ -869,6 +869,8 @@ async def modify_gmail_message_labels(
 ) -> str:
     """
     Adds or removes labels from a Gmail message.
+    To archive an email, remove the INBOX label.
+    To delete an email, add the TRASH label.
 
     Args:
         user_google_email (str): The user's Google email address. Required.
