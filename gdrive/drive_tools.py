@@ -74,7 +74,7 @@ def _build_drive_list_params(
     return list_params
 
 @server.tool()
-@handle_http_errors("search_drive_files", is_read_only=True)
+@handle_http_errors("search_drive_files", is_read_only=True, service_type="drive")
 @require_google_service("drive", "drive_read")
 async def search_drive_files(
     service,
@@ -141,7 +141,7 @@ async def search_drive_files(
     return text_output
 
 @server.tool()
-@handle_http_errors("get_drive_file_content", is_read_only=True)
+@handle_http_errors("get_drive_file_content", is_read_only=True, service_type="drive")
 @require_google_service("drive", "drive_read")
 async def get_drive_file_content(
     service,
@@ -231,7 +231,7 @@ async def get_drive_file_content(
 
 
 @server.tool()
-@handle_http_errors("list_drive_items", is_read_only=True)
+@handle_http_errors("list_drive_items", is_read_only=True, service_type="drive")
 @require_google_service("drive", "drive_read")
 async def list_drive_items(
     service,
@@ -287,7 +287,7 @@ async def list_drive_items(
     return text_output
 
 @server.tool()
-@handle_http_errors("create_drive_file")
+@handle_http_errors("create_drive_file", service_type="drive")
 @require_google_service("drive", "drive_file")
 async def create_drive_file(
     service,
