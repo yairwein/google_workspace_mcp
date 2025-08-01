@@ -130,8 +130,6 @@ async def oauth2_callback(request: Request) -> HTMLResponse:
 
         logger.info(f"OAuth callback: Received code (state: {state}). Attempting to exchange for tokens.")
 
-        # Session ID tracking removed - not needed
-
         # Exchange code for credentials. handle_auth_callback will save them.
         # The user_id returned here is the Google-verified email.
         verified_user_id, credentials = handle_auth_callback(
