@@ -186,6 +186,24 @@ class OAuth2Handler:
 
         session = self.session_store.get_session(session_id)
         logger.info(f"Created session {session_id} for user {user_id}")
+        
+        # Store in global OAuth 2.1 session store for Google services
+        try:
+            from auth.oauth21_session_store import get_oauth21_session_store
+            store = get_oauth21_session_store()
+            store.store_session(
+                user_email=user_id,
+                access_token=access_token,
+                refresh_token=token_response.get("refresh_token"),
+                token_uri=token_response.get("token_uri", "https://oauth2.googleapis.com/token"),
+                client_id=self.config.client_id,
+                client_secret=self.config.client_secret,
+                scopes=token_info.get("scopes", []),
+                expiry=token_info.get("expires_at"),
+                session_id=session_id,
+            )
+        except Exception as e:
+            logger.error(f"Failed to store session in global store: {e}")
 
         return session_id, session
 

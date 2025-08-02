@@ -148,11 +148,17 @@ async def initialize_oauth21_auth() -> Optional[AuthCompatibilityLayer]:
 
             # Add middleware if HTTP transport is being used
             if _current_transport_mode == "http" or _current_transport_mode == "streamable-http":
-                middleware = _auth_layer.create_enhanced_middleware()
-                if middleware and hasattr(server, 'app'):
-                    server.app.add_middleware(type(middleware), **middleware.__dict__)
-                    logger.info("Added OAuth 2.1 middleware to FastAPI app")
+                # For now, skip the middleware addition due to compatibility issues
+                # The OAuth 2.1 session store approach will still work
+                logger.info("OAuth 2.1 middleware skipped - using session store approach")
+                
+                # Note: The MCPSessionMiddleware and OAuth21 middleware would need
+                # to be refactored to work with Starlette's middleware system
 
+            # Set up OAuth 2.1 integration for Google services
+            from auth.oauth21_integration import set_auth_layer
+            set_auth_layer(_auth_layer)
+            
             logger.info("OAuth 2.1 authentication initialized successfully")
         else:
             logger.info("OAuth 2.1 not configured, using legacy authentication only")
@@ -237,6 +243,25 @@ async def oauth2_callback(request: Request) -> HTMLResponse:
         )
 
         logger.info(f"OAuth callback: Successfully authenticated user: {verified_user_id} (state: {state}).")
+        
+        # Store Google credentials in OAuth 2.1 session store
+        try:
+            from auth.oauth21_session_store import get_oauth21_session_store
+            store = get_oauth21_session_store()
+            store.store_session(
+                user_email=verified_user_id,
+                access_token=credentials.token,
+                refresh_token=credentials.refresh_token,
+                token_uri=credentials.token_uri,
+                client_id=credentials.client_id,
+                client_secret=credentials.client_secret,
+                scopes=credentials.scopes,
+                expiry=credentials.expiry,
+                session_id=f"google-{state}",  # Use state as a pseudo session ID
+            )
+            logger.info(f"Stored Google credentials in OAuth 2.1 session store for {verified_user_id}")
+        except Exception as e:
+            logger.error(f"Failed to store Google credentials in OAuth 2.1 store: {e}")
 
         # Return success page using shared template
         return create_success_response(verified_user_id)
@@ -758,6 +783,8 @@ async def oauth2_token(request: Request):
                 code_verifier=code_verifier,
                 redirect_uri=redirect_uri
             )
+
+            logger.info(f"Token exchange successful - session_id: {session_id}, user: {session.user_id}")
 
             # Return token response
             token_response = {

@@ -6,6 +6,16 @@ from datetime import datetime, timedelta
 
 from google.auth.exceptions import RefreshError
 from auth.google_auth import get_authenticated_google_service, GoogleAuthenticationError
+
+# Try to import OAuth 2.1 integration
+try:
+    from auth.oauth21_integration import get_authenticated_google_service_oauth21
+    from auth.session_context import get_session_context
+    OAUTH21_INTEGRATION_AVAILABLE = True
+except ImportError:
+    OAUTH21_INTEGRATION_AVAILABLE = False
+    get_authenticated_google_service_oauth21 = None
+    get_session_context = None
 from auth.scopes import (
     GMAIL_READONLY_SCOPE, GMAIL_SEND_SCOPE, GMAIL_COMPOSE_SCOPE, GMAIL_MODIFY_SCOPE, GMAIL_LABELS_SCOPE,
     DRIVE_READONLY_SCOPE, DRIVE_FILE_SCOPE,
@@ -256,13 +266,41 @@ def require_google_service(
             if service is None:
                 try:
                     tool_name = func.__name__
-                    service, actual_user_email = await get_authenticated_google_service(
-                        service_name=service_name,
-                        version=service_version,
-                        tool_name=tool_name,
-                        user_google_email=user_google_email,
-                        required_scopes=resolved_scopes,
-                    )
+                    
+                    # Try OAuth 2.1 integration first if available
+                    session_ctx = get_session_context() if OAUTH21_INTEGRATION_AVAILABLE else None
+                    
+                    # Also check if user has credentials in OAuth 2.1 store
+                    has_oauth21_creds = False
+                    if OAUTH21_INTEGRATION_AVAILABLE:
+                        try:
+                            from auth.oauth21_session_store import get_oauth21_session_store
+                            store = get_oauth21_session_store()
+                            has_oauth21_creds = store.has_session(user_google_email)
+                        except:
+                            pass
+                    
+                    logger.debug(f"OAuth 2.1 available: {OAUTH21_INTEGRATION_AVAILABLE}, Session context: {session_ctx}, Has OAuth21 creds: {has_oauth21_creds}")
+                    
+                    if OAUTH21_INTEGRATION_AVAILABLE and (session_ctx or has_oauth21_creds):
+                        logger.info(f"Using OAuth 2.1 authentication for {tool_name}")
+                        service, actual_user_email = await get_authenticated_google_service_oauth21(
+                            service_name=service_name,
+                            version=service_version,
+                            tool_name=tool_name,
+                            user_google_email=user_google_email,
+                            required_scopes=resolved_scopes,
+                        )
+                    else:
+                        # Fall back to legacy authentication
+                        service, actual_user_email = await get_authenticated_google_service(
+                            service_name=service_name,
+                            version=service_version,
+                            tool_name=tool_name,
+                            user_google_email=user_google_email,
+                            required_scopes=resolved_scopes,
+                        )
+                    
                     if cache_enabled:
                         cache_key = _get_cache_key(user_google_email, service_name, service_version, resolved_scopes)
                         _cache_service(cache_key, service, actual_user_email)
@@ -340,13 +378,26 @@ def require_multiple_services(service_configs: List[Dict[str, Any]]):
 
                 try:
                     tool_name = func.__name__
-                    service, _ = await get_authenticated_google_service(
-                        service_name=service_name,
-                        version=service_version,
-                        tool_name=tool_name,
-                        user_google_email=user_google_email,
-                        required_scopes=resolved_scopes,
-                    )
+                    
+                    # Try OAuth 2.1 integration first if available
+                    if OAUTH21_INTEGRATION_AVAILABLE and get_session_context():
+                        logger.debug(f"Attempting OAuth 2.1 authentication for {tool_name} ({service_type})")
+                        service, _ = await get_authenticated_google_service_oauth21(
+                            service_name=service_name,
+                            version=service_version,
+                            tool_name=tool_name,
+                            user_google_email=user_google_email,
+                            required_scopes=resolved_scopes,
+                        )
+                    else:
+                        # Fall back to legacy authentication
+                        service, _ = await get_authenticated_google_service(
+                            service_name=service_name,
+                            version=service_version,
+                            tool_name=tool_name,
+                            user_google_email=user_google_email,
+                            required_scopes=resolved_scopes,
+                        )
 
                     # Inject service with specified parameter name
                     kwargs[param_name] = service

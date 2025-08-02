@@ -295,6 +295,44 @@ class AuthCompatibilityLayer:
             
         except Exception as e:
             logger.error(f"Failed to bridge legacy credentials to OAuth 2.1: {e}")
+    
+    def get_credentials_from_oauth2_session(
+        self,
+        session_id: str,
+        user_email: Optional[str] = None,
+    ) -> Optional[Credentials]:
+        """
+        Get Google credentials from OAuth 2.1 session.
+        
+        Args:
+            session_id: OAuth 2.1 session ID
+            user_email: Optional user email for validation
+            
+        Returns:
+            Google Credentials object or None
+        """
+        if not self.oauth2_handler:
+            return None
+            
+        try:
+            session = self.oauth2_handler.session_store.get_session(session_id)
+            if not session:
+                logger.debug(f"No OAuth 2.1 session found for {session_id}")
+                return None
+            
+            # Validate user if provided
+            if user_email and session.user_id != user_email:
+                logger.warning(
+                    f"Session user {session.user_id} doesn't match requested user {user_email}"
+                )
+                return None
+            
+            # Convert to Google credentials
+            return self._convert_oauth2_to_credentials(session.token_info)
+            
+        except Exception as e:
+            logger.error(f"Failed to get credentials from OAuth 2.1 session: {e}")
+            return None
 
     def create_enhanced_middleware(self):
         """Create middleware that supports both OAuth 2.1 and legacy auth."""
