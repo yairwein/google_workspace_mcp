@@ -796,6 +796,8 @@ async def get_authenticated_google_service(
             session_id = get_fastmcp_session_id()
             if session_id:
                 logger.debug(f"[{tool_name}] Got FastMCP session ID from context: {session_id}")
+            else:
+                logger.debug(f"[{tool_name}] Context variable returned None/empty session ID")
         except Exception as e:
             logger.debug(f"[{tool_name}] Could not get FastMCP session from context: {e}")
         
@@ -804,10 +806,17 @@ async def get_authenticated_google_service(
             try:
                 from fastmcp.server.dependencies import get_context
                 fastmcp_ctx = get_context()
-                session_id = fastmcp_ctx.session_id
-                logger.debug(f"[{tool_name}] Got FastMCP session ID directly: {session_id}")
+                if fastmcp_ctx and hasattr(fastmcp_ctx, 'session_id'):
+                    session_id = fastmcp_ctx.session_id
+                    logger.debug(f"[{tool_name}] Got FastMCP session ID directly: {session_id}")
+                else:
+                    logger.debug(f"[{tool_name}] FastMCP context exists but no session_id attribute")
             except Exception as e:
                 logger.debug(f"[{tool_name}] Could not get FastMCP context directly: {e}")
+        
+        # Final fallback: log if we still don't have session_id
+        if not session_id:
+            logger.warning(f"[{tool_name}] Unable to obtain FastMCP session ID from any source")
     
     logger.info(
         f"[{tool_name}] Attempting to get authenticated {service_name} service. Email: '{user_google_email}', Session: '{session_id}'"

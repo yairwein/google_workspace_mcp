@@ -8,9 +8,42 @@ from google.auth.exceptions import RefreshError
 from auth.google_auth import get_authenticated_google_service, GoogleAuthenticationError
 
 # OAuth 2.1 integration is now handled by FastMCP auth
-OAUTH21_INTEGRATION_AVAILABLE = False
-get_authenticated_google_service_oauth21 = None
-get_session_context = None
+OAUTH21_INTEGRATION_AVAILABLE = True
+
+async def get_authenticated_google_service_oauth21(
+    service_name: str,
+    version: str,
+    tool_name: str,
+    user_google_email: str,
+    required_scopes: List[str],
+) -> tuple[Any, str]:
+    """
+    OAuth 2.1 authentication using the session store.
+    """
+    from auth.oauth21_session_store import get_oauth21_session_store
+    from googleapiclient.discovery import build
+    
+    store = get_oauth21_session_store()
+    credentials = store.get_credentials(user_google_email)
+    
+    if not credentials:
+        from auth.google_auth import GoogleAuthenticationError
+        raise GoogleAuthenticationError(f"No OAuth 2.1 credentials found for {user_google_email}")
+    
+    # Check scopes
+    if not all(scope in credentials.scopes for scope in required_scopes):
+        from auth.google_auth import GoogleAuthenticationError
+        raise GoogleAuthenticationError(f"OAuth 2.1 credentials lack required scopes. Need: {required_scopes}, Have: {credentials.scopes}")
+    
+    # Build service
+    service = build(service_name, version, credentials=credentials)
+    logger.info(f"[{tool_name}] Successfully authenticated {service_name} service using OAuth 2.1 for user: {user_google_email}")
+    
+    return service, user_google_email
+
+def get_session_context():
+    """Placeholder for session context - not needed with direct OAuth 2.1 store access."""
+    return None
 from auth.scopes import (
     GMAIL_READONLY_SCOPE, GMAIL_SEND_SCOPE, GMAIL_COMPOSE_SCOPE, GMAIL_MODIFY_SCOPE, GMAIL_LABELS_SCOPE,
     DRIVE_READONLY_SCOPE, DRIVE_FILE_SCOPE,
@@ -265,31 +298,29 @@ def require_google_service(
                     # Check if we have OAuth 2.1 credentials for this user
                     session_ctx = None
                     
-                    # Try to get session from FastMCP Context if available
+                    # Try to get FastMCP session ID (for future use)
                     mcp_session_id = None
+                    session_ctx = None
                     try:
                         from fastmcp.server.dependencies import get_context
                         fastmcp_ctx = get_context()
-                        mcp_session_id = fastmcp_ctx.session_id
-                        logger.debug(f"Got FastMCP session ID: {mcp_session_id} for user {user_google_email}")
-                        
-                        # Set FastMCP session ID in context variable for propagation
-                        from core.context import set_fastmcp_session_id
-                        set_fastmcp_session_id(mcp_session_id)
-                        logger.debug(f"Set FastMCP session ID in context: {mcp_session_id}")
-                        
-                        # Create session context using FastMCP session ID
-                        from auth.session_context import SessionContext
-                        session_ctx = SessionContext(
-                            session_id=mcp_session_id,  # Use FastMCP session ID directly
-                            user_id=user_google_email,
-                            metadata={"fastmcp_session_id": mcp_session_id, "user_email": user_google_email}
-                        )
-                        logger.debug(f"Created session context with FastMCP session ID {mcp_session_id} for {user_google_email}")
-                        
+                        if fastmcp_ctx and hasattr(fastmcp_ctx, 'session_id'):
+                            mcp_session_id = fastmcp_ctx.session_id
+                            logger.debug(f"[{tool_name}] Got FastMCP session ID: {mcp_session_id}")
+                            
+                            # Set FastMCP session ID in context variable for propagation
+                            from core.context import set_fastmcp_session_id
+                            set_fastmcp_session_id(mcp_session_id)
+                            
+                            # Create session context using FastMCP session ID
+                            from auth.session_context import SessionContext
+                            session_ctx = SessionContext(
+                                session_id=mcp_session_id,
+                                user_id=user_google_email,
+                                metadata={"fastmcp_session_id": mcp_session_id, "user_email": user_google_email}
+                            )
                     except Exception as e:
-                        logger.debug(f"Could not get FastMCP context: {e}")
-                        mcp_session_id = None
+                        logger.debug(f"[{tool_name}] Could not get FastMCP context: {e}")
                     
                     # Fallback to legacy session context if available
                     if not session_ctx and OAUTH21_INTEGRATION_AVAILABLE:
@@ -306,10 +337,10 @@ def require_google_service(
                             pass
                     
                     session_id_for_log = mcp_session_id if mcp_session_id else (session_ctx.session_id if session_ctx else 'None')
-                    logger.debug(f"OAuth 2.1 available: {OAUTH21_INTEGRATION_AVAILABLE}, FastMCP Session ID: {mcp_session_id}, Session context: {session_ctx}, Session ID: {session_id_for_log}, Has OAuth21 creds: {has_oauth21_creds}")
+                    logger.info(f"[{tool_name}] OAuth 2.1 available: {OAUTH21_INTEGRATION_AVAILABLE}, FastMCP Session ID: {mcp_session_id}, Session context: {session_ctx}, Session ID: {session_id_for_log}, Has OAuth21 creds: {has_oauth21_creds}")
                     
                     if OAUTH21_INTEGRATION_AVAILABLE and (session_ctx or has_oauth21_creds):
-                        logger.info(f"Using OAuth 2.1 authentication for {tool_name}")
+                        logger.info(f"[{tool_name}] Using OAuth 2.1 authentication")
                         service, actual_user_email = await get_authenticated_google_service_oauth21(
                             service_name=service_name,
                             version=service_version,
@@ -320,6 +351,7 @@ def require_google_service(
                     else:
                         # Fall back to legacy authentication
                         session_id_for_legacy = mcp_session_id if mcp_session_id else (session_ctx.session_id if session_ctx else None)
+                        logger.info(f"[{tool_name}] Calling get_authenticated_google_service with session_id_for_legacy: {session_id_for_legacy}")
                         service, actual_user_email = await get_authenticated_google_service(
                             service_name=service_name,
                             version=service_version,
