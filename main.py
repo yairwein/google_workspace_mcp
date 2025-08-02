@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Local imports
-from core.server import server, set_transport_mode, initialize_oauth21_auth, shutdown_oauth21_auth
+from core.server import server, set_transport_mode, initialize_auth, shutdown_auth
 from core.utils import check_credentials_directory_permissions
 
 logging.basicConfig(
@@ -151,20 +151,20 @@ def main():
 
         # Initialize OAuth 2.1 authentication if available
         import asyncio
-        auth_layer = None
+        auth_provider = None
         try:
             if args.transport == 'streamable-http':
                 # Only initialize OAuth 2.1 for HTTP transport
-                auth_layer = asyncio.run(initialize_oauth21_auth())
-                if auth_layer and auth_layer.config.is_oauth2_enabled():
-                    safe_print("🔐 OAuth 2.1 authentication initialized")
+                auth_provider = asyncio.run(initialize_auth())
+                if auth_provider:
+                    safe_print("🔐 OAuth 2.1 authentication initialized with FastMCP")
                     safe_print(f"   Discovery endpoints available at {base_uri}:{port}/.well-known/")
                 else:
                     safe_print("🔐 Using legacy authentication only")
             else:
-                safe_print("🔐 OAuth 2.1 not available in stdio mode (using legacy auth)")
+                safe_print("🔐 OAuth authentication not available in stdio mode (using legacy auth)")
         except Exception as e:
-            safe_print(f"⚠️  OAuth 2.1 initialization failed: {e}")
+            safe_print(f"⚠️  OAuth authentication initialization failed: {e}")
             safe_print("   Falling back to legacy authentication")
 
         if args.transport == 'streamable-http':
@@ -194,8 +194,8 @@ def main():
         safe_print("\n👋 Server shutdown requested")
         # Clean up OAuth 2.1 authentication
         try:
-            if auth_layer:
-                asyncio.run(shutdown_oauth21_auth())
+            if auth_provider:
+                asyncio.run(shutdown_auth())
         except Exception as e:
             safe_print(f"⚠️  Error during OAuth 2.1 shutdown: {e}")
         

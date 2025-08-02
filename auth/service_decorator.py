@@ -7,15 +7,10 @@ from datetime import datetime, timedelta
 from google.auth.exceptions import RefreshError
 from auth.google_auth import get_authenticated_google_service, GoogleAuthenticationError
 
-# Try to import OAuth 2.1 integration
-try:
-    from auth.oauth21_integration import get_authenticated_google_service_oauth21
-    from auth.session_context import get_session_context
-    OAUTH21_INTEGRATION_AVAILABLE = True
-except ImportError:
-    OAUTH21_INTEGRATION_AVAILABLE = False
-    get_authenticated_google_service_oauth21 = None
-    get_session_context = None
+# OAuth 2.1 integration is now handled by FastMCP auth
+OAUTH21_INTEGRATION_AVAILABLE = False
+get_authenticated_google_service_oauth21 = None
+get_session_context = None
 from auth.scopes import (
     GMAIL_READONLY_SCOPE, GMAIL_SEND_SCOPE, GMAIL_COMPOSE_SCOPE, GMAIL_MODIFY_SCOPE, GMAIL_LABELS_SCOPE,
     DRIVE_READONLY_SCOPE, DRIVE_FILE_SCOPE,
