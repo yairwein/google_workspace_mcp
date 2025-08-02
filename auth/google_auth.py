@@ -164,6 +164,9 @@ def load_credentials_from_file(
         if creds_data.get("expiry"):
             try:
                 expiry = datetime.fromisoformat(creds_data["expiry"])
+                # Ensure timezone-naive datetime for Google auth library compatibility
+                if expiry.tzinfo is not None:
+                    expiry = expiry.replace(tzinfo=None)
             except (ValueError, TypeError) as e:
                 logger.warning(
                     f"Could not parse expiry time for {user_google_email}: {e}"

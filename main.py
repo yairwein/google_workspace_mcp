@@ -13,7 +13,7 @@ from core.server import server, set_transport_mode, initialize_auth, shutdown_au
 from core.utils import check_credentials_directory_permissions
 
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
@@ -198,7 +198,7 @@ def main():
                 asyncio.run(shutdown_auth())
         except Exception as e:
             safe_print(f"⚠️  Error during OAuth 2.1 shutdown: {e}")
-        
+
         # Clean up OAuth callback server if running
         from auth.oauth_callback_server import cleanup_oauth_callback_server
         cleanup_oauth_callback_server()

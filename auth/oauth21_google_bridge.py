@@ -58,7 +58,8 @@ def get_credentials_from_token(access_token: str, user_email: Optional[str] = No
             # Calculate expiry
             expiry = None
             if "expires_in" in token_data:
-                expiry = datetime.now(timezone.utc) + timedelta(seconds=token_data["expires_in"])
+                # Google auth library expects timezone-naive datetime
+                expiry = datetime.utcnow() + timedelta(seconds=token_data["expires_in"])
             
             credentials = Credentials(
                 token=token_data["access_token"],
@@ -76,7 +77,8 @@ def get_credentials_from_token(access_token: str, user_email: Optional[str] = No
         # Otherwise, create minimal credentials with just the access token
         else:
             # Assume token is valid for 1 hour (typical for Google tokens)
-            expiry = datetime.now(timezone.utc) + timedelta(hours=1)
+            # Google auth library expects timezone-naive datetime
+            expiry = datetime.utcnow() + timedelta(hours=1)
             
             credentials = Credentials(
                 token=access_token,
@@ -129,7 +131,7 @@ def store_token_session(token_response: dict, user_email: str) -> str:
             client_id=_auth_provider.client_id,
             client_secret=_auth_provider.client_secret,
             scopes=token_response.get("scope", "").split() if token_response.get("scope") else None,
-            expiry=datetime.now(timezone.utc) + timedelta(seconds=token_response.get("expires_in", 3600)),
+            expiry=datetime.utcnow() + timedelta(seconds=token_response.get("expires_in", 3600)),
             session_id=session_id,
         )
         

@@ -44,21 +44,46 @@ class MCPSessionMiddleware(BaseHTTPMiddleware):
             headers = dict(request.headers)
             session_id = extract_session_from_headers(headers)
             
-            # Try to get OAuth 2.1 auth context
+            # Try to get OAuth 2.1 auth context from FastMCP
             auth_context = None
+            user_email = None
+            
+            # Check for FastMCP auth context
             if hasattr(request.state, "auth"):
                 auth_context = request.state.auth
+                # Extract user email from auth claims if available
+                if hasattr(auth_context, 'claims') and auth_context.claims:
+                    user_email = auth_context.claims.get('email')
+            
+            # Also check Authorization header for bearer tokens
+            auth_header = headers.get("authorization")
+            if auth_header and auth_header.lower().startswith("bearer ") and not user_email:
+                try:
+                    import jwt
+                    token = auth_header[7:]  # Remove "Bearer " prefix
+                    # Decode without verification to extract email
+                    claims = jwt.decode(token, options={"verify_signature": False})
+                    user_email = claims.get('email')
+                    if user_email:
+                        logger.debug(f"Extracted user email from JWT: {user_email}")
+                except:
+                    pass
             
             # Build session context
-            if session_id or auth_context:
+            if session_id or auth_context or user_email:
+                # Create session ID from user email if not provided
+                if not session_id and user_email:
+                    session_id = f"google_{user_email}"
+                
                 session_context = SessionContext(
                     session_id=session_id or (auth_context.session_id if auth_context else None),
-                    user_id=auth_context.user_id if auth_context else None,
+                    user_id=user_email or (auth_context.user_id if auth_context else None),
                     auth_context=auth_context,
                     request=request,
                     metadata={
                         "path": request.url.path,
                         "method": request.method,
+                        "user_email": user_email,
                     }
                 )
                 
