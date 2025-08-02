@@ -47,6 +47,7 @@ class MCPSessionMiddleware(BaseHTTPMiddleware):
             # Try to get OAuth 2.1 auth context from FastMCP
             auth_context = None
             user_email = None
+            mcp_session_id = None
             
             # Check for FastMCP auth context
             if hasattr(request.state, "auth"):
@@ -54,6 +55,11 @@ class MCPSessionMiddleware(BaseHTTPMiddleware):
                 # Extract user email from auth claims if available
                 if hasattr(auth_context, 'claims') and auth_context.claims:
                     user_email = auth_context.claims.get('email')
+            
+            # Check for FastMCP session ID (from streamable HTTP transport)
+            if hasattr(request.state, "session_id"):
+                mcp_session_id = request.state.session_id
+                logger.debug(f"Found FastMCP session ID: {mcp_session_id}")
             
             # Also check Authorization header for bearer tokens
             auth_header = headers.get("authorization")
@@ -70,13 +76,16 @@ class MCPSessionMiddleware(BaseHTTPMiddleware):
                     pass
             
             # Build session context
-            if session_id or auth_context or user_email:
-                # Create session ID from user email if not provided
-                if not session_id and user_email:
-                    session_id = f"google_{user_email}"
+            if session_id or auth_context or user_email or mcp_session_id:
+                # Create session ID hierarchy: explicit session_id > Google user session > FastMCP session
+                effective_session_id = session_id
+                if not effective_session_id and user_email:
+                    effective_session_id = f"google_{user_email}"
+                elif not effective_session_id and mcp_session_id:
+                    effective_session_id = mcp_session_id
                 
                 session_context = SessionContext(
-                    session_id=session_id or (auth_context.session_id if auth_context else None),
+                    session_id=effective_session_id,
                     user_id=user_email or (auth_context.user_id if auth_context else None),
                     auth_context=auth_context,
                     request=request,
@@ -84,6 +93,7 @@ class MCPSessionMiddleware(BaseHTTPMiddleware):
                         "path": request.url.path,
                         "method": request.method,
                         "user_email": user_email,
+                        "mcp_session_id": mcp_session_id,
                     }
                 )
                 

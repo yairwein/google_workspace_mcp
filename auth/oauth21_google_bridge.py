@@ -98,13 +98,14 @@ def get_credentials_from_token(access_token: str, user_email: Optional[str] = No
         return None
 
 
-def store_token_session(token_response: dict, user_email: str) -> str:
+def store_token_session(token_response: dict, user_email: str, mcp_session_id: Optional[str] = None) -> str:
     """
     Store a token response in the session store.
     
     Args:
         token_response: OAuth token response from Google
         user_email: User's email address
+        mcp_session_id: Optional FastMCP session ID to map to this user
         
     Returns:
         Session ID
@@ -114,10 +115,21 @@ def store_token_session(token_response: dict, user_email: str) -> str:
         return ""
         
     try:
+        # Try to get FastMCP session ID from context if not provided
+        if not mcp_session_id:
+            try:
+                from core.context import get_fastmcp_session_id
+                mcp_session_id = get_fastmcp_session_id()
+                if mcp_session_id:
+                    logger.debug(f"Got FastMCP session ID from context: {mcp_session_id}")
+            except Exception as e:
+                logger.debug(f"Could not get FastMCP session from context: {e}")
+        
         session_id = f"google_{user_email}"
         _auth_provider._sessions[session_id] = {
             "token_response": token_response,
             "user_email": user_email,
+            "mcp_session_id": mcp_session_id,
             "created_at": datetime.now(timezone.utc).isoformat()
         }
         
@@ -133,9 +145,13 @@ def store_token_session(token_response: dict, user_email: str) -> str:
             scopes=token_response.get("scope", "").split() if token_response.get("scope") else None,
             expiry=datetime.utcnow() + timedelta(seconds=token_response.get("expires_in", 3600)),
             session_id=session_id,
+            mcp_session_id=mcp_session_id,
         )
         
-        logger.info(f"Stored token session for {user_email}")
+        if mcp_session_id:
+            logger.info(f"Stored token session for {user_email} with MCP session {mcp_session_id}")
+        else:
+            logger.info(f"Stored token session for {user_email}")
         return session_id
         
     except Exception as e:

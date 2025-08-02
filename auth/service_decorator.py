@@ -262,8 +262,38 @@ def require_google_service(
                 try:
                     tool_name = func.__name__
                     
-                    # Try OAuth 2.1 integration first if available
-                    session_ctx = get_session_context() if OAUTH21_INTEGRATION_AVAILABLE else None
+                    # Check if we have OAuth 2.1 credentials for this user
+                    session_ctx = None
+                    
+                    # Try to get session from FastMCP Context if available
+                    mcp_session_id = None
+                    try:
+                        from fastmcp.server.dependencies import get_context
+                        fastmcp_ctx = get_context()
+                        mcp_session_id = fastmcp_ctx.session_id
+                        logger.debug(f"Got FastMCP session ID: {mcp_session_id} for user {user_google_email}")
+                        
+                        # Set FastMCP session ID in context variable for propagation
+                        from core.context import set_fastmcp_session_id
+                        set_fastmcp_session_id(mcp_session_id)
+                        logger.debug(f"Set FastMCP session ID in context: {mcp_session_id}")
+                        
+                        # Create session context using FastMCP session ID
+                        from auth.session_context import SessionContext
+                        session_ctx = SessionContext(
+                            session_id=mcp_session_id,  # Use FastMCP session ID directly
+                            user_id=user_google_email,
+                            metadata={"fastmcp_session_id": mcp_session_id, "user_email": user_google_email}
+                        )
+                        logger.debug(f"Created session context with FastMCP session ID {mcp_session_id} for {user_google_email}")
+                        
+                    except Exception as e:
+                        logger.debug(f"Could not get FastMCP context: {e}")
+                        mcp_session_id = None
+                    
+                    # Fallback to legacy session context if available
+                    if not session_ctx and OAUTH21_INTEGRATION_AVAILABLE:
+                        session_ctx = get_session_context()
                     
                     # Also check if user has credentials in OAuth 2.1 store
                     has_oauth21_creds = False
@@ -275,7 +305,8 @@ def require_google_service(
                         except:
                             pass
                     
-                    logger.debug(f"OAuth 2.1 available: {OAUTH21_INTEGRATION_AVAILABLE}, Session context: {session_ctx}, Has OAuth21 creds: {has_oauth21_creds}")
+                    session_id_for_log = mcp_session_id if mcp_session_id else (session_ctx.session_id if session_ctx else 'None')
+                    logger.debug(f"OAuth 2.1 available: {OAUTH21_INTEGRATION_AVAILABLE}, FastMCP Session ID: {mcp_session_id}, Session context: {session_ctx}, Session ID: {session_id_for_log}, Has OAuth21 creds: {has_oauth21_creds}")
                     
                     if OAUTH21_INTEGRATION_AVAILABLE and (session_ctx or has_oauth21_creds):
                         logger.info(f"Using OAuth 2.1 authentication for {tool_name}")
@@ -288,12 +319,14 @@ def require_google_service(
                         )
                     else:
                         # Fall back to legacy authentication
+                        session_id_for_legacy = mcp_session_id if mcp_session_id else (session_ctx.session_id if session_ctx else None)
                         service, actual_user_email = await get_authenticated_google_service(
                             service_name=service_name,
                             version=service_version,
                             tool_name=tool_name,
                             user_google_email=user_google_email,
                             required_scopes=resolved_scopes,
+                            session_id=session_id_for_legacy,
                         )
                     
                     if cache_enabled:

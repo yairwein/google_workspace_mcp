@@ -453,7 +453,7 @@ async def oauth_authorization_server(request: Request):
                 "code_challenge_methods_supported": ["S256"],
                 "pkce_required": True,
                 "grant_types_supported": ["authorization_code", "refresh_token"],
-                "scopes_supported": ["openid", "email", "profile"],
+                "scopes_supported": SCOPES,
                 "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"]
             },
             headers={
@@ -567,6 +567,13 @@ async def oauth_authorize(request: Request):
 
     # Ensure response_type is code
     params["response_type"] = "code"
+    
+    # Merge client scopes with our full SCOPES list
+    client_scopes = params.get("scope", "").split() if params.get("scope") else []
+    # Always include all Google Workspace scopes for full functionality
+    all_scopes = set(client_scopes) | set(SCOPES)
+    params["scope"] = " ".join(sorted(all_scopes))
+    logger.info(f"OAuth 2.1 authorization: Requesting scopes: {params['scope']}")
 
     # Build Google authorization URL
     google_auth_url = "https://accounts.google.com/o/oauth2/v2/auth?" + urlencode(params)
