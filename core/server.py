@@ -4,17 +4,17 @@ import jwt
 import os
 import time
 
-from typing import Any, Optional
+from typing import Optional
 from importlib import metadata
 from urllib.parse import urlencode
 
 from datetime import datetime, timedelta
 
-from fastapi import Header
 from fastapi.responses import HTMLResponse
 from fastapi.responses import JSONResponse
 
 from mcp.server.fastmcp import FastMCP
+from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import RedirectResponse
 from starlette.middleware import Middleware
@@ -24,6 +24,7 @@ from auth.oauth21_session_store import get_oauth21_session_store
 from auth.google_auth import handle_auth_callback, start_auth_flow, check_client_secrets, save_credentials_to_file
 from google.oauth2.credentials import Credentials
 from auth.oauth_callback_server import get_oauth_redirect_uri, ensure_oauth_callback_available
+from auth.mcp_session_middleware import MCPSessionMiddleware
 from auth.oauth_responses import create_error_response, create_success_response, create_server_error_response
 
 # FastMCP OAuth imports
@@ -86,7 +87,6 @@ _current_transport_mode = "stdio"  # Default to stdio
 _auth_provider: Optional[GoogleWorkspaceAuthProvider] = None
 
 # Create middleware configuration
-from auth.mcp_session_middleware import MCPSessionMiddleware
 
 cors_middleware = Middleware(
     CORSMiddleware,
@@ -616,7 +616,7 @@ async def proxy_token_exchange(request: Request):
                 if response.status != 200:
                     logger.error(f"Token exchange failed: {response.status} - {response_data}")
                 else:
-                    logger.info(f"Token exchange successful")
+                    logger.info("Token exchange successful")
 
                     # Store the token session for credential bridging
                     if "access_token" in response_data:

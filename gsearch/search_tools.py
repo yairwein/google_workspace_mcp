@@ -7,7 +7,7 @@ This module provides MCP tools for interacting with Google Programmable Search E
 import logging
 import asyncio
 import os
-from typing import Optional, List, Dict, Any, Literal
+from typing import Optional, List, Literal
 
 from auth.service_decorator import require_google_service
 from core.server import server
@@ -208,7 +208,7 @@ async def get_search_engine_info(
     search_info = result.get('searchInformation', {})
     if search_info:
         total_results = search_info.get('totalResults', 'Unknown')
-        confirmation_message += f"\nSearch Statistics:\n"
+        confirmation_message += "\nSearch Statistics:\n"
         confirmation_message += f"  - Total indexed results: {total_results}\n"
 
     logger.info(f"Search engine info retrieved successfully for {user_google_email}")

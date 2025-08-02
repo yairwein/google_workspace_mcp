@@ -6,6 +6,18 @@ from datetime import datetime, timedelta
 
 from google.auth.exceptions import RefreshError
 from auth.google_auth import get_authenticated_google_service, GoogleAuthenticationError
+from auth.scopes import (
+    GMAIL_READONLY_SCOPE, GMAIL_SEND_SCOPE, GMAIL_COMPOSE_SCOPE, GMAIL_MODIFY_SCOPE, GMAIL_LABELS_SCOPE,
+    DRIVE_READONLY_SCOPE, DRIVE_FILE_SCOPE,
+    DOCS_READONLY_SCOPE, DOCS_WRITE_SCOPE,
+    CALENDAR_READONLY_SCOPE, CALENDAR_EVENTS_SCOPE,
+    SHEETS_READONLY_SCOPE, SHEETS_WRITE_SCOPE,
+    CHAT_READONLY_SCOPE, CHAT_WRITE_SCOPE, CHAT_SPACES_SCOPE,
+    FORMS_BODY_SCOPE, FORMS_BODY_READONLY_SCOPE, FORMS_RESPONSES_READONLY_SCOPE,
+    SLIDES_SCOPE, SLIDES_READONLY_SCOPE,
+    TASKS_SCOPE, TASKS_READONLY_SCOPE,
+    CUSTOM_SEARCH_SCOPE
+)
 
 # OAuth 2.1 integration is now handled by FastMCP auth
 OAUTH21_INTEGRATION_AVAILABLE = True
@@ -44,18 +56,6 @@ async def get_authenticated_google_service_oauth21(
 def get_session_context():
     """Placeholder for session context - not needed with direct OAuth 2.1 store access."""
     return None
-from auth.scopes import (
-    GMAIL_READONLY_SCOPE, GMAIL_SEND_SCOPE, GMAIL_COMPOSE_SCOPE, GMAIL_MODIFY_SCOPE, GMAIL_LABELS_SCOPE,
-    DRIVE_READONLY_SCOPE, DRIVE_FILE_SCOPE,
-    DOCS_READONLY_SCOPE, DOCS_WRITE_SCOPE,
-    CALENDAR_READONLY_SCOPE, CALENDAR_EVENTS_SCOPE,
-    SHEETS_READONLY_SCOPE, SHEETS_WRITE_SCOPE,
-    CHAT_READONLY_SCOPE, CHAT_WRITE_SCOPE, CHAT_SPACES_SCOPE,
-    FORMS_BODY_SCOPE, FORMS_BODY_READONLY_SCOPE, FORMS_RESPONSES_READONLY_SCOPE,
-    SLIDES_SCOPE, SLIDES_READONLY_SCOPE,
-    TASKS_SCOPE, TASKS_READONLY_SCOPE,
-    CUSTOM_SEARCH_SCOPE
-)
 
 logger = logging.getLogger(__name__)
 
@@ -333,7 +333,7 @@ def require_google_service(
                             from auth.oauth21_session_store import get_oauth21_session_store
                             store = get_oauth21_session_store()
                             has_oauth21_creds = store.has_session(user_google_email)
-                        except:
+                        except Exception:
                             pass
                     
                     session_id_for_log = mcp_session_id if mcp_session_id else (session_ctx.session_id if session_ctx else 'None')

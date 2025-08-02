@@ -72,7 +72,7 @@ class MCPSessionMiddleware(BaseHTTPMiddleware):
                     user_email = claims.get('email')
                     if user_email:
                         logger.debug(f"Extracted user email from JWT: {user_email}")
-                except:
+                except Exception:
                     pass
             
             # Build session context

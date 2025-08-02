@@ -4,13 +4,11 @@ import os
 import sys
 from importlib import metadata
 from dotenv import load_dotenv
+from core.server import server, set_transport_mode, initialize_auth, shutdown_auth
+from core.utils import check_credentials_directory_permissions
 
 # Load environment variables from .env file
 load_dotenv()
-
-# Local imports
-from core.server import server, set_transport_mode, initialize_auth, shutdown_auth
-from core.utils import check_credentials_directory_permissions
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -177,7 +175,7 @@ def main():
             if success:
                 safe_print(f"   OAuth callback server started on {base_uri}:{port}/oauth2callback")
             else:
-                warning_msg = f"   ⚠️  Warning: Failed to start OAuth callback server"
+                warning_msg = "   ⚠️  Warning: Failed to start OAuth callback server"
                 if error_msg:
                     warning_msg += f": {error_msg}"
                 safe_print(warning_msg)

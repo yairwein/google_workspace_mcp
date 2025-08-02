@@ -8,15 +8,10 @@ allowing authenticated sessions to be passed through to Google API calls.
 import asyncio
 import logging
 from typing import Optional, Tuple, Any, Dict
-from functools import lru_cache
 
-from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 
-from auth.oauth21_google_bridge import get_auth_provider, get_credentials_from_token
 from auth.google_auth import (
-    save_credentials_to_session,
-    load_credentials_from_session,
     GoogleAuthenticationError,
 )
 
