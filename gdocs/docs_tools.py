@@ -95,25 +95,13 @@ async def get_doc_content(
         logger.info("[get_doc_content] Processing as native Google Doc.")
         doc_data = await asyncio.to_thread(
             docs_service.documents().get(
-<<<<<<< HEAD
-                documentId=document_id, 
-                includeTabsContent=True
-            ).execute
-        )
-        def extract_text_from_elements(elements, tab_name=None):
-            """Extract text from document elements (paragraphs, tables, etc.)"""
-            text_lines = []
-            if tab_name:
-                text_lines.append(f"\n--- TAB: {tab_name} ---\n")
-            
-=======
                 documentId=document_id,
                 includeTabsContent=True
             ).execute
         )
         # Tab header format constant
         TAB_HEADER_FORMAT = "\n--- TAB: {tab_name} ---\n"
-        
+
         def extract_text_from_elements(elements, tab_name=None, depth=0):
             """Extract text from document elements (paragraphs, tables, etc.)"""
             # Prevent infinite recursion by limiting depth
@@ -123,7 +111,6 @@ async def get_doc_content(
             if tab_name:
                 text_lines.append(TAB_HEADER_FORMAT.format(tab_name=tab_name))
 
->>>>>>> 6cb5b05da1c5469db3c34ab1bf0b83d4f950d3ba
             for element in elements:
                 if 'paragraph' in element:
                     paragraph = element.get('paragraph', {})
@@ -143,22 +130,6 @@ async def get_doc_content(
                         row_cells = row.get('tableCells', [])
                         for cell in row_cells:
                             cell_content = cell.get('content', [])
-<<<<<<< HEAD
-                            cell_text = extract_text_from_elements(cell_content)
-                            if cell_text.strip():
-                                text_lines.append(cell_text)
-            return "".join(text_lines)
-        
-        def process_tab_hierarchy(tab, level=0):
-            """Process a tab and its nested child tabs recursively"""
-            tab_text = ""
-            
-            if 'documentTab' in tab:
-                tab_title = tab.get('documentTab', {}).get('title', f'Untitled Tab (Level {level})')
-                tab_body = tab.get('documentTab', {}).get('body', {}).get('content', [])
-                tab_text += extract_text_from_elements(tab_body, tab_title)
-            
-=======
                             cell_text = extract_text_from_elements(cell_content, depth=depth + 1)
                             if cell_text.strip():
                                 text_lines.append(cell_text)
@@ -176,31 +147,10 @@ async def get_doc_content(
                 tab_body = tab.get('documentTab', {}).get('body', {}).get('content', [])
                 tab_text += extract_text_from_elements(tab_body, tab_title)
 
->>>>>>> 6cb5b05da1c5469db3c34ab1bf0b83d4f950d3ba
             # Process child tabs (nested tabs)
             child_tabs = tab.get('childTabs', [])
             for child_tab in child_tabs:
                 tab_text += process_tab_hierarchy(child_tab, level + 1)
-<<<<<<< HEAD
-            
-            return tab_text
-
-        processed_text_lines = []
-        
-        # Process main document body
-        body_elements = doc_data.get('body', {}).get('content', [])
-        main_content = extract_text_from_elements(body_elements)
-        if main_content.strip():
-            processed_text_lines.append(main_content)
-        
-        # Process all tabs
-        tabs = doc_data.get('tabs', [])
-        for tab in tabs:
-            tab_content = process_tab_hierarchy(tab)
-            if tab_content.strip():
-                processed_text_lines.append(tab_content)
-        
-=======
 
             return tab_text
 
@@ -219,7 +169,6 @@ async def get_doc_content(
             if tab_content.strip():
                 processed_text_lines.append(tab_content)
 
->>>>>>> 6cb5b05da1c5469db3c34ab1bf0b83d4f950d3ba
         body_text = "".join(processed_text_lines)
     else:
         logger.info(f"[get_doc_content] Processing as Drive file (e.g., .docx, other). MimeType: {mime_type}")

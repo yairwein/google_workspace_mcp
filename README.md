@@ -53,7 +53,7 @@ A production-ready MCP server that integrates all major Google Workspace service
 
 ## Features
 
-- **🔐 Advanced OAuth 2.0**: Secure authentication with automatic token refresh, transport-aware callback handling, session management, and centralized scope management
+- **🔐 Advanced OAuth 2.0 & OAuth 2.1**: Secure authentication with automatic token refresh, transport-aware callback handling, session management, centralized scope management, and OAuth 2.1 bearer token support for multi-user environments
 - **📅 Google Calendar**: Full calendar management with event CRUD operations
 - **📁 Google Drive**: File operations with native Microsoft Office format support (.docx, .xlsx)
 - **📧 Gmail**: Complete email management with search, send, and draft capabilities
@@ -89,8 +89,8 @@ A production-ready MCP server that integrates all major Google Workspace service
 
 | Variable | Purpose |
 |----------|---------|
-| `GOOGLE_OAUTH_CLIENT_ID` | OAuth client ID from Google Cloud |
-| `GOOGLE_OAUTH_CLIENT_SECRET` | OAuth client secret |
+| `GOOGLE_OAUTH_CLIENT_ID` | OAuth client ID from Google Cloud (used by both legacy auth and OAuth 2.1) |
+| `GOOGLE_OAUTH_CLIENT_SECRET` | OAuth client secret (used by both legacy auth and OAuth 2.1) |
 | `USER_GOOGLE_EMAIL` *(optional)* | Default email for single-user auth |
 | `GOOGLE_PSE_API_KEY` *(optional)* | API key for Google Custom Search - see [Custom Search Setup](#google-custom-search-setup) |
 | `GOOGLE_PSE_ENGINE_ID` *(optional)* | Programmable Search Engine ID for Custom Search |
@@ -227,6 +227,27 @@ docker run -p 8000:8000 -v $(pwd):/app workspace-mcp --transport streamable-http
 ```
 
 **Available Tools for `--tools` flag**: `gmail`, `drive`, `calendar`, `docs`, `sheets`, `forms`, `tasks`, `chat`, `search`
+
+### OAuth 2.1 Support (Multi-User Bearer Token Authentication)
+
+The server includes OAuth 2.1 support for bearer token authentication, enabling multi-user session management. **OAuth 2.1 automatically reuses your existing `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET` credentials** - no additional configuration needed!
+
+**When to use OAuth 2.1:**
+- Multiple users accessing the same MCP server instance
+- Need for bearer token authentication instead of passing user emails
+- Building web applications or APIs on top of the MCP server
+- Production environments requiring secure session management
+
+**Enabling OAuth 2.1:**
+```bash
+# OAuth 2.1 requires HTTP transport mode
+uv run main.py --transport streamable-http
+
+# The server will automatically detect your GOOGLE_OAUTH_CLIENT_ID/SECRET
+# and initialize OAuth 2.1 if available
+```
+
+For detailed OAuth 2.1 setup and client implementation, see [docs/oauth21-setup.md](docs/oauth21-setup.md).
 
 ### Connect to Claude Desktop
 

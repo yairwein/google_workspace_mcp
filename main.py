@@ -3,6 +3,10 @@ import logging
 import os
 import sys
 from importlib import metadata
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Local imports
 from core.server import server, set_transport_mode, initialize_oauth21_auth, shutdown_oauth21_auth
@@ -182,7 +186,7 @@ def main():
         safe_print("")
 
         if args.transport == 'streamable-http':
-            # The server is already configured with port and server_url in core/server.py
+            # The server has CORS middleware built-in via CORSEnabledFastMCP
             server.run(transport="streamable-http")
         else:
             server.run()
