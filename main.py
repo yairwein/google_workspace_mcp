@@ -4,7 +4,7 @@ import os
 import sys
 from importlib import metadata
 from dotenv import load_dotenv
-from core.server import server, set_transport_mode, initialize_auth, shutdown_auth
+from core.server import server, set_transport_mode
 from core.utils import check_credentials_directory_permissions
 
 # Load environment variables from .env file
@@ -147,23 +147,12 @@ def main():
         # Set transport mode for OAuth callback handling
         set_transport_mode(args.transport)
 
-        # Initialize OAuth 2.1 authentication if available
-        import asyncio
-        auth_provider = None
-        try:
-            if args.transport == 'streamable-http':
-                # Only initialize OAuth 2.1 for HTTP transport
-                auth_provider = asyncio.run(initialize_auth())
-                if auth_provider:
-                    safe_print("🔐 OAuth 2.1 authentication initialized with FastMCP")
-                    safe_print(f"   Discovery endpoints available at {base_uri}:{port}/.well-known/")
-                else:
-                    safe_print("🔐 Using legacy authentication only")
-            else:
-                safe_print("🔐 OAuth authentication not available in stdio mode (using legacy auth)")
-        except Exception as e:
-            safe_print(f"⚠️  OAuth authentication initialization failed: {e}")
-            safe_print("   Falling back to legacy authentication")
+        # Configure auth initialization for FastMCP lifecycle events
+        if args.transport == 'streamable-http':
+            safe_print("🔐 OAuth 2.1 authentication will be initialized on startup")
+            safe_print(f"   Discovery endpoints will be available at {base_uri}:{port}/.well-known/")
+        else:
+            safe_print("🔐 OAuth authentication not available in stdio mode (using legacy auth)")
 
         if args.transport == 'streamable-http':
             safe_print(f"🚀 Starting server on {base_uri}:{port}")
@@ -190,13 +179,6 @@ def main():
             server.run()
     except KeyboardInterrupt:
         safe_print("\n👋 Server shutdown requested")
-        # Clean up OAuth 2.1 authentication
-        try:
-            if auth_provider:
-                asyncio.run(shutdown_auth())
-        except Exception as e:
-            safe_print(f"⚠️  Error during OAuth 2.1 shutdown: {e}")
-
         # Clean up OAuth callback server if running
         from auth.oauth_callback_server import cleanup_oauth_callback_server
         cleanup_oauth_callback_server()
