@@ -84,11 +84,23 @@ class GoogleWorkspaceAuthProvider(AuthProvider):
                     store = get_oauth21_session_store()
                     session_id = f"google_{access_token.claims.get('sub', 'unknown')}"
                     
+                    # Try to get FastMCP session ID for binding
+                    mcp_session_id = None
+                    try:
+                        from fastmcp.server.dependencies import get_context
+                        ctx = get_context()
+                        if ctx and hasattr(ctx, 'session_id'):
+                            mcp_session_id = ctx.session_id
+                            logger.debug(f"Binding MCP session {mcp_session_id} to user {user_email}")
+                    except Exception:
+                        pass
+                    
                     store.store_session(
                         user_email=user_email,
                         access_token=token,
                         scopes=access_token.scopes or [],
-                        session_id=session_id
+                        session_id=session_id,
+                        mcp_session_id=mcp_session_id
                     )
                 
                 logger.debug(f"Successfully verified Google token for user: {user_email}")
