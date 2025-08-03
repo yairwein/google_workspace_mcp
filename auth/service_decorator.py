@@ -18,7 +18,7 @@ from auth.scopes import (
     TASKS_SCOPE, TASKS_READONLY_SCOPE,
     CUSTOM_SEARCH_SCOPE
 )
-from auth.session_context import get_session_context
+from auth.oauth21_session_store import get_session_context
 
 # OAuth 2.1 integration is now handled by FastMCP auth
 OAUTH21_INTEGRATION_AVAILABLE = True
@@ -310,7 +310,7 @@ def require_google_service(
                             set_fastmcp_session_id(mcp_session_id)
                             
                             # Create session context using FastMCP session ID
-                            from auth.session_context import SessionContext
+                            from auth.oauth21_session_store import SessionContext
                             session_ctx = SessionContext(
                                 session_id=mcp_session_id,
                                 user_id=user_google_email,

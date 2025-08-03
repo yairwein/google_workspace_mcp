@@ -11,7 +11,7 @@ from typing import Callable, Any
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
-from auth.session_context import (
+from auth.oauth21_session_store import (
     SessionContext,
     SessionContextManager,
     extract_session_from_headers,

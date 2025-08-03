@@ -30,7 +30,7 @@ from auth.oauth_responses import create_error_response, create_success_response,
 
 # FastMCP OAuth imports
 from auth.fastmcp_google_auth import GoogleWorkspaceAuthProvider
-from auth.oauth21_google_bridge import set_auth_provider, store_token_session
+from auth.oauth21_session_store import set_auth_provider, store_token_session
 
 # Import shared configuration
 from auth.scopes import SCOPES
