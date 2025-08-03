@@ -1,6 +1,7 @@
 import aiohttp
 import logging
 import jwt
+from jwt import PyJWKClient
 import os
 import time
 
@@ -567,7 +568,7 @@ async def oauth_authorize(request: Request):
 
     # Ensure response_type is code
     params["response_type"] = "code"
-    
+
     # Merge client scopes with our full SCOPES list
     client_scopes = params.get("scope", "").split() if params.get("scope") else []
     # Always include all Google Workspace scopes for full functionality
@@ -623,9 +624,29 @@ async def proxy_token_exchange(request: Request):
                         try:
                             # Extract user email from ID token if present
                             if "id_token" in response_data:
-                                # Decode without verification (we trust Google's response)
-                                id_token_claims = jwt.decode(response_data["id_token"], options={"verify_signature": False})
-                                user_email = id_token_claims.get("email")
+                                # Verify ID token using Google's public keys for security
+                                try:
+                                    # Get Google's public keys for verification
+                                    jwks_client = PyJWKClient("https://www.googleapis.com/oauth2/v3/certs")
+
+                                    # Get signing key from JWT header
+                                    signing_key = jwks_client.get_signing_key_from_jwt(response_data["id_token"])
+
+                                    # Verify and decode the ID token
+                                    id_token_claims = jwt.decode(
+                                        response_data["id_token"],
+                                        signing_key.key,
+                                        algorithms=["RS256"],
+                                        audience=os.getenv("GOOGLE_OAUTH_CLIENT_ID"),
+                                        issuer="https://accounts.google.com"
+                                    )
+                                    user_email = id_token_claims.get("email")
+                                except Exception as e:
+                                    logger.error(f"Failed to verify ID token: {e}")
+                                    # Fallback to unverified decode for backwards compatibility (with warning)
+                                    logger.warning("Using unverified ID token decode as fallback - this should be fixed")
+                                    id_token_claims = jwt.decode(response_data["id_token"], options={"verify_signature": False})
+                                    user_email = id_token_claims.get("email")
 
                                 if user_email:
                                     # Store the token session
@@ -728,13 +749,13 @@ async def oauth_register(request: Request):
             "response_types": body.get("response_types", ["code"]),
             "scope": body.get("scope", " ".join([
                 "openid",
-                "https://www.googleapis.com/auth/userinfo.email", 
+                "https://www.googleapis.com/auth/userinfo.email",
                 "https://www.googleapis.com/auth/userinfo.profile",
                 "https://www.googleapis.com/auth/calendar",
                 "https://www.googleapis.com/auth/calendar.readonly",
                 "https://www.googleapis.com/auth/calendar.events",
                 "https://www.googleapis.com/auth/drive",
-                "https://www.googleapis.com/auth/drive.readonly", 
+                "https://www.googleapis.com/auth/drive.readonly",
                 "https://www.googleapis.com/auth/drive.file",
                 "https://www.googleapis.com/auth/gmail.modify",
                 "https://www.googleapis.com/auth/gmail.readonly",

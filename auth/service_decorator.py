@@ -18,6 +18,7 @@ from auth.scopes import (
     TASKS_SCOPE, TASKS_READONLY_SCOPE,
     CUSTOM_SEARCH_SCOPE
 )
+from auth.session_context import get_session_context
 
 # OAuth 2.1 integration is now handled by FastMCP auth
 OAUTH21_INTEGRATION_AVAILABLE = True
@@ -52,10 +53,6 @@ async def get_authenticated_google_service_oauth21(
     logger.info(f"[{tool_name}] Successfully authenticated {service_name} service using OAuth 2.1 for user: {user_google_email}")
     
     return service, user_google_email
-
-def get_session_context():
-    """Placeholder for session context - not needed with direct OAuth 2.1 store access."""
-    return None
 
 logger = logging.getLogger(__name__)
 

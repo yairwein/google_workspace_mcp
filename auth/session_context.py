@@ -54,7 +54,6 @@ def get_session_context() -> Optional[SessionContext]:
     Returns:
         The current session context or None
     """
-    print('called get_session_context')
     return _current_session_context.get()
 
 
