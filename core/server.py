@@ -24,7 +24,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from auth.oauth21_session_store import get_oauth21_session_store
 from auth.google_auth import handle_auth_callback, start_auth_flow, check_client_secrets, save_credentials_to_file
 from google.oauth2.credentials import Credentials
-from auth.oauth_callback_server import get_oauth_redirect_uri, ensure_oauth_callback_available
+from auth.oauth_callback_server import get_oauth_redirect_uri
 from auth.mcp_session_middleware import MCPSessionMiddleware
 from auth.oauth_responses import create_error_response, create_success_response, create_server_error_response
 
@@ -33,56 +33,19 @@ from auth.fastmcp_google_auth import GoogleWorkspaceAuthProvider
 from auth.oauth21_google_bridge import set_auth_provider, store_token_session
 
 # Import shared configuration
-from auth.scopes import (
-    SCOPES,
-    USERINFO_EMAIL_SCOPE,  # noqa: F401
-    OPENID_SCOPE,  # noqa: F401
-    CALENDAR_READONLY_SCOPE,  # noqa: F401
-    CALENDAR_EVENTS_SCOPE,  # noqa: F401
-    DRIVE_READONLY_SCOPE,  # noqa: F401
-    DRIVE_FILE_SCOPE,  # noqa: F401
-    GMAIL_READONLY_SCOPE,  # noqa: F401
-    GMAIL_SEND_SCOPE,  # noqa: F401
-    GMAIL_COMPOSE_SCOPE,  # noqa: F401
-    GMAIL_MODIFY_SCOPE,  # noqa: F401
-    GMAIL_LABELS_SCOPE,  # noqa: F401
-    BASE_SCOPES,  # noqa: F401
-    CALENDAR_SCOPES,  # noqa: F401
-    DRIVE_SCOPES,  # noqa: F401
-    GMAIL_SCOPES,  # noqa: F401
-    DOCS_READONLY_SCOPE,  # noqa: F401
-    DOCS_WRITE_SCOPE,  # noqa: F401
-    CHAT_READONLY_SCOPE,  # noqa: F401
-    CHAT_WRITE_SCOPE,  # noqa: F401
-    CHAT_SPACES_SCOPE,  # noqa: F401
-    CHAT_SCOPES,  # noqa: F401
-    SHEETS_READONLY_SCOPE,  # noqa: F401
-    SHEETS_WRITE_SCOPE,  # noqa: F401
-    SHEETS_SCOPES,  # noqa: F401
-    FORMS_BODY_SCOPE,  # noqa: F401
-    FORMS_BODY_READONLY_SCOPE,  # noqa: F401
-    FORMS_RESPONSES_READONLY_SCOPE,  # noqa: F401
-    FORMS_SCOPES,  # noqa: F401
-    SLIDES_SCOPE,  # noqa: F401
-    SLIDES_READONLY_SCOPE,  # noqa: F401
-    SLIDES_SCOPES,  # noqa: F401
-    TASKS_SCOPE,  # noqa: F401
-    TASKS_READONLY_SCOPE,  # noqa: F401
-    TASKS_SCOPES,  # noqa: F401
-    CUSTOM_SEARCH_SCOPE,  # noqa: F401
-    CUSTOM_SEARCH_SCOPES,  # noqa: F401
+from auth.scopes import SCOPES
+from core.config import (
+    WORKSPACE_MCP_PORT,
+    WORKSPACE_MCP_BASE_URI,
+    USER_GOOGLE_EMAIL,
+    get_transport_mode,
+    set_transport_mode as _set_transport_mode,
+    get_oauth_redirect_uri as get_oauth_redirect_uri_for_current_mode,
 )
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-WORKSPACE_MCP_PORT = int(os.getenv("PORT", os.getenv("WORKSPACE_MCP_PORT", 8000)))
-WORKSPACE_MCP_BASE_URI = os.getenv("WORKSPACE_MCP_BASE_URI", "http://localhost")
-USER_GOOGLE_EMAIL = os.getenv("USER_GOOGLE_EMAIL", None)
-
-# Transport mode detection (will be set by main.py)
-_current_transport_mode = "stdio"  # Default to stdio
 
 # FastMCP authentication provider instance
 _auth_provider: Optional[GoogleWorkspaceAuthProvider] = None
@@ -116,7 +79,7 @@ class CORSEnabledFastMCP(FastMCP):
 # Initialize auth provider for HTTP transport
 def create_auth_provider() -> Optional[GoogleWorkspaceAuthProvider]:
     """Create auth provider if OAuth credentials are configured."""
-    if os.getenv("GOOGLE_OAUTH_CLIENT_ID") and _current_transport_mode == "streamable-http":
+    if os.getenv("GOOGLE_OAUTH_CLIENT_ID") and get_transport_mode() == "streamable-http":
         return GoogleWorkspaceAuthProvider()
     return None
 
@@ -130,20 +93,15 @@ server = CORSEnabledFastMCP(
 
 def set_transport_mode(mode: str):
     """Set the current transport mode for OAuth callback handling."""
-    global _current_transport_mode
-    _current_transport_mode = mode
+    _set_transport_mode(mode)
     logger.info(f"Transport mode set to: {mode}")
-
-def get_oauth_redirect_uri_for_current_mode() -> str:
-    """Get OAuth redirect URI based on current transport mode."""
-    return get_oauth_redirect_uri(WORKSPACE_MCP_PORT, WORKSPACE_MCP_BASE_URI)
 
 async def initialize_auth() -> Optional[GoogleWorkspaceAuthProvider]:
     """Initialize FastMCP authentication if available and configured."""
     global _auth_provider
 
     # Only initialize auth for HTTP transport
-    if _current_transport_mode != "streamable-http":
+    if get_transport_mode() != "streamable-http":
         logger.info("Authentication not available in stdio mode")
         return None
 
@@ -198,7 +156,7 @@ async def health_check(request: Request):
         "status": "healthy",
         "service": "workspace-mcp",
         "version": version,
-        "transport": _current_transport_mode
+        "transport": get_transport_mode()
     })
 
 
@@ -311,8 +269,9 @@ async def start_google_auth(
     logger.info(f"Tool 'start_google_auth' invoked for user_google_email: '{user_google_email}', service: '{service_name}'.")
 
     # Ensure OAuth callback is available for current transport mode
+    from auth.oauth_callback_server import ensure_oauth_callback_available
     redirect_uri = get_oauth_redirect_uri_for_current_mode()
-    success, error_msg = ensure_oauth_callback_available(_current_transport_mode, WORKSPACE_MCP_PORT, WORKSPACE_MCP_BASE_URI)
+    success, error_msg = ensure_oauth_callback_available(get_transport_mode(), WORKSPACE_MCP_PORT, WORKSPACE_MCP_BASE_URI)
     if not success:
         if error_msg:
             raise Exception(f"Failed to start OAuth callback server: {error_msg}")
@@ -347,48 +306,7 @@ async def oauth_protected_resource(request: Request):
             f"{WORKSPACE_MCP_BASE_URI}:{WORKSPACE_MCP_PORT}"
         ],
         "bearer_methods_supported": ["header"],
-        "scopes_supported": [
-            # Base scopes
-            "openid",
-            "https://www.googleapis.com/auth/userinfo.email",
-            "https://www.googleapis.com/auth/userinfo.profile",
-            # Calendar scopes
-            "https://www.googleapis.com/auth/calendar",
-            "https://www.googleapis.com/auth/calendar.readonly",
-            "https://www.googleapis.com/auth/calendar.events",
-            # Drive scopes
-            "https://www.googleapis.com/auth/drive",
-            "https://www.googleapis.com/auth/drive.readonly",
-            "https://www.googleapis.com/auth/drive.file",
-            # Gmail scopes
-            "https://www.googleapis.com/auth/gmail.modify",
-            "https://www.googleapis.com/auth/gmail.readonly",
-            "https://www.googleapis.com/auth/gmail.send",
-            "https://www.googleapis.com/auth/gmail.compose",
-            "https://www.googleapis.com/auth/gmail.labels",
-            # Docs scopes
-            "https://www.googleapis.com/auth/documents",
-            "https://www.googleapis.com/auth/documents.readonly",
-            # Sheets scopes
-            "https://www.googleapis.com/auth/spreadsheets",
-            "https://www.googleapis.com/auth/spreadsheets.readonly",
-            # Slides scopes
-            "https://www.googleapis.com/auth/presentations",
-            "https://www.googleapis.com/auth/presentations.readonly",
-            # Chat scopes
-            "https://www.googleapis.com/auth/chat.spaces",
-            "https://www.googleapis.com/auth/chat.messages",
-            "https://www.googleapis.com/auth/chat.messages.readonly",
-            # Forms scopes
-            "https://www.googleapis.com/auth/forms.body",
-            "https://www.googleapis.com/auth/forms.body.readonly",
-            "https://www.googleapis.com/auth/forms.responses.readonly",
-            # Tasks scopes
-            "https://www.googleapis.com/auth/tasks",
-            "https://www.googleapis.com/auth/tasks.readonly",
-            # Search scope
-            "https://www.googleapis.com/auth/cse"
-        ],
+        "scopes_supported": SCOPES,
         "resource_documentation": "https://developers.google.com/workspace",
         "client_registration_required": True,
         "client_configuration_endpoint": f"{WORKSPACE_MCP_BASE_URI}:{WORKSPACE_MCP_PORT}/.well-known/oauth-client",
@@ -504,37 +422,7 @@ async def oauth_client_config(request: Request):
             ],
             "grant_types": ["authorization_code", "refresh_token"],
             "response_types": ["code"],
-            "scope": " ".join([
-                "openid",
-                "https://www.googleapis.com/auth/userinfo.email",
-                "https://www.googleapis.com/auth/userinfo.profile",
-                "https://www.googleapis.com/auth/calendar",
-                "https://www.googleapis.com/auth/calendar.readonly",
-                "https://www.googleapis.com/auth/calendar.events",
-                "https://www.googleapis.com/auth/drive",
-                "https://www.googleapis.com/auth/drive.readonly",
-                "https://www.googleapis.com/auth/drive.file",
-                "https://www.googleapis.com/auth/gmail.modify",
-                "https://www.googleapis.com/auth/gmail.readonly",
-                "https://www.googleapis.com/auth/gmail.send",
-                "https://www.googleapis.com/auth/gmail.compose",
-                "https://www.googleapis.com/auth/gmail.labels",
-                "https://www.googleapis.com/auth/documents",
-                "https://www.googleapis.com/auth/documents.readonly",
-                "https://www.googleapis.com/auth/spreadsheets",
-                "https://www.googleapis.com/auth/spreadsheets.readonly",
-                "https://www.googleapis.com/auth/presentations",
-                "https://www.googleapis.com/auth/presentations.readonly",
-                "https://www.googleapis.com/auth/chat.spaces",
-                "https://www.googleapis.com/auth/chat.messages",
-                "https://www.googleapis.com/auth/chat.messages.readonly",
-                "https://www.googleapis.com/auth/forms.body",
-                "https://www.googleapis.com/auth/forms.body.readonly",
-                "https://www.googleapis.com/auth/forms.responses.readonly",
-                "https://www.googleapis.com/auth/tasks",
-                "https://www.googleapis.com/auth/tasks.readonly",
-                "https://www.googleapis.com/auth/cse"
-            ]),
+            "scope": " ".join(SCOPES),
             "token_endpoint_auth_method": "client_secret_basic",
             "code_challenge_methods": ["S256"]
         },
@@ -747,37 +635,7 @@ async def oauth_register(request: Request):
             "redirect_uris": redirect_uris,
             "grant_types": body.get("grant_types", ["authorization_code", "refresh_token"]),
             "response_types": body.get("response_types", ["code"]),
-            "scope": body.get("scope", " ".join([
-                "openid",
-                "https://www.googleapis.com/auth/userinfo.email",
-                "https://www.googleapis.com/auth/userinfo.profile",
-                "https://www.googleapis.com/auth/calendar",
-                "https://www.googleapis.com/auth/calendar.readonly",
-                "https://www.googleapis.com/auth/calendar.events",
-                "https://www.googleapis.com/auth/drive",
-                "https://www.googleapis.com/auth/drive.readonly",
-                "https://www.googleapis.com/auth/drive.file",
-                "https://www.googleapis.com/auth/gmail.modify",
-                "https://www.googleapis.com/auth/gmail.readonly",
-                "https://www.googleapis.com/auth/gmail.send",
-                "https://www.googleapis.com/auth/gmail.compose",
-                "https://www.googleapis.com/auth/gmail.labels",
-                "https://www.googleapis.com/auth/documents",
-                "https://www.googleapis.com/auth/documents.readonly",
-                "https://www.googleapis.com/auth/spreadsheets",
-                "https://www.googleapis.com/auth/spreadsheets.readonly",
-                "https://www.googleapis.com/auth/presentations",
-                "https://www.googleapis.com/auth/presentations.readonly",
-                "https://www.googleapis.com/auth/chat.spaces",
-                "https://www.googleapis.com/auth/chat.messages",
-                "https://www.googleapis.com/auth/chat.messages.readonly",
-                "https://www.googleapis.com/auth/forms.body",
-                "https://www.googleapis.com/auth/forms.body.readonly",
-                "https://www.googleapis.com/auth/forms.responses.readonly",
-                "https://www.googleapis.com/auth/tasks",
-                "https://www.googleapis.com/auth/tasks.readonly",
-                "https://www.googleapis.com/auth/cse"
-            ])),
+            "scope": body.get("scope", " ".join(SCOPES)),
             "token_endpoint_auth_method": body.get("token_endpoint_auth_method", "client_secret_basic"),
             "code_challenge_methods": ["S256"],
             # Additional OAuth 2.1 fields

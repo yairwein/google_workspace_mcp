@@ -10,11 +10,14 @@ logger = logging.getLogger(__name__)
 
 # Individual OAuth Scope Constants
 USERINFO_EMAIL_SCOPE = 'https://www.googleapis.com/auth/userinfo.email'
+USERINFO_PROFILE_SCOPE = 'https://www.googleapis.com/auth/userinfo.profile'
 OPENID_SCOPE = 'openid'
+CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar'
 CALENDAR_READONLY_SCOPE = 'https://www.googleapis.com/auth/calendar.readonly'
 CALENDAR_EVENTS_SCOPE = 'https://www.googleapis.com/auth/calendar.events'
 
 # Google Drive scopes
+DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive'
 DRIVE_READONLY_SCOPE = 'https://www.googleapis.com/auth/drive.readonly'
 DRIVE_FILE_SCOPE = 'https://www.googleapis.com/auth/drive.file'
 
@@ -57,6 +60,7 @@ CUSTOM_SEARCH_SCOPE = 'https://www.googleapis.com/auth/cse'
 # Base OAuth scopes required for user identification
 BASE_SCOPES = [
     USERINFO_EMAIL_SCOPE,
+    USERINFO_PROFILE_SCOPE,
     OPENID_SCOPE
 ]
 
@@ -67,11 +71,13 @@ DOCS_SCOPES = [
 ]
 
 CALENDAR_SCOPES = [
+    CALENDAR_SCOPE,
     CALENDAR_READONLY_SCOPE,
     CALENDAR_EVENTS_SCOPE
 ]
 
 DRIVE_SCOPES = [
+    DRIVE_SCOPE,
     DRIVE_READONLY_SCOPE,
     DRIVE_FILE_SCOPE
 ]

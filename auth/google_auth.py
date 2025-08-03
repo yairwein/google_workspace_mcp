@@ -16,6 +16,20 @@ from google.auth.exceptions import RefreshError
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from auth.scopes import SCOPES
+from auth.oauth21_session_store import get_oauth21_session_store
+from core.config import (
+    WORKSPACE_MCP_PORT,
+    WORKSPACE_MCP_BASE_URI,
+    get_transport_mode,
+    get_oauth_redirect_uri,
+)
+from core.context import get_fastmcp_session_id
+
+# Try to import FastMCP dependencies (may not be available in all environments)
+try:
+    from fastmcp.server.dependencies import get_context as get_fastmcp_context
+except ImportError:
+    get_fastmcp_context = None
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -382,15 +396,7 @@ async def start_auth_flow(
         f"[start_auth_flow] Initiating auth for {user_display_name} with global SCOPES."
     )
 
-    # Import here to avoid circular imports
-    from auth.oauth_callback_server import ensure_oauth_callback_available
-    from core.server import _current_transport_mode, WORKSPACE_MCP_PORT, WORKSPACE_MCP_BASE_URI
-
-    # Ensure OAuth callback server is available before generating URLs
-    success, error_msg = ensure_oauth_callback_available(_current_transport_mode, WORKSPACE_MCP_PORT, WORKSPACE_MCP_BASE_URI)
-    if not success:
-        error_detail = f" ({error_msg})" if error_msg else ""
-        raise Exception(f"Cannot initiate OAuth flow - callback server unavailable{error_detail}. Please ensure the OAuth callback server can start before attempting authentication.")
+    # Note: Caller should ensure OAuth callback is available before calling this function
 
     try:
         if "OAUTHLIB_INSECURE_TRANSPORT" not in os.environ and (
@@ -557,21 +563,20 @@ def get_credentials(
     # First, try OAuth 2.1 session store if we have a session_id (FastMCP session)
     if session_id:
         try:
-            from auth.oauth21_session_store import get_oauth21_session_store
             store = get_oauth21_session_store()
-            
+
             # Try to get credentials by MCP session
             credentials = store.get_credentials_by_mcp_session(session_id)
             if credentials:
                 logger.info(f"[get_credentials] Found OAuth 2.1 credentials for MCP session {session_id}")
-                
+
                 # Check scopes
                 if not all(scope in credentials.scopes for scope in required_scopes):
                     logger.warning(
                         f"[get_credentials] OAuth 2.1 credentials lack required scopes. Need: {required_scopes}, Have: {credentials.scopes}"
                     )
                     return None
-                
+
                 # Return if valid
                 if credentials.valid:
                     return credentials
@@ -599,7 +604,7 @@ def get_credentials(
             pass  # OAuth 2.1 store not available
         except Exception as e:
             logger.debug(f"[get_credentials] Error checking OAuth 2.1 store: {e}")
-    
+
     # Check for single-user mode
     if os.getenv("MCP_SINGLE_USER_MODE") == "1":
         logger.info(
@@ -787,12 +792,11 @@ async def get_authenticated_google_service(
     Raises:
         GoogleAuthenticationError: When authentication is required or fails
     """
-    
+
     # Try to get FastMCP session ID if not provided
     if not session_id:
         try:
             # First try context variable (works in async context)
-            from core.context import get_fastmcp_session_id
             session_id = get_fastmcp_session_id()
             if session_id:
                 logger.debug(f"[{tool_name}] Got FastMCP session ID from context: {session_id}")
@@ -800,12 +804,11 @@ async def get_authenticated_google_service(
                 logger.debug(f"[{tool_name}] Context variable returned None/empty session ID")
         except Exception as e:
             logger.debug(f"[{tool_name}] Could not get FastMCP session from context: {e}")
-        
+
         # Fallback to direct FastMCP context if context variable not set
-        if not session_id:
+        if not session_id and get_fastmcp_context:
             try:
-                from fastmcp.server.dependencies import get_context
-                fastmcp_ctx = get_context()
+                fastmcp_ctx = get_fastmcp_context()
                 if fastmcp_ctx and hasattr(fastmcp_ctx, 'session_id'):
                     session_id = fastmcp_ctx.session_id
                     logger.debug(f"[{tool_name}] Got FastMCP session ID directly: {session_id}")
@@ -813,11 +816,11 @@ async def get_authenticated_google_service(
                     logger.debug(f"[{tool_name}] FastMCP context exists but no session_id attribute")
             except Exception as e:
                 logger.debug(f"[{tool_name}] Could not get FastMCP context directly: {e}")
-        
+
         # Final fallback: log if we still don't have session_id
         if not session_id:
             logger.warning(f"[{tool_name}] Unable to obtain FastMCP session ID from any source")
-    
+
     logger.info(
         f"[{tool_name}] Attempting to get authenticated {service_name} service. Email: '{user_google_email}', Session: '{session_id}'"
     )
@@ -844,12 +847,13 @@ async def get_authenticated_google_service(
             f"[{tool_name}] Valid email '{user_google_email}' provided, initiating auth flow."
         )
 
-        # Import here to avoid circular import
-        from core.server import get_oauth_redirect_uri_for_current_mode
-
         # Ensure OAuth callback is available
-        redirect_uri = get_oauth_redirect_uri_for_current_mode()
-        # Note: We don't know the transport mode here, but the server should have set it
+        from auth.oauth_callback_server import ensure_oauth_callback_available
+        redirect_uri = get_oauth_redirect_uri()
+        success, error_msg = ensure_oauth_callback_available(get_transport_mode(), WORKSPACE_MCP_PORT, WORKSPACE_MCP_BASE_URI)
+        if not success:
+            error_detail = f" ({error_msg})" if error_msg else ""
+            raise GoogleAuthenticationError(f"Cannot initiate OAuth flow - callback server unavailable{error_detail}")
 
         # Generate auth URL and raise exception with it
         auth_response = await start_auth_flow(

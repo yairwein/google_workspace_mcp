@@ -11,7 +11,7 @@ from core.utils import check_credentials_directory_permissions
 load_dotenv()
 
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)

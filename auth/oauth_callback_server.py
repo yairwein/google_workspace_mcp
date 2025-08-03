@@ -17,7 +17,7 @@ from fastapi import FastAPI, Request
 from typing import Optional
 from urllib.parse import urlparse
 
-from auth.google_auth import handle_auth_callback, check_client_secrets
+# Import moved inside functions to avoid circular import
 from auth.scopes import SCOPES
 from auth.oauth_responses import create_error_response, create_success_response, create_server_error_response
 
@@ -62,6 +62,7 @@ class MinimalOAuthServer:
 
             try:
                 # Check if we have credentials available (environment variables or file)
+                from auth.google_auth import check_client_secrets
                 error_message = check_client_secrets()
                 if error_message:
                     return create_server_error_response(error_message)
@@ -71,6 +72,7 @@ class MinimalOAuthServer:
                 # Session ID tracking removed - not needed
 
                 # Exchange code for credentials
+                from auth.google_auth import handle_auth_callback
                 redirect_uri = get_oauth_redirect_uri(port=self.port, base_uri=self.base_uri)
                 verified_user_id, credentials = handle_auth_callback(
                     scopes=SCOPES,

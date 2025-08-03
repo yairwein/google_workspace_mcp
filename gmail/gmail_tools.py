@@ -16,12 +16,12 @@ from fastapi import Body
 
 from auth.service_decorator import require_google_service
 from core.utils import handle_http_errors
-from core.server import (
+from core.server import server
+from auth.scopes import (
     GMAIL_SEND_SCOPE,
     GMAIL_COMPOSE_SCOPE,
     GMAIL_MODIFY_SCOPE,
     GMAIL_LABELS_SCOPE,
-    server,
 )
 
 logger = logging.getLogger(__name__)
