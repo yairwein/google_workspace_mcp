@@ -61,8 +61,7 @@ class GoogleWorkspaceAuthProvider(AuthProvider):
             algorithm="RS256"
         )
         
-        # Session store for bridging to Google credentials
-        self._sessions: Dict[str, Dict[str, Any]] = {}
+        # Session bridging now handled by OAuth21SessionStore
         
     async def verify_token(self, token: str) -> Optional[AccessToken]:
         """
@@ -82,16 +81,21 @@ class GoogleWorkspaceAuthProvider(AuthProvider):
             access_token = await self.jwt_verifier.verify_token(token)
             
             if access_token:
-                # Store session info for credential bridging
-                session_id = f"google_{access_token.claims.get('sub', 'unknown')}"
-                self._sessions[session_id] = {
-                    "access_token": token,
-                    "user_email": access_token.claims.get("email"),
-                    "claims": access_token.claims,
-                    "scopes": access_token.scopes or []
-                }
+                # Store session info in OAuth21SessionStore for credential bridging
+                user_email = access_token.claims.get("email")
+                if user_email:
+                    from auth.oauth21_session_store import get_oauth21_session_store
+                    store = get_oauth21_session_store()
+                    session_id = f"google_{access_token.claims.get('sub', 'unknown')}"
+                    
+                    store.store_session(
+                        user_email=user_email,
+                        access_token=token,
+                        scopes=access_token.scopes or [],
+                        session_id=session_id
+                    )
                 
-                logger.debug(f"Successfully verified Google token for user: {access_token.claims.get('email')}")
+                logger.debug(f"Successfully verified Google token for user: {user_email}")
                 
             return access_token
             
@@ -306,18 +310,11 @@ class GoogleWorkspaceAuthProvider(AuthProvider):
                         else:
                             logger.info("Token exchange successful")
                             
-                            # Store session for credential bridging
+                            # Session storage for credential bridging handled by verify_token
                             if "access_token" in response_data:
-                                # Try to decode the token to get user info
+                                # Token storage handled in verify_token method
                                 try:
-                                    access_token = await self.verify_token(response_data["access_token"])
-                                    if access_token:
-                                        session_id = f"google_{access_token.claims.get('sub', 'unknown')}"
-                                        self._sessions[session_id] = {
-                                            "token_response": response_data,
-                                            "user_email": access_token.claims.get("email"),
-                                            "claims": access_token.claims
-                                        }
+                                    await self.verify_token(response_data["access_token"])
                                 except Exception as e:
                                     logger.debug(f"Could not verify token for session storage: {e}")
                         
@@ -414,7 +411,7 @@ class GoogleWorkspaceAuthProvider(AuthProvider):
     
     def get_session_info(self, session_id: str) -> Optional[Dict[str, Any]]:
         """
-        Get session information for credential bridging.
+        Get session information for credential bridging from OAuth21SessionStore.
         
         Args:
             session_id: The session identifier
@@ -422,11 +419,24 @@ class GoogleWorkspaceAuthProvider(AuthProvider):
         Returns:
             Session information if found
         """
-        return self._sessions.get(session_id)
+        from auth.oauth21_session_store import get_oauth21_session_store
+        store = get_oauth21_session_store()
+        
+        # Try to get user by session_id (assuming it's the MCP session ID)
+        user_email = store.get_user_by_mcp_session(session_id)
+        if user_email:
+            credentials = store.get_credentials(user_email)
+            if credentials:
+                return {
+                    "access_token": credentials.token,
+                    "user_email": user_email,
+                    "scopes": credentials.scopes or []
+                }
+        return None
     
     def create_session_from_token(self, token: str, user_email: str) -> str:
         """
-        Create a session from an access token for credential bridging.
+        Create a session from an access token for credential bridging using OAuth21SessionStore.
         
         Args:
             token: The access token
@@ -435,10 +445,13 @@ class GoogleWorkspaceAuthProvider(AuthProvider):
         Returns:
             Session ID
         """
+        from auth.oauth21_session_store import get_oauth21_session_store
+        store = get_oauth21_session_store()
         session_id = f"google_{user_email}"
-        self._sessions[session_id] = {
-            "access_token": token,
-            "user_email": user_email,
-            "created_at": "now"  # You could use datetime here
-        }
+        
+        store.store_session(
+            user_email=user_email,
+            access_token=token,
+            session_id=session_id
+        )
         return session_id

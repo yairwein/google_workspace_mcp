@@ -125,17 +125,12 @@ def store_token_session(token_response: dict, user_email: str, mcp_session_id: O
             except Exception as e:
                 logger.debug(f"Could not get FastMCP session from context: {e}")
         
-        session_id = f"google_{user_email}"
-        _auth_provider._sessions[session_id] = {
-            "token_response": token_response,
-            "user_email": user_email,
-            "mcp_session_id": mcp_session_id,
-            "created_at": datetime.now(timezone.utc).isoformat()
-        }
+        # Store session in OAuth21SessionStore instead of provider's _sessions
+        from auth.oauth21_session_store import get_oauth21_session_store
+        store = get_oauth21_session_store()
         
-        # Also store in the global OAuth21 session store for compatibility
-        session_store = get_oauth21_session_store()
-        session_store.store_session(
+        session_id = f"google_{user_email}"
+        store.store_session(
             user_email=user_email,
             access_token=token_response.get("access_token"),
             refresh_token=token_response.get("refresh_token"),

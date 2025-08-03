@@ -54,10 +54,7 @@ def get_default_credentials_dir():
 
 DEFAULT_CREDENTIALS_DIR = get_default_credentials_dir()
 
-# In-memory cache for session credentials, maps session_id to Credentials object
-# This is brittle and bad, but our options are limited with Claude in present state.
-# This should be more robust in a production system once OAuth2.1 is implemented in client.
-_SESSION_CREDENTIALS_CACHE: Dict[str, Credentials] = {}
+# Session credentials now handled by OAuth21SessionStore - no local cache needed
 # Centralized Client Secrets Path Logic
 _client_secrets_env = os.getenv("GOOGLE_CLIENT_SECRET_PATH") or os.getenv(
     "GOOGLE_CLIENT_SECRETS"
@@ -153,9 +150,34 @@ def save_credentials_to_file(
 
 
 def save_credentials_to_session(session_id: str, credentials: Credentials):
-    """Saves user credentials to the in-memory session cache."""
-    _SESSION_CREDENTIALS_CACHE[session_id] = credentials
-    logger.debug(f"Credentials saved to session cache for session_id: {session_id}")
+    """Saves user credentials using OAuth21SessionStore."""
+    # Get user email from credentials if possible
+    user_email = None
+    if credentials and credentials.id_token:
+        try:
+            decoded_token = jwt.decode(
+                credentials.id_token, options={"verify_signature": False}
+            )
+            user_email = decoded_token.get("email")
+        except Exception as e:
+            logger.debug(f"Could not decode id_token to get email: {e}")
+    
+    if user_email:
+        store = get_oauth21_session_store()
+        store.store_session(
+            user_email=user_email,
+            access_token=credentials.token,
+            refresh_token=credentials.refresh_token,
+            token_uri=credentials.token_uri,
+            client_id=credentials.client_id,
+            client_secret=credentials.client_secret,
+            scopes=credentials.scopes,
+            expiry=credentials.expiry,
+            mcp_session_id=session_id
+        )
+        logger.debug(f"Credentials saved to OAuth21SessionStore for session_id: {session_id}, user: {user_email}")
+    else:
+        logger.warning(f"Could not save credentials to session store - no user email found for session: {session_id}")
 
 
 def load_credentials_from_file(
@@ -207,15 +229,16 @@ def load_credentials_from_file(
 
 
 def load_credentials_from_session(session_id: str) -> Optional[Credentials]:
-    """Loads user credentials from the in-memory session cache."""
-    credentials = _SESSION_CREDENTIALS_CACHE.get(session_id)
+    """Loads user credentials from OAuth21SessionStore."""
+    store = get_oauth21_session_store()
+    credentials = store.get_credentials_by_mcp_session(session_id)
     if credentials:
         logger.debug(
-            f"Credentials loaded from session cache for session_id: {session_id}"
+            f"Credentials loaded from OAuth21SessionStore for session_id: {session_id}"
         )
     else:
         logger.debug(
-            f"No credentials found in session cache for session_id: {session_id}"
+            f"No credentials found in OAuth21SessionStore for session_id: {session_id}"
         )
     return credentials
 
@@ -527,7 +550,21 @@ def handle_auth_callback(
         # Save the credentials to file
         save_credentials_to_file(user_google_email, credentials, credentials_base_dir)
 
-        # If session_id is provided, also save to session cache
+        # Always save to OAuth21SessionStore for centralized management
+        store = get_oauth21_session_store()
+        store.store_session(
+            user_email=user_google_email,
+            access_token=credentials.token,
+            refresh_token=credentials.refresh_token,
+            token_uri=credentials.token_uri,
+            client_id=credentials.client_id,
+            client_secret=credentials.client_secret,
+            scopes=credentials.scopes,
+            expiry=credentials.expiry,
+            mcp_session_id=session_id
+        )
+
+        # If session_id is provided, also save to session cache for compatibility
         if session_id:
             save_credentials_to_session(session_id, credentials)
 
@@ -713,6 +750,21 @@ def get_credentials(
                 save_credentials_to_file(
                     user_google_email, credentials, credentials_base_dir
                 )
+                
+                # Also update OAuth21SessionStore
+                store = get_oauth21_session_store()
+                store.store_session(
+                    user_email=user_google_email,
+                    access_token=credentials.token,
+                    refresh_token=credentials.refresh_token,
+                    token_uri=credentials.token_uri,
+                    client_id=credentials.client_id,
+                    client_secret=credentials.client_secret,
+                    scopes=credentials.scopes,
+                    expiry=credentials.expiry,
+                    mcp_session_id=session_id
+                )
+                
             if session_id:  # Update session cache if it was the source or is active
                 save_credentials_to_session(session_id, credentials)
             return credentials
