@@ -87,6 +87,8 @@ def _prepare_gmail_message(
     subject: str,
     body: str,
     to: Optional[str] = None,
+    cc: Optional[str] = None,
+    bcc: Optional[str] = None,
     thread_id: Optional[str] = None,
     in_reply_to: Optional[str] = None,
     references: Optional[str] = None,
@@ -98,6 +100,8 @@ def _prepare_gmail_message(
         subject: Email subject
         body: Email body (plain text)
         to: Optional recipient email address
+        cc: Optional CC email address
+        bcc: Optional BCC email address
         thread_id: Optional Gmail thread ID to reply within
         in_reply_to: Optional Message-ID of the message being replied to
         references: Optional chain of Message-IDs for proper threading
@@ -114,9 +118,13 @@ def _prepare_gmail_message(
     message = MIMEText(body)
     message["subject"] = reply_subject
 
-    # Add recipient if provided
+    # Add recipients if provided
     if to:
         message["to"] = to
+    if cc:
+        message["cc"] = cc
+    if bcc:
+        message["bcc"] = bcc
 
     # Add reply headers for threading
     if in_reply_to:
@@ -498,6 +506,8 @@ async def send_gmail_message(
     to: str = Body(..., description="Recipient email address."),
     subject: str = Body(..., description="Email subject."),
     body: str = Body(..., description="Email body (plain text)."),
+    cc: Optional[str] = Body(None, description="Optional CC email address."),
+    bcc: Optional[str] = Body(None, description="Optional BCC email address."),
     thread_id: Optional[str] = Body(None, description="Optional Gmail thread ID to reply within."),
     in_reply_to: Optional[str] = Body(None, description="Optional Message-ID of the message being replied to."),
     references: Optional[str] = Body(None, description="Optional chain of Message-IDs for proper threading."),
@@ -509,6 +519,8 @@ async def send_gmail_message(
         to (str): Recipient email address.
         subject (str): Email subject.
         body (str): Email body (plain text).
+        cc (Optional[str]): Optional CC email address.
+        bcc (Optional[str]): Optional BCC email address.
         user_google_email (str): The user's Google email address. Required.
         thread_id (Optional[str]): Optional Gmail thread ID to reply within. When provided, sends a reply.
         in_reply_to (Optional[str]): Optional Message-ID of the message being replied to. Used for proper threading.
@@ -520,6 +532,15 @@ async def send_gmail_message(
     Examples:
         # Send a new email
         send_gmail_message(to="user@example.com", subject="Hello", body="Hi there!")
+        
+        # Send an email with CC and BCC
+        send_gmail_message(
+            to="user@example.com", 
+            cc="manager@example.com",
+            bcc="archive@example.com",
+            subject="Project Update", 
+            body="Here's the latest update..."
+        )
         
         # Send a reply
         send_gmail_message(
@@ -540,6 +561,8 @@ async def send_gmail_message(
         subject=subject,
         body=body,
         to=to,
+        cc=cc,
+        bcc=bcc,
         thread_id=thread_id,
         in_reply_to=in_reply_to,
         references=references,
@@ -568,6 +591,8 @@ async def draft_gmail_message(
     subject: str = Body(..., description="Email subject."),
     body: str = Body(..., description="Email body (plain text)."),
     to: Optional[str] = Body(None, description="Optional recipient email address."),
+    cc: Optional[str] = Body(None, description="Optional CC email address."),
+    bcc: Optional[str] = Body(None, description="Optional BCC email address."),
     thread_id: Optional[str] = Body(None, description="Optional Gmail thread ID to reply within."),
     in_reply_to: Optional[str] = Body(None, description="Optional Message-ID of the message being replied to."),
     references: Optional[str] = Body(None, description="Optional chain of Message-IDs for proper threading."),
@@ -580,6 +605,8 @@ async def draft_gmail_message(
         subject (str): Email subject.
         body (str): Email body (plain text).
         to (Optional[str]): Optional recipient email address. Can be left empty for drafts.
+        cc (Optional[str]): Optional CC email address.
+        bcc (Optional[str]): Optional BCC email address.
         thread_id (Optional[str]): Optional Gmail thread ID to reply within. When provided, creates a reply draft.
         in_reply_to (Optional[str]): Optional Message-ID of the message being replied to. Used for proper threading.
         references (Optional[str]): Optional chain of Message-IDs for proper threading. Should include all previous Message-IDs.
@@ -590,6 +617,15 @@ async def draft_gmail_message(
     Examples:
         # Create a new draft
         draft_gmail_message(subject="Hello", body="Hi there!", to="user@example.com")
+        
+        # Create a draft with CC and BCC
+        draft_gmail_message(
+            subject="Project Update", 
+            body="Here's the latest update...",
+            to="user@example.com",
+            cc="manager@example.com",
+            bcc="archive@example.com"
+        )
         
         # Create a reply draft
         draft_gmail_message(
@@ -610,6 +646,8 @@ async def draft_gmail_message(
         subject=subject,
         body=body,
         to=to,
+        cc=cc,
+        bcc=bcc,
         thread_id=thread_id,
         in_reply_to=in_reply_to,
         references=references,
