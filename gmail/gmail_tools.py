@@ -450,25 +450,66 @@ async def send_gmail_message(
     to: str = Body(..., description="Recipient email address."),
     subject: str = Body(..., description="Email subject."),
     body: str = Body(..., description="Email body (plain text)."),
+    thread_id: Optional[str] = Body(None, description="Optional Gmail thread ID to reply within."),
+    in_reply_to: Optional[str] = Body(None, description="Optional Message-ID of the message being replied to."),
+    references: Optional[str] = Body(None, description="Optional chain of Message-IDs for proper threading."),
 ) -> str:
     """
-    Sends an email using the user's Gmail account.
+    Sends an email using the user's Gmail account. Supports both new emails and replies.
 
     Args:
         to (str): Recipient email address.
         subject (str): Email subject.
         body (str): Email body (plain text).
         user_google_email (str): The user's Google email address. Required.
+        thread_id (Optional[str]): Optional Gmail thread ID to reply within. When provided, sends a reply.
+        in_reply_to (Optional[str]): Optional Message-ID of the message being replied to. Used for proper threading.
+        references (Optional[str]): Optional chain of Message-IDs for proper threading. Should include all previous Message-IDs.
 
     Returns:
         str: Confirmation message with the sent email's message ID.
+        
+    Examples:
+        # Send a new email
+        send_gmail_message(to="user@example.com", subject="Hello", body="Hi there!")
+        
+        # Send a reply
+        send_gmail_message(
+            to="user@example.com", 
+            subject="Re: Meeting tomorrow", 
+            body="Thanks for the update!",
+            thread_id="thread_123",
+            in_reply_to="<message123@gmail.com>",
+            references="<original@gmail.com> <message123@gmail.com>"
+        )
     """
+    logger.info(
+        f"[send_gmail_message] Invoked. Email: '{user_google_email}', Subject: '{subject}'"
+    )
+
+    # Handle reply subject formatting
+    reply_subject = subject
+    if in_reply_to and not subject.lower().startswith('re:'):
+        reply_subject = f"Re: {subject}"
+
     # Prepare the email
     message = MIMEText(body)
     message["to"] = to
-    message["subject"] = subject
+    message["subject"] = reply_subject
+
+    # Add reply headers for threading
+    if in_reply_to:
+        message["In-Reply-To"] = in_reply_to
+    
+    if references:
+        message["References"] = references
+
     raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
     send_body = {"raw": raw_message}
+    
+    # Associate with thread if provided
+    if thread_id:
+        send_body["threadId"] = thread_id
 
     # Send the message
     sent_message = await asyncio.to_thread(
