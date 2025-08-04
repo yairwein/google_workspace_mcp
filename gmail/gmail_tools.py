@@ -83,6 +83,54 @@ def _extract_headers(payload: dict, header_names: List[str]) -> Dict[str, str]:
     return headers
 
 
+def _prepare_gmail_message(
+    subject: str,
+    body: str,
+    to: Optional[str] = None,
+    thread_id: Optional[str] = None,
+    in_reply_to: Optional[str] = None,
+    references: Optional[str] = None,
+) -> tuple[str, Optional[str]]:
+    """
+    Prepare a Gmail message with threading support.
+    
+    Args:
+        subject: Email subject
+        body: Email body (plain text)
+        to: Optional recipient email address
+        thread_id: Optional Gmail thread ID to reply within
+        in_reply_to: Optional Message-ID of the message being replied to
+        references: Optional chain of Message-IDs for proper threading
+        
+    Returns:
+        Tuple of (raw_message, thread_id) where raw_message is base64 encoded
+    """
+    # Handle reply subject formatting
+    reply_subject = subject
+    if in_reply_to and not subject.lower().startswith('re:'):
+        reply_subject = f"Re: {subject}"
+
+    # Prepare the email
+    message = MIMEText(body)
+    message["subject"] = reply_subject
+
+    # Add recipient if provided
+    if to:
+        message["to"] = to
+
+    # Add reply headers for threading
+    if in_reply_to:
+        message["In-Reply-To"] = in_reply_to
+    
+    if references:
+        message["References"] = references
+
+    # Encode message
+    raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+    
+    return raw_message, thread_id
+
+
 def _generate_gmail_web_url(item_id: str, account_index: int = 0) -> str:
     """
     Generate Gmail web interface URL for a message or thread ID.
@@ -487,29 +535,21 @@ async def send_gmail_message(
         f"[send_gmail_message] Invoked. Email: '{user_google_email}', Subject: '{subject}'"
     )
 
-    # Handle reply subject formatting
-    reply_subject = subject
-    if in_reply_to and not subject.lower().startswith('re:'):
-        reply_subject = f"Re: {subject}"
-
-    # Prepare the email
-    message = MIMEText(body)
-    message["to"] = to
-    message["subject"] = reply_subject
-
-    # Add reply headers for threading
-    if in_reply_to:
-        message["In-Reply-To"] = in_reply_to
+    # Prepare the email message
+    raw_message, thread_id_final = _prepare_gmail_message(
+        subject=subject,
+        body=body,
+        to=to,
+        thread_id=thread_id,
+        in_reply_to=in_reply_to,
+        references=references,
+    )
     
-    if references:
-        message["References"] = references
-
-    raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
     send_body = {"raw": raw_message}
     
     # Associate with thread if provided
-    if thread_id:
-        send_body["threadId"] = thread_id
+    if thread_id_final:
+        send_body["threadId"] = thread_id_final
 
     # Send the message
     sent_message = await asyncio.to_thread(
@@ -565,34 +605,22 @@ async def draft_gmail_message(
         f"[draft_gmail_message] Invoked. Email: '{user_google_email}', Subject: '{subject}'"
     )
 
-    # Handle reply subject formatting
-    reply_subject = subject
-    if in_reply_to and not subject.lower().startswith('re:'):
-        reply_subject = f"Re: {subject}"
-
-    # Prepare the email
-    message = MIMEText(body)
-    message["subject"] = reply_subject
-
-    # Add recipient if provided
-    if to:
-        message["to"] = to
-
-    # Add reply headers for threading
-    if in_reply_to:
-        message["In-Reply-To"] = in_reply_to
-    
-    if references:
-        message["References"] = references
-
-    raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
+    # Prepare the email message
+    raw_message, thread_id_final = _prepare_gmail_message(
+        subject=subject,
+        body=body,
+        to=to,
+        thread_id=thread_id,
+        in_reply_to=in_reply_to,
+        references=references,
+    )
 
     # Create a draft instead of sending
     draft_body = {"message": {"raw": raw_message}}
     
     # Associate with thread if provided
-    if thread_id:
-        draft_body["message"]["threadId"] = thread_id
+    if thread_id_final:
+        draft_body["message"]["threadId"] = thread_id_final
 
     # Create the draft
     created_draft = await asyncio.to_thread(
