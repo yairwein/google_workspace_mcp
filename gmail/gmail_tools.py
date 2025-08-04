@@ -487,35 +487,71 @@ async def draft_gmail_message(
     subject: str = Body(..., description="Email subject."),
     body: str = Body(..., description="Email body (plain text)."),
     to: Optional[str] = Body(None, description="Optional recipient email address."),
+    thread_id: Optional[str] = Body(None, description="Optional Gmail thread ID to reply within."),
+    in_reply_to: Optional[str] = Body(None, description="Optional Message-ID of the message being replied to."),
+    references: Optional[str] = Body(None, description="Optional chain of Message-IDs for proper threading."),
 ) -> str:
     """
-    Creates a draft email in the user's Gmail account.
+    Creates a draft email in the user's Gmail account. Supports both new drafts and reply drafts.
 
     Args:
         user_google_email (str): The user's Google email address. Required.
         subject (str): Email subject.
         body (str): Email body (plain text).
         to (Optional[str]): Optional recipient email address. Can be left empty for drafts.
+        thread_id (Optional[str]): Optional Gmail thread ID to reply within. When provided, creates a reply draft.
+        in_reply_to (Optional[str]): Optional Message-ID of the message being replied to. Used for proper threading.
+        references (Optional[str]): Optional chain of Message-IDs for proper threading. Should include all previous Message-IDs.
 
     Returns:
         str: Confirmation message with the created draft's ID.
+        
+    Examples:
+        # Create a new draft
+        draft_gmail_message(subject="Hello", body="Hi there!", to="user@example.com")
+        
+        # Create a reply draft
+        draft_gmail_message(
+            subject="Re: Meeting tomorrow", 
+            body="Thanks for the update!",
+            to="user@example.com",
+            thread_id="thread_123",
+            in_reply_to="<message123@gmail.com>",
+            references="<original@gmail.com> <message123@gmail.com>"
+        )
     """
     logger.info(
         f"[draft_gmail_message] Invoked. Email: '{user_google_email}', Subject: '{subject}'"
     )
 
+    # Handle reply subject formatting
+    reply_subject = subject
+    if in_reply_to and not subject.lower().startswith('re:'):
+        reply_subject = f"Re: {subject}"
+
     # Prepare the email
     message = MIMEText(body)
-    message["subject"] = subject
+    message["subject"] = reply_subject
 
     # Add recipient if provided
     if to:
         message["to"] = to
 
+    # Add reply headers for threading
+    if in_reply_to:
+        message["In-Reply-To"] = in_reply_to
+    
+    if references:
+        message["References"] = references
+
     raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
 
     # Create a draft instead of sending
     draft_body = {"message": {"raw": raw_message}}
+    
+    # Associate with thread if provided
+    if thread_id:
+        draft_body["message"]["threadId"] = thread_id
 
     # Create the draft
     created_draft = await asyncio.to_thread(
