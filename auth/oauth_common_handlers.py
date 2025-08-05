@@ -15,7 +15,7 @@ from google.oauth2.credentials import Credentials
 
 from auth.oauth21_session_store import store_token_session
 from auth.google_auth import save_credentials_to_file
-from auth.scopes import SCOPES
+from auth.scopes import get_current_scopes
 from core.config import WORKSPACE_MCP_BASE_URI, WORKSPACE_MCP_PORT
 
 logger = logging.getLogger(__name__)
@@ -44,10 +44,11 @@ async def handle_oauth_authorize(request: Request):
     # Ensure response_type is code
     params["response_type"] = "code"
 
-    # Merge client scopes with our full SCOPES list
+    # Merge client scopes with scopes for enabled tools only
     client_scopes = params.get("scope", "").split() if params.get("scope") else []
-    # Always include all Google Workspace scopes for full functionality
-    all_scopes = set(client_scopes) | set(SCOPES)
+    # Include scopes for enabled tools only (not all tools)
+    enabled_tool_scopes = get_current_scopes()
+    all_scopes = set(client_scopes) | set(enabled_tool_scopes)
     params["scope"] = " ".join(sorted(all_scopes))
     logger.info(f"OAuth 2.1 authorization: Requesting scopes: {params['scope']}")
 
@@ -222,7 +223,7 @@ async def handle_oauth_protected_resource(request: Request):
             f"{WORKSPACE_MCP_BASE_URI}:{WORKSPACE_MCP_PORT}"
         ],
         "bearer_methods_supported": ["header"],
-        "scopes_supported": SCOPES,
+        "scopes_supported": get_current_scopes(),
         "resource_documentation": "https://developers.google.com/workspace",
         "client_registration_required": True,
         "client_configuration_endpoint": f"{WORKSPACE_MCP_BASE_URI}:{WORKSPACE_MCP_PORT}/.well-known/oauth-client",
@@ -287,7 +288,7 @@ async def handle_oauth_authorization_server(request: Request):
                 "code_challenge_methods_supported": ["S256"],
                 "pkce_required": True,
                 "grant_types_supported": ["authorization_code", "refresh_token"],
-                "scopes_supported": SCOPES,
+                "scopes_supported": get_current_scopes(),
                 "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"]
             },
             headers={
@@ -336,7 +337,7 @@ async def handle_oauth_client_config(request: Request):
             ],
             "grant_types": ["authorization_code", "refresh_token"],
             "response_types": ["code"],
-            "scope": " ".join(SCOPES),
+            "scope": " ".join(get_current_scopes()),
             "token_endpoint_auth_method": "client_secret_basic",
             "code_challenge_methods": ["S256"]
         },
@@ -391,7 +392,7 @@ async def handle_oauth_register(request: Request):
             "redirect_uris": redirect_uris,
             "grant_types": body.get("grant_types", ["authorization_code", "refresh_token"]),
             "response_types": body.get("response_types", ["code"]),
-            "scope": body.get("scope", " ".join(SCOPES)),
+            "scope": body.get("scope", " ".join(get_current_scopes())),
             "token_endpoint_auth_method": body.get("token_endpoint_auth_method", "client_secret_basic"),
             "code_challenge_methods": ["S256"],
             # Additional OAuth 2.1 fields

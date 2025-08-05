@@ -140,6 +140,11 @@ def main():
 
     # Import specified tools or all tools if none specified
     tools_to_import = args.tools if args.tools is not None else tool_imports.keys()
+    
+    # Set enabled tools for scope management
+    from auth.scopes import set_enabled_tools
+    set_enabled_tools(list(tools_to_import))
+    
     safe_print(f"🛠️  Loading {len(tools_to_import)} tool module{'s' if len(tools_to_import) != 1 else ''}:")
     for tool in tools_to_import:
         tool_imports[tool]()
