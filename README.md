@@ -94,6 +94,7 @@ A production-ready MCP server that integrates all major Google Workspace service
 | `USER_GOOGLE_EMAIL` *(optional)* | Default email for single-user auth |
 | `GOOGLE_PSE_API_KEY` *(optional)* | API key for Google Custom Search - see [Custom Search Setup](#google-custom-search-setup) |
 | `GOOGLE_PSE_ENGINE_ID` *(optional)* | Programmable Search Engine ID for Custom Search |
+| `MCP_ENABLE_OAUTH21` *(optional)* | Set to `true` to enable OAuth 2.1 support (requires streamable-http transport) |
 | `OAUTHLIB_INSECURE_TRANSPORT=1` | Development only (allows `http://` redirect) |
 
 Claude Desktop stores these securely in the OS keychain; set them once in the extension pane.
@@ -250,13 +251,15 @@ The server includes OAuth 2.1 support for bearer token authentication, enabling 
 - Browser-based clients requiring CORS support
 
 **Enabling OAuth 2.1:**
+To enable OAuth 2.1, set the `MCP_ENABLE_OAUTH21` environment variable to `true`.
+
 ```bash
 # OAuth 2.1 requires HTTP transport mode
+export MCP_ENABLE_OAUTH21=true
 uv run main.py --transport streamable-http
-
-# The server will automatically detect your GOOGLE_OAUTH_CLIENT_ID/SECRET
-# and initialize OAuth 2.1 if available
 ```
+
+If `MCP_ENABLE_OAUTH21` is not set to `true`, the server will use legacy authentication, which is suitable for clients that do not support OAuth 2.1.
 
 <details>
 <summary><b>Innovative CORS Proxy Architecture</b></summary>

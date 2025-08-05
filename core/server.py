@@ -1,40 +1,30 @@
 import logging
 import os
-from contextlib import asynccontextmanager
-
-from typing import Optional
+from typing import Optional, Union
 from importlib import metadata
 
-from fastapi.responses import HTMLResponse
-from fastapi.responses import JSONResponse
-
-from fastmcp import FastMCP
+from fastapi.responses import HTMLResponse, JSONResponse
 from starlette.applications import Starlette
 from starlette.requests import Request
-from starlette.responses import RedirectResponse
 from starlette.middleware import Middleware
 from fastapi.middleware.cors import CORSMiddleware
 
-from auth.oauth21_session_store import get_oauth21_session_store
-from auth.google_auth import handle_auth_callback, start_auth_flow, check_client_secrets, save_credentials_to_file
+from fastmcp import FastMCP
+
+from auth.oauth21_session_store import get_oauth21_session_store, set_auth_provider
+from auth.google_auth import handle_auth_callback, start_auth_flow, check_client_secrets
 from auth.mcp_session_middleware import MCPSessionMiddleware
 from auth.oauth_responses import create_error_response, create_success_response, create_server_error_response
 from auth.auth_info_middleware import AuthInfoMiddleware
-from google.oauth2.credentials import Credentials
-
-# Import common OAuth handlers
-from auth.oauth_common_handlers import (
-    handle_oauth_authorize,
-    handle_proxy_token_exchange,
-    handle_oauth_protected_resource,
-    handle_oauth_authorization_server,
-    handle_oauth_client_config,
-    handle_oauth_register
-)
-
-# FastMCP OAuth imports
 from auth.fastmcp_google_auth import GoogleWorkspaceAuthProvider
-from auth.oauth21_session_store import set_auth_provider, store_token_session
+from auth.scopes import SCOPES
+from core.config import (
+    WORKSPACE_MCP_PORT,
+    USER_GOOGLE_EMAIL,
+    get_transport_mode,
+    set_transport_mode as _set_transport_mode,
+    get_oauth_redirect_uri as get_oauth_redirect_uri_for_current_mode,
+)
 
 # Try to import GoogleRemoteAuthProvider for FastMCP 2.11.1+
 try:
@@ -44,35 +34,19 @@ except ImportError:
     GOOGLE_REMOTE_AUTH_AVAILABLE = False
     GoogleRemoteAuthProvider = None
 
-# Import shared configuration
-from auth.scopes import SCOPES
-from core.config import (
-    WORKSPACE_MCP_PORT,
-    WORKSPACE_MCP_BASE_URI,
-    USER_GOOGLE_EMAIL,
-    get_transport_mode,
-    set_transport_mode as _set_transport_mode,
-    get_oauth_redirect_uri as get_oauth_redirect_uri_for_current_mode,
-)
-
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# FastMCP authentication provider instance
-from typing import Union
 _auth_provider: Optional[Union[GoogleWorkspaceAuthProvider, GoogleRemoteAuthProvider]] = None
 
-# Create middleware configuration
-
+# --- Middleware Definitions ---
 cors_middleware = Middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify allowed origins
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 session_middleware = Middleware(MCPSessionMiddleware)
 
 # Custom FastMCP that adds CORS to streamable HTTP
@@ -89,164 +63,65 @@ class CORSEnabledFastMCP(FastMCP):
         logger.info("Added session and CORS middleware to streamable HTTP app")
         return app
 
-
-# Basic MCP server instance - auth will be set based on transport mode
+# --- Server Instance ---
 server = CORSEnabledFastMCP(
     name="google_workspace",
     port=WORKSPACE_MCP_PORT,
     host="0.0.0.0",
-    auth=None  # Will be set in set_transport_mode() for HTTP
+    auth=None,
 )
 
 # Add the AuthInfo middleware to inject authentication into FastMCP context
 auth_info_middleware = AuthInfoMiddleware()
-# Set the auth provider type so tools can access it
-auth_info_middleware.auth_provider_type = "GoogleRemoteAuthProvider"
 server.add_middleware(auth_info_middleware)
 
-# Add startup and shutdown event handlers to the underlying FastAPI app
-def add_lifecycle_events():
-    """Add lifecycle events after server creation."""
-    # Get the FastAPI app from streamable HTTP
-    app = server.streamable_http_app()
-    
-    @asynccontextmanager
-    async def lifespan(app):
-        # Startup
-        global _auth_provider
-        try:
-            _auth_provider = await initialize_auth()
-            if _auth_provider:
-                logger.info("OAuth 2.1 authentication initialized on startup")
-            else:
-                logger.info("OAuth authentication not configured or not available")
-        except Exception as e:
-            logger.error(f"Failed to initialize authentication on startup: {e}")
-        
-        yield
-        
-        # Shutdown
-        await shutdown_auth()
-    
-    # Set the lifespan if it's not already set
-    if not hasattr(app, 'lifespan') or app.lifespan is None:
-        app.router.lifespan_context = lifespan
 
 def set_transport_mode(mode: str):
-    """Set the current transport mode for OAuth callback handling."""
-    global _auth_provider
-    
+    """Sets the transport mode for the server."""
     _set_transport_mode(mode)
     logger.info(f"Transport mode set to: {mode}")
-    
-    # Initialize auth and lifecycle events for HTTP transport
-    if mode == "streamable-http":
-        # Initialize auth provider immediately for HTTP mode
-        if os.getenv("GOOGLE_OAUTH_CLIENT_ID") and not _auth_provider:
-            try:
-                # Use GoogleRemoteAuthProvider if available (FastMCP 2.11.1+)
-                if GOOGLE_REMOTE_AUTH_AVAILABLE:
-                    try:
-                        _auth_provider = GoogleRemoteAuthProvider()
-                        server.auth = _auth_provider
-                        set_auth_provider(_auth_provider)
-                        
-                        # Manually register the auth provider's routes
-                        auth_routes = _auth_provider.get_routes()
-                        logger.info(f"Registering {len(auth_routes)} routes from GoogleRemoteAuthProvider")
-                        for route in auth_routes:
-                            server.custom_route(route.path, methods=list(route.methods))(route.endpoint)
-                        
-                        logger.info("OAuth 2.1 authentication provider initialized with GoogleRemoteAuthProvider")
-                    except Exception as e:
-                        logger.warning(f"Failed to initialize GoogleRemoteAuthProvider, falling back to legacy: {e}")
-                        _auth_provider = GoogleWorkspaceAuthProvider()
-                        server.auth = _auth_provider
-                        set_auth_provider(_auth_provider)
-                        logger.info("OAuth 2.1 authentication provider initialized (legacy)")
-                else:
-                    _auth_provider = GoogleWorkspaceAuthProvider()
-                    server.auth = _auth_provider
-                    set_auth_provider(_auth_provider)
-                    logger.info("OAuth 2.1 authentication provider initialized (legacy)")
-            except Exception as e:
-                logger.error(f"Failed to initialize auth provider: {e}")
-        
-        add_lifecycle_events()
 
-async def initialize_auth() -> Optional[Union[GoogleWorkspaceAuthProvider, GoogleRemoteAuthProvider]]:
-    """Initialize FastMCP authentication if available and configured."""
+def configure_server_for_http():
+    """
+    Configures the authentication provider for HTTP transport.
+    This must be called BEFORE server.run().
+    """
     global _auth_provider
+    transport_mode = get_transport_mode()
 
-    # Only initialize auth for HTTP transport
-    if get_transport_mode() != "streamable-http":
-        logger.info("Authentication not available in stdio mode")
-        return None
+    if transport_mode != "streamable-http":
+        return
 
-    # Check if OAuth is configured
-    if not os.getenv("GOOGLE_OAUTH_CLIENT_ID"):
-        logger.info("OAuth not configured (GOOGLE_OAUTH_CLIENT_ID not set)")
-        return None
+    oauth21_enabled = os.getenv("MCP_ENABLE_OAUTH21", "false").lower() == "true"
 
-    # Return existing auth provider if already initialized
-    if _auth_provider:
-        logger.info("Using existing OAuth 2.1 authentication provider")
-        return _auth_provider
+    if oauth21_enabled:
+        if not os.getenv("GOOGLE_OAUTH_CLIENT_ID"):
+            logger.warning("OAuth 2.1 is enabled, but GOOGLE_OAUTH_CLIENT_ID is not set.")
+            return
 
-    try:
-        # Use GoogleRemoteAuthProvider if available (FastMCP 2.11.1+)
         if GOOGLE_REMOTE_AUTH_AVAILABLE:
+            logger.info("OAuth 2.1 is ENABLED. Initializing and attaching GoogleRemoteAuthProvider.")
             try:
                 _auth_provider = GoogleRemoteAuthProvider()
                 server.auth = _auth_provider
                 set_auth_provider(_auth_provider)
-                
-                # Manually register the auth provider's routes
-                # This ensures the OAuth discovery endpoints are available
-                auth_routes = _auth_provider.get_routes()
-                logger.info(f"Registering {len(auth_routes)} routes from GoogleRemoteAuthProvider")
-                for route in auth_routes:
-                    logger.info(f"  - Registering route: {route.path} ({', '.join(route.methods)})")
-                    server.custom_route(route.path, methods=list(route.methods))(route.endpoint)
-                
-                logger.info("FastMCP authentication initialized with GoogleRemoteAuthProvider (v2.11.1+)")
-                return _auth_provider
+                from auth.oauth21_integration import enable_oauth21
+                enable_oauth21()
             except Exception as e:
-                logger.warning(f"Failed to initialize GoogleRemoteAuthProvider, falling back to legacy: {e}")
-        
-        # Fallback to legacy GoogleWorkspaceAuthProvider
-        _auth_provider = GoogleWorkspaceAuthProvider()
-        server.auth = _auth_provider
-        set_auth_provider(_auth_provider)
-        
-        logger.info("FastMCP authentication initialized with Google Workspace provider (legacy)")
-        return _auth_provider
-    except Exception as e:
-        logger.error(f"Failed to initialize authentication: {e}")
-        return None
-
-async def shutdown_auth():
-    """Shutdown authentication provider."""
-    global _auth_provider
-    if _auth_provider:
-        try:
-            # FastMCP auth providers don't need explicit shutdown
-            logger.info("Authentication provider stopped")
-        except Exception as e:
-            logger.error(f"Error stopping authentication: {e}")
-        finally:
-            _auth_provider = None
-            server.auth = None
+                logger.error(f"Failed to initialize GoogleRemoteAuthProvider: {e}", exc_info=True)
+        else:
+            logger.error("OAuth 2.1 is enabled, but GoogleRemoteAuthProvider is not available.")
+    else:
+        logger.info("OAuth 2.1 is DISABLED. Server will use legacy tool-based authentication.")
+        server.auth = None
 
 def get_auth_provider() -> Optional[Union[GoogleWorkspaceAuthProvider, GoogleRemoteAuthProvider]]:
-    """Get the global authentication provider instance."""
+    """Gets the global authentication provider instance."""
     return _auth_provider
 
-
-# Health check endpoint
+# --- Custom Routes ---
 @server.custom_route("/health", methods=["GET"])
 async def health_check(request: Request):
-    """Health check endpoint for container orchestration."""
     try:
         version = metadata.version("workspace-mcp")
     except metadata.PackageNotFoundError:
@@ -258,60 +133,44 @@ async def health_check(request: Request):
         "transport": get_transport_mode()
     })
 
-
 @server.custom_route("/oauth2callback", methods=["GET"])
 async def oauth2_callback(request: Request) -> HTMLResponse:
-    """
-    Handle OAuth2 callback from Google via a custom route.
-    This endpoint exchanges the authorization code for credentials and saves them.
-    It then displays a success or error page to the user.
-    """
     state = request.query_params.get("state")
     code = request.query_params.get("code")
     error = request.query_params.get("error")
 
     if error:
-        error_message = f"Authentication failed: Google returned an error: {error}. State: {state}."
-        logger.error(error_message)
-        return create_error_response(error_message)
+        msg = f"Authentication failed: Google returned an error: {error}. State: {state}."
+        logger.error(msg)
+        return create_error_response(msg)
 
     if not code:
-        error_message = "Authentication failed: No authorization code received from Google."
-        logger.error(error_message)
-        return create_error_response(error_message)
+        msg = "Authentication failed: No authorization code received from Google."
+        logger.error(msg)
+        return create_error_response(msg)
 
     try:
-        # Check if we have credentials available (environment variables or file)
         error_message = check_client_secrets()
         if error_message:
             return create_server_error_response(error_message)
 
-        logger.info(f"OAuth callback: Received code (state: {state}). Attempting to exchange for tokens.")
+        logger.info(f"OAuth callback: Received code (state: {state}).")
 
-        # Exchange code for credentials. handle_auth_callback will save them.
-        # The user_id returned here is the Google-verified email.
         verified_user_id, credentials = handle_auth_callback(
-            scopes=SCOPES, # Ensure all necessary scopes are requested
+            scopes=SCOPES,
             authorization_response=str(request.url),
             redirect_uri=get_oauth_redirect_uri_for_current_mode(),
-            session_id=None # Session ID tracking removed
+            session_id=None
         )
 
-        logger.info(f"OAuth callback: Successfully authenticated user: {verified_user_id} (state: {state}).")
+        logger.info(f"OAuth callback: Successfully authenticated user: {verified_user_id}.")
 
-        # Store Google credentials in OAuth 2.1 session store
         try:
             store = get_oauth21_session_store()
-            
-            # Try to get MCP session ID from request for binding
             mcp_session_id = None
-            try:
-                if hasattr(request, 'state') and hasattr(request.state, 'session_id'):
-                    mcp_session_id = request.state.session_id
-                    logger.info(f"OAuth callback: Found MCP session ID for binding: {mcp_session_id}")
-            except Exception as e:
-                logger.debug(f"OAuth callback: Could not get MCP session ID: {e}")
-            
+            if hasattr(request, 'state') and hasattr(request.state, 'session_id'):
+                mcp_session_id = request.state.session_id
+
             store.store_session(
                 user_email=verified_user_id,
                 access_token=credentials.token,
@@ -321,110 +180,40 @@ async def oauth2_callback(request: Request) -> HTMLResponse:
                 client_secret=credentials.client_secret,
                 scopes=credentials.scopes,
                 expiry=credentials.expiry,
-                session_id=f"google-{state}",  # Use state as a pseudo session ID
-                mcp_session_id=mcp_session_id,  # Bind to MCP session if available
+                session_id=f"google-{state}",
+                mcp_session_id=mcp_session_id,
             )
-            logger.info(f"Stored Google credentials in OAuth 2.1 session store for {verified_user_id} (mcp: {mcp_session_id})")
+            logger.info(f"Stored Google credentials in OAuth 2.1 session store for {verified_user_id}")
         except Exception as e:
-            logger.error(f"Failed to store Google credentials in OAuth 2.1 store: {e}")
+            logger.error(f"Failed to store credentials in OAuth 2.1 store: {e}")
 
-        # Return success page using shared template
         return create_success_response(verified_user_id)
-
     except Exception as e:
-        error_message_detail = f"Error processing OAuth callback (state: {state}): {str(e)}"
-        logger.error(error_message_detail, exc_info=True)
-        # Generic error page for any other issues during token exchange or credential saving
+        logger.error(f"Error processing OAuth callback: {str(e)}", exc_info=True)
         return create_server_error_response(str(e))
 
+# --- Tools ---
 @server.tool()
-async def start_google_auth(
-    service_name: str,
-    user_google_email: str = USER_GOOGLE_EMAIL
-) -> str:
-    """
-    Initiates the Google OAuth 2.0 authentication flow for the specified user email and service.
-    This is the primary method to establish credentials when no valid session exists or when targeting a specific account for a particular service.
-    It generates an authorization URL that the LLM must present to the user.
-    This initiates a new authentication flow for the specified user and service.
+async def start_google_auth(service_name: str, user_google_email: str = USER_GOOGLE_EMAIL) -> str:
+    if not user_google_email:
+        raise ValueError("user_google_email must be provided.")
 
-    LLM Guidance:
-    - Use this tool when you need to authenticate a user for a specific Google service (e.g., "Google Calendar", "Google Docs", "Gmail", "Google Drive")
-      and don't have existing valid credentials for the session or specified email.
-    - You MUST provide the `user_google_email` and the `service_name`. If you don't know the email, ask the user first.
-    - Valid `service_name` values typically include "Google Calendar", "Google Docs", "Gmail", "Google Drive".
-    - After calling this tool, present the returned authorization URL clearly to the user and instruct them to:
-        1. Click the link and complete the sign-in/consent process in their browser.
-        2. Note the authenticated email displayed on the success page.
-        3. Provide that email back to you (the LLM).
-        4. Retry their original request, including the confirmed `user_google_email`.
+    error_message = check_client_secrets()
+    if error_message:
+        return f"**Authentication Error:** {error_message}"
 
-    Args:
-        user_google_email (str): The user's full Google email address (e.g., 'example@gmail.com'). This is REQUIRED.
-        service_name (str): The name of the Google service for which authentication is being requested (e.g., "Google Calendar", "Google Docs"). This is REQUIRED.
-
-    Returns:
-        str: A detailed message for the LLM with the authorization URL and instructions to guide the user through the authentication process.
-    """
-    if not user_google_email or not isinstance(user_google_email, str) or '@' not in user_google_email:
-        error_msg = "Invalid or missing 'user_google_email'. This parameter is required and must be a valid email address. LLM, please ask the user for their Google email address."
-        logger.error(f"[start_google_auth] {error_msg}")
-        raise Exception(error_msg)
-
-    if not service_name or not isinstance(service_name, str):
-        error_msg = "Invalid or missing 'service_name'. This parameter is required (e.g., 'Google Calendar', 'Google Docs'). LLM, please specify the service name."
-        logger.error(f"[start_google_auth] {error_msg}")
-        raise Exception(error_msg)
-
-    logger.info(f"Tool 'start_google_auth' invoked for user_google_email: '{user_google_email}', service: '{service_name}'.")
-
-    # Ensure OAuth callback is available for current transport mode
-    from auth.oauth_callback_server import ensure_oauth_callback_available
-    redirect_uri = get_oauth_redirect_uri_for_current_mode()
-    success, error_msg = ensure_oauth_callback_available(get_transport_mode(), WORKSPACE_MCP_PORT, WORKSPACE_MCP_BASE_URI)
-    if not success:
-        if error_msg:
-            raise Exception(f"Failed to start OAuth callback server: {error_msg}")
-        else:
-            raise Exception("Failed to start OAuth callback server. Please try again.")
-
-    auth_result = await start_auth_flow(
-        user_google_email=user_google_email,
-        service_name=service_name,
-        redirect_uri=redirect_uri
-    )
-    return auth_result
-
-
-# OAuth 2.1 Discovery Endpoints are now handled by GoogleRemoteAuthProvider when available
-# For legacy mode, we need to register them manually
-if not GOOGLE_REMOTE_AUTH_AVAILABLE:
-    server.custom_route("/.well-known/oauth-protected-resource", methods=["GET", "OPTIONS"])(handle_oauth_protected_resource)
-
-
-# Authorization server metadata endpoint now handled by GoogleRemoteAuthProvider
-if not GOOGLE_REMOTE_AUTH_AVAILABLE:
-    server.custom_route("/.well-known/oauth-authorization-server", methods=["GET", "OPTIONS"])(handle_oauth_authorization_server)
-
-
-# OAuth client configuration endpoint now handled by GoogleRemoteAuthProvider
-if not GOOGLE_REMOTE_AUTH_AVAILABLE:
-    server.custom_route("/.well-known/oauth-client", methods=["GET", "OPTIONS"])(handle_oauth_client_config)
-
-
-# OAuth authorization proxy endpoint now handled by GoogleRemoteAuthProvider
-if not GOOGLE_REMOTE_AUTH_AVAILABLE:
-    server.custom_route("/oauth2/authorize", methods=["GET", "OPTIONS"])(handle_oauth_authorize)
-
-
-# Token exchange proxy endpoint now handled by GoogleRemoteAuthProvider
-if not GOOGLE_REMOTE_AUTH_AVAILABLE:
-    server.custom_route("/oauth2/token", methods=["POST", "OPTIONS"])(handle_proxy_token_exchange)
-
-
-# Dynamic client registration endpoint now handled by GoogleRemoteAuthProvider
-if not GOOGLE_REMOTE_AUTH_AVAILABLE:
-    server.custom_route("/oauth2/register", methods=["POST", "OPTIONS"])(handle_oauth_register)
-
-
-
+    try:
+        auth_url, _ = start_auth_flow(
+            scopes=SCOPES,
+            redirect_uri=get_oauth_redirect_uri_for_current_mode(),
+            login_hint=user_google_email
+        )
+        return (
+            "**Action Required: Authenticate with Google**\n\n"
+            "Please visit this URL to authenticate:\n\n"
+            f"**[Authenticate with Google]({auth_url})**\n\n"
+            "After authenticating, retry your request."
+        )
+    except Exception as e:
+        logger.error(f"Failed to start Google authentication flow: {e}", exc_info=True)
+        return f"**Error:** An unexpected error occurred: {e}"

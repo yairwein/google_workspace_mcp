@@ -4,7 +4,7 @@ import os
 import sys
 from importlib import metadata
 from dotenv import load_dotenv
-from core.server import server, set_transport_mode
+from core.server import server, set_transport_mode, configure_server_for_http
 from core.utils import check_credentials_directory_permissions
 
 # Load environment variables from .env file, specifying an explicit path
@@ -86,6 +86,28 @@ def main():
     safe_print(f"   🐍 Python: {sys.version.split()[0]}")
     safe_print("")
 
+    # Active Configuration
+    safe_print("엑 Active Configuration:")
+
+    # Redact client secret for security
+    client_secret = os.getenv('GOOGLE_OAUTH_CLIENT_SECRET', 'Not Set')
+    redacted_secret = f"{client_secret[:4]}...{client_secret[-4:]}" if len(client_secret) > 8 else "Invalid or too short"
+
+    config_vars = {
+        "GOOGLE_OAUTH_CLIENT_ID": os.getenv('GOOGLE_OAUTH_CLIENT_ID', 'Not Set'),
+        "GOOGLE_OAUTH_CLIENT_SECRET": redacted_secret,
+        "USER_GOOGLE_EMAIL": os.getenv('USER_GOOGLE_EMAIL', 'Not Set'),
+        "MCP_SINGLE_USER_MODE": os.getenv('MCP_SINGLE_USER_MODE', 'false'),
+        "MCP_ENABLE_OAUTH21": os.getenv('MCP_ENABLE_OAUTH21', 'false'),
+        "OAUTHLIB_INSECURE_TRANSPORT": os.getenv('OAUTHLIB_INSECURE_TRANSPORT', 'false'),
+        "GOOGLE_CLIENT_SECRET_PATH": os.getenv('GOOGLE_CLIENT_SECRET_PATH', 'Not Set'),
+    }
+
+    for key, value in config_vars.items():
+        safe_print(f"   - {key}: {value}")
+    safe_print("")
+
+
     # Import tool modules to register them with the MCP server via decorators
     tool_imports = {
         'gmail': lambda: __import__('gmail.gmail_tools'),
@@ -151,10 +173,10 @@ def main():
 
         # Configure auth initialization for FastMCP lifecycle events
         if args.transport == 'streamable-http':
-            safe_print("🔐 OAuth 2.1 authentication will be initialized on startup")
-            safe_print(f"   Discovery endpoints will be available at {base_uri}:{port}/.well-known/")
+            configure_server_for_http()
+            safe_print("🔐 HTTP server configured for authentication.")
         else:
-            safe_print("🔐 OAuth authentication not available in stdio mode (using legacy auth)")
+            safe_print("🔐 Using legacy authentication for stdio mode.")
 
         if args.transport == 'streamable-http':
             safe_print(f"🚀 Starting server on {base_uri}:{port}")
