@@ -16,7 +16,6 @@ For earlier versions or other transport modes, the legacy GoogleWorkspaceAuthPro
 import os
 import logging
 import aiohttp
-import jwt
 from typing import Optional, List
 
 from starlette.routing import Route
@@ -31,19 +30,11 @@ except ImportError:
     RemoteAuthProvider = object  # Fallback for type hints
     JWTVerifier = object
 
-from auth.oauth21_session_store import get_oauth21_session_store, store_token_session
-from auth.google_auth import save_credentials_to_file
-from auth.scopes import SCOPES
-from core.config import (
-    WORKSPACE_MCP_PORT,
-    WORKSPACE_MCP_BASE_URI,
-)
 
 # Import common OAuth handlers
 from auth.oauth_common_handlers import (
     handle_oauth_authorize,
     handle_proxy_token_exchange,
-    handle_oauth_protected_resource,
     handle_oauth_authorization_server,
     handle_oauth_client_config,
     handle_oauth_register

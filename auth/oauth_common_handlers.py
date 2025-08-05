@@ -89,14 +89,14 @@ async def handle_proxy_token_exchange(request: Request):
                 client_id = os.getenv("GOOGLE_OAUTH_CLIENT_ID")
                 if client_id:
                     form_data['client_id'] = [client_id]
-                    logger.debug(f"Added missing client_id to token request")
+                    logger.debug("Added missing client_id to token request")
             
             # Check if client_secret is missing (public client using PKCE)
             if 'client_secret' not in form_data:
                 client_secret = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET")
                 if client_secret:
                     form_data['client_secret'] = [client_secret]
-                    logger.debug(f"Added missing client_secret to token request")
+                    logger.debug("Added missing client_secret to token request")
             
             # Reconstruct body with added credentials
             body = urlencode(form_data, doseq=True).encode('utf-8')
