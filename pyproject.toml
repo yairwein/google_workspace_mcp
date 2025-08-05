@@ -11,7 +11,7 @@ keywords = [ "mcp", "google", "workspace", "llm", "ai", "claude", "model", "cont
 requires-python = ">=3.10"
 dependencies = [
  "fastapi>=0.115.12",
- "fastmcp>=2.10.6",
+ "fastmcp==2.11.1",
  "google-api-python-client>=2.168.0",
  "google-auth-httplib2>=0.2.0",
  "google-auth-oauthlib>=1.2.2",
@@ -19,6 +19,9 @@ dependencies = [
  "pyjwt>=2.10.1",
  "ruff>=0.12.4",
  "tomlkit",
+ "aiohttp>=3.9.0",
+ "cachetools>=5.3.0",
+ "cryptography>=41.0.0",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",

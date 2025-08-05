@@ -3,10 +3,17 @@ import logging
 import os
 import sys
 from importlib import metadata
+from dotenv import load_dotenv
+from core.server import server, set_transport_mode, configure_server_for_http
 
-# Local imports
-from core.server import server, set_transport_mode
+# Suppress googleapiclient discovery cache warning
+logging.getLogger('googleapiclient.discovery_cache').setLevel(logging.ERROR)
 from core.utils import check_credentials_directory_permissions
+
+# Load environment variables from .env file, specifying an explicit path
+# This prevents accidentally loading a .env file from a different directory
+dotenv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+load_dotenv(dotenv_path=dotenv_path)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -82,6 +89,28 @@ def main():
     safe_print(f"   🐍 Python: {sys.version.split()[0]}")
     safe_print("")
 
+    # Active Configuration
+    safe_print("⚙️ Active Configuration:")
+
+    # Redact client secret for security
+    client_secret = os.getenv('GOOGLE_OAUTH_CLIENT_SECRET', 'Not Set')
+    redacted_secret = f"{client_secret[:4]}...{client_secret[-4:]}" if len(client_secret) > 8 else "Invalid or too short"
+
+    config_vars = {
+        "GOOGLE_OAUTH_CLIENT_ID": os.getenv('GOOGLE_OAUTH_CLIENT_ID', 'Not Set'),
+        "GOOGLE_OAUTH_CLIENT_SECRET": redacted_secret,
+        "USER_GOOGLE_EMAIL": os.getenv('USER_GOOGLE_EMAIL', 'Not Set'),
+        "MCP_SINGLE_USER_MODE": os.getenv('MCP_SINGLE_USER_MODE', 'false'),
+        "MCP_ENABLE_OAUTH21": os.getenv('MCP_ENABLE_OAUTH21', 'false'),
+        "OAUTHLIB_INSECURE_TRANSPORT": os.getenv('OAUTHLIB_INSECURE_TRANSPORT', 'false'),
+        "GOOGLE_CLIENT_SECRET_PATH": os.getenv('GOOGLE_CLIENT_SECRET_PATH', 'Not Set'),
+    }
+
+    for key, value in config_vars.items():
+        safe_print(f"   - {key}: {value}")
+    safe_print("")
+
+
     # Import tool modules to register them with the MCP server via decorators
     tool_imports = {
         'gmail': lambda: __import__('gmail.gmail_tools'),
@@ -111,6 +140,11 @@ def main():
 
     # Import specified tools or all tools if none specified
     tools_to_import = args.tools if args.tools is not None else tool_imports.keys()
+    
+    # Set enabled tools for scope management
+    from auth.scopes import set_enabled_tools
+    set_enabled_tools(list(tools_to_import))
+    
     safe_print(f"🛠️  Loading {len(tools_to_import)} tool module{'s' if len(tools_to_import) != 1 else ''}:")
     for tool in tools_to_import:
         tool_imports[tool]()
@@ -145,27 +179,31 @@ def main():
         # Set transport mode for OAuth callback handling
         set_transport_mode(args.transport)
 
+        # Configure auth initialization for FastMCP lifecycle events
         if args.transport == 'streamable-http':
-            safe_print(f"🚀 Starting server on {base_uri}:{port}")
+            configure_server_for_http()
+            safe_print(f"")
+            safe_print(f"🚀 Starting HTTP server on {base_uri}:{port}")
         else:
-            safe_print("🚀 Starting server in stdio mode")
+            safe_print(f"")
+            safe_print("🚀 Starting STDIO server")
             # Start minimal OAuth callback server for stdio mode
             from auth.oauth_callback_server import ensure_oauth_callback_available
             success, error_msg = ensure_oauth_callback_available('stdio', port, base_uri)
             if success:
                 safe_print(f"   OAuth callback server started on {base_uri}:{port}/oauth2callback")
             else:
-                warning_msg = f"   ⚠️  Warning: Failed to start OAuth callback server"
+                warning_msg = "   ⚠️  Warning: Failed to start OAuth callback server"
                 if error_msg:
                     warning_msg += f": {error_msg}"
                 safe_print(warning_msg)
 
-        safe_print("   Ready for MCP connections!")
+        safe_print("✅ Ready for MCP connections")
         safe_print("")
 
         if args.transport == 'streamable-http':
-            # The server is already configured with port and server_url in core/server.py
-            server.run(transport="streamable-http")
+            # The server has CORS middleware built-in via CORSEnabledFastMCP
+            server.run(transport="streamable-http", host="0.0.0.0", port=port)
         else:
             server.run()
     except KeyboardInterrupt:

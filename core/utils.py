@@ -11,6 +11,7 @@ from typing import List, Optional
 
 from googleapiclient.errors import HttpError
 from .api_enablement import get_api_enablement_message
+from auth.google_auth import GoogleAuthenticationError
 
 logger = logging.getLogger(__name__)
 
@@ -305,6 +306,9 @@ def handle_http_errors(tool_name: str, is_read_only: bool = False, service_type:
                     raise Exception(message) from error
                 except TransientNetworkError:
                     # Re-raise without wrapping to preserve the specific error type
+                    raise
+                except GoogleAuthenticationError:
+                    # Re-raise authentication errors without wrapping
                     raise
                 except Exception as e:
                     message = f"An unexpected error occurred in {tool_name}: {e}"

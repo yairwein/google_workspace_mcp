@@ -19,6 +19,55 @@ from auth.scopes import (
     CUSTOM_SEARCH_SCOPE
 )
 
+# OAuth 2.1 integration is now handled by FastMCP auth
+OAUTH21_INTEGRATION_AVAILABLE = True
+
+
+# REMOVED: _extract_and_verify_bearer_token function. This functionality is now handled by AuthInfoMiddleware.
+async def get_authenticated_google_service_oauth21(
+    service_name: str,
+    version: str,
+    tool_name: str,
+    user_google_email: str,
+    required_scopes: List[str],
+    session_id: Optional[str] = None,
+    auth_token_email: Optional[str] = None,
+    allow_recent_auth: bool = False,
+) -> tuple[Any, str]:
+    """
+    OAuth 2.1 authentication using the session store with security validation.
+    """
+    from auth.oauth21_session_store import get_oauth21_session_store
+    from googleapiclient.discovery import build
+
+    store = get_oauth21_session_store()
+
+    # Use the new validation method to ensure session can only access its own credentials
+    credentials = store.get_credentials_with_validation(
+        requested_user_email=user_google_email,
+        session_id=session_id,
+        auth_token_email=auth_token_email,
+        allow_recent_auth=allow_recent_auth
+    )
+
+    if not credentials:
+        from auth.google_auth import GoogleAuthenticationError
+        raise GoogleAuthenticationError(
+            f"Access denied: Cannot retrieve credentials for {user_google_email}. "
+            f"You can only access credentials for your authenticated account."
+        )
+
+    # Check scopes
+    if not all(scope in credentials.scopes for scope in required_scopes):
+        from auth.google_auth import GoogleAuthenticationError
+        raise GoogleAuthenticationError(f"OAuth 2.1 credentials lack required scopes. Need: {required_scopes}, Have: {credentials.scopes}")
+
+    # Build service
+    service = build(service_name, version, credentials=credentials)
+    logger.info(f"[{tool_name}] Authenticated {service_name} for {user_google_email}")
+
+    return service, user_google_email
+
 logger = logging.getLogger(__name__)
 
 # Service configuration mapping
@@ -78,7 +127,7 @@ SCOPE_GROUPS = {
     # Tasks scopes
     "tasks": TASKS_SCOPE,
     "tasks_read": TASKS_READONLY_SCOPE,
-    
+
     # Custom Search scope
     "customsearch": CUSTOM_SEARCH_SCOPE,
 }
@@ -256,18 +305,75 @@ def require_google_service(
             if service is None:
                 try:
                     tool_name = func.__name__
-                    service, actual_user_email = await get_authenticated_google_service(
-                        service_name=service_name,
-                        version=service_version,
-                        tool_name=tool_name,
-                        user_google_email=user_google_email,
-                        required_scopes=resolved_scopes,
-                    )
+
+                    # SIMPLIFIED: Just get the authenticated user from the context
+                    # The AuthInfoMiddleware has already done all the authentication checks
+                    authenticated_user = None
+                    auth_method = None
+                    mcp_session_id = None
+
+                    try:
+                        from fastmcp.server.dependencies import get_context
+                        ctx = get_context()
+                        if ctx:
+                            # Get the authenticated user email set by AuthInfoMiddleware
+                            authenticated_user = ctx.get_state("authenticated_user_email")
+                            auth_method = ctx.get_state("authenticated_via")
+
+                            # Get session ID for logging
+                            if hasattr(ctx, 'session_id'):
+                                mcp_session_id = ctx.session_id
+                                # Set FastMCP session ID in context variable for propagation
+                                from core.context import set_fastmcp_session_id
+                                set_fastmcp_session_id(mcp_session_id)
+
+                            logger.debug(f"[{tool_name}] Auth from middleware: {authenticated_user} via {auth_method}")
+                    except Exception as e:
+                        logger.debug(f"[{tool_name}] Could not get FastMCP context: {e}")
+
+                    # Log authentication status
+                    logger.debug(f"[{tool_name}] Auth: {authenticated_user or 'none'} via {auth_method or 'none'} (session: {mcp_session_id[:8] if mcp_session_id else 'none'})")
+
+                    from auth.oauth21_integration import is_oauth21_enabled
+
+                    if is_oauth21_enabled():
+                        logger.debug(f"[{tool_name}] Using OAuth 2.1 flow")
+                        # The downstream get_authenticated_google_service_oauth21 will handle
+                        # whether the user's token is valid for the requested resource.
+                        # This decorator should not block the call here.
+                        service, actual_user_email = await get_authenticated_google_service_oauth21(
+                            service_name=service_name,
+                            version=service_version,
+                            tool_name=tool_name,
+                            user_google_email=user_google_email,
+                            required_scopes=resolved_scopes,
+                            session_id=mcp_session_id,
+                            auth_token_email=authenticated_user,
+                            allow_recent_auth=False,
+                        )
+                    else:
+                        # If OAuth 2.1 is not enabled, always use the legacy authentication method.
+                        logger.debug(f"[{tool_name}] Using legacy OAuth flow")
+                        service, actual_user_email = await get_authenticated_google_service(
+                            service_name=service_name,
+                            version=service_version,
+                            tool_name=tool_name,
+                            user_google_email=user_google_email,
+                            required_scopes=resolved_scopes,
+                            session_id=mcp_session_id,
+                        )
+
                     if cache_enabled:
                         cache_key = _get_cache_key(user_google_email, service_name, service_version, resolved_scopes)
                         _cache_service(cache_key, service, actual_user_email)
                 except GoogleAuthenticationError as e:
-                    raise Exception(str(e))
+                    logger.error(
+                        f"[{tool_name}] GoogleAuthenticationError during authentication. "
+                        f"Method={auth_method or 'none'}, User={authenticated_user or 'none'}, "
+                        f"Service={service_name} v{service_version}, MCPSessionID={mcp_session_id or 'none'}: {e}"
+                    )
+                    # Re-raise the original error without wrapping it
+                    raise
 
             # --- Call the original function with the service object injected ---
             try:
@@ -340,19 +446,59 @@ def require_multiple_services(service_configs: List[Dict[str, Any]]):
 
                 try:
                     tool_name = func.__name__
-                    service, _ = await get_authenticated_google_service(
-                        service_name=service_name,
-                        version=service_version,
-                        tool_name=tool_name,
-                        user_google_email=user_google_email,
-                        required_scopes=resolved_scopes,
-                    )
+
+                    # SIMPLIFIED: Get authentication state from context (set by AuthInfoMiddleware)
+                    authenticated_user = None
+                    auth_method = None
+                    mcp_session_id = None
+
+                    try:
+                        from fastmcp.server.dependencies import get_context
+                        ctx = get_context()
+                        if ctx:
+                            authenticated_user = ctx.get_state("authenticated_user_email")
+                            auth_method = ctx.get_state("authenticated_via")
+                            if hasattr(ctx, 'session_id'):
+                                mcp_session_id = ctx.session_id
+                    except Exception as e:
+                        logger.debug(f"[{tool_name}] Could not get FastMCP context: {e}")
+
+                    # Use the same logic as single service decorator
+                    from auth.oauth21_integration import is_oauth21_enabled
+
+                    if is_oauth21_enabled():
+                        logger.debug(f"[{tool_name}] Attempting OAuth 2.1 authentication flow for {service_type}.")
+                        service, _ = await get_authenticated_google_service_oauth21(
+                            service_name=service_name,
+                            version=service_version,
+                            tool_name=tool_name,
+                            user_google_email=user_google_email,
+                            required_scopes=resolved_scopes,
+                            session_id=mcp_session_id,
+                            auth_token_email=authenticated_user,
+                            allow_recent_auth=False,
+                        )
+                    else:
+                        # If OAuth 2.1 is not enabled, always use the legacy authentication method.
+                        logger.debug(f"[{tool_name}] Using legacy authentication flow for {service_type} (OAuth 2.1 disabled).")
+                        service, _ = await get_authenticated_google_service(
+                            service_name=service_name,
+                            version=service_version,
+                            tool_name=tool_name,
+                            user_google_email=user_google_email,
+                            required_scopes=resolved_scopes,
+                            session_id=mcp_session_id,
+                        )
 
                     # Inject service with specified parameter name
                     kwargs[param_name] = service
 
                 except GoogleAuthenticationError as e:
-                    raise Exception(str(e))
+                    logger.error(
+                        f"[{tool_name}] GoogleAuthenticationError for service '{service_type}' (user: {user_google_email}): {e}"
+                    )
+                    # Re-raise the original error without wrapping it
+                    raise
 
             # Call the original function with refresh error handling
             try:

@@ -101,7 +101,7 @@ async def get_doc_content(
         )
         # Tab header format constant
         TAB_HEADER_FORMAT = "\n--- TAB: {tab_name} ---\n"
-        
+
         def extract_text_from_elements(elements, tab_name=None, depth=0):
             """Extract text from document elements (paragraphs, tables, etc.)"""
             # Prevent infinite recursion by limiting depth

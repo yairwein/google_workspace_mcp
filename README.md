@@ -9,7 +9,7 @@
 [![Website](https://img.shields.io/badge/Website-workspacemcp.com-green.svg)](https://workspacemcp.com)
 [![Verified on MseeP](https://mseep.ai/badge.svg)](https://mseep.ai/app/eebbc4a6-0f8c-41b2-ace8-038e5516dba0)
 
-**This is the single most feature-complete Google Workspace MCP server** now with 1-click Claude installation
+**The most feature-complete Google Workspace MCP server**, now with multi-user support and 1-click Claude installation
 
 *Full natural language control over Google Calendar, Drive, Gmail, Docs, Sheets, Slides, Forms, Tasks, and Chat through all MCP clients, AI assistants and developer tools.*
 
@@ -49,11 +49,11 @@
 
 ## Overview
 
-A production-ready MCP server that integrates all major Google Workspace services with AI assistants. Built with FastMCP for optimal performance, featuring advanced authentication handling, service caching, and streamlined development patterns.
+A production-ready MCP server that integrates all major Google Workspace services with AI assistants. It supports both single-user operation and multi-user authentication via OAuth 2.1, making it a powerful backend for custom applications. Built with FastMCP for optimal performance, featuring advanced authentication handling, service caching, and streamlined development patterns.
 
 ## Features
 
-- **🔐 Advanced OAuth 2.0**: Secure authentication with automatic token refresh, transport-aware callback handling, session management, and centralized scope management
+- **🔐 Advanced OAuth 2.0 & OAuth 2.1**: Secure authentication with automatic token refresh, transport-aware callback handling, session management, centralized scope management, and OAuth 2.1 bearer token support for multi-user environments with innovative CORS proxy architecture
 - **📅 Google Calendar**: Full calendar management with event CRUD operations
 - **📁 Google Drive**: File operations with native Microsoft Office format support (.docx, .xlsx)
 - **📧 Gmail**: Complete email management with search, send, and draft capabilities
@@ -89,11 +89,12 @@ A production-ready MCP server that integrates all major Google Workspace service
 
 | Variable | Purpose |
 |----------|---------|
-| `GOOGLE_OAUTH_CLIENT_ID` | OAuth client ID from Google Cloud |
-| `GOOGLE_OAUTH_CLIENT_SECRET` | OAuth client secret |
+| `GOOGLE_OAUTH_CLIENT_ID` | OAuth client ID from Google Cloud (used by both legacy auth and OAuth 2.1) |
+| `GOOGLE_OAUTH_CLIENT_SECRET` | OAuth client secret (used by both legacy auth and OAuth 2.1) |
 | `USER_GOOGLE_EMAIL` *(optional)* | Default email for single-user auth |
 | `GOOGLE_PSE_API_KEY` *(optional)* | API key for Google Custom Search - see [Custom Search Setup](#google-custom-search-setup) |
 | `GOOGLE_PSE_ENGINE_ID` *(optional)* | Programmable Search Engine ID for Custom Search |
+| `MCP_ENABLE_OAUTH21` *(optional)* | Set to `true` to enable OAuth 2.1 support (requires streamable-http transport) |
 | `OAUTHLIB_INSECURE_TRANSPORT=1` | Development only (allows `http://` redirect) |
 
 Claude Desktop stores these securely in the OS keychain; set them once in the extension pane.
@@ -155,10 +156,20 @@ Claude Desktop stores these securely in the OS keychain; set them once in the ex
      - Download credentials as `client_secret.json` in project root
      - To use a different location, set `GOOGLE_CLIENT_SECRET_PATH` (or legacy `GOOGLE_CLIENT_SECRETS`) environment variable with the file path
 
+     **Option C: .env File (Recommended for Development)**
+     - Copy the provided `.env.oauth21` example file to `.env` in the project root:
+     ```bash
+     cp .env.oauth21 .env
+     ```
+     - Edit the `.env` file to add your `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET`.
+     - The server automatically loads variables from this file on startup, simplifying local development.
+
    **Credential Loading Priority**:
-   1. Environment variables (`GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`)
-   2. File specified by `GOOGLE_CLIENT_SECRET_PATH` or `GOOGLE_CLIENT_SECRETS` environment variable
-   3. Default file (`client_secret.json` in project root)
+   The server loads credentials in the following order of precedence:
+   1. Manually set environment variables (e.g., `export VAR=value`).
+   2. Variables defined in a `.env` file in the project root.
+   3. `client_secret.json` file specified by `GOOGLE_CLIENT_SECRET_PATH`.
+   4. Default `client_secret.json` file in the project root.
 
    **Why Environment Variables?**
    - ✅ Containerized deployments (Docker, Kubernetes)
@@ -227,6 +238,45 @@ docker run -p 8000:8000 -v $(pwd):/app workspace-mcp --transport streamable-http
 ```
 
 **Available Tools for `--tools` flag**: `gmail`, `drive`, `calendar`, `docs`, `sheets`, `forms`, `tasks`, `chat`, `search`
+
+### OAuth 2.1 Support (Multi-User Bearer Token Authentication)
+
+The server includes OAuth 2.1 support for bearer token authentication, enabling multi-user session management. **OAuth 2.1 automatically reuses your existing `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET` credentials** - no additional configuration needed!
+
+**When to use OAuth 2.1:**
+- Multiple users accessing the same MCP server instance
+- Need for bearer token authentication instead of passing user emails
+- Building web applications or APIs on top of the MCP server
+- Production environments requiring secure session management
+- Browser-based clients requiring CORS support
+
+**Enabling OAuth 2.1:**
+To enable OAuth 2.1, set the `MCP_ENABLE_OAUTH21` environment variable to `true`.
+
+```bash
+# OAuth 2.1 requires HTTP transport mode
+export MCP_ENABLE_OAUTH21=true
+uv run main.py --transport streamable-http
+```
+
+If `MCP_ENABLE_OAUTH21` is not set to `true`, the server will use legacy authentication, which is suitable for clients that do not support OAuth 2.1.
+
+<details>
+<summary><b>Innovative CORS Proxy Architecture</b></summary>
+
+This implementation solves two critical challenges when using Google OAuth in browser environments:
+
+1.  **Dynamic Client Registration**: Google doesn't support OAuth 2.1 dynamic client registration. Our server provides a clever proxy that accepts any client registration request and returns the pre-configured Google OAuth credentials, allowing standards-compliant clients to work seamlessly.
+
+2.  **CORS Issues**: Google's OAuth endpoints don't include CORS headers, blocking browser-based clients. We implement intelligent proxy endpoints that:
+   - Proxy authorization server discovery requests through `/auth/discovery/authorization-server/{server}`
+   - Proxy token exchange requests through `/oauth2/token`
+   - Add proper CORS headers to all responses
+   - Maintain security by only proxying to known Google OAuth endpoints
+
+This architecture enables any OAuth 2.1 compliant client to authenticate users through Google, even from browser environments, without requiring changes to the client implementation.
+
+</details>
 
 ### Connect to Claude Desktop
 
