@@ -23,9 +23,7 @@ from auth.scopes import (
 OAUTH21_INTEGRATION_AVAILABLE = True
 
 
-# REMOVED: _extract_and_verify_bearer_token function
-# This functionality is now handled by AuthInfoMiddleware
-
+# REMOVED: _extract_and_verify_bearer_token function. This functionality is now handled by AuthInfoMiddleware.
 async def get_authenticated_google_service_oauth21(
     service_name: str,
     version: str,
