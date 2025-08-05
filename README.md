@@ -265,8 +265,6 @@ This architecture enables any OAuth 2.1 compliant client to authenticate users t
 
 </details>
 
-For detailed OAuth 2.1 setup and client implementation, see [docs/oauth21-setup.md](docs/oauth21-setup.md).
-
 ### Connect to Claude Desktop
 
 The server supports two transport modes:
