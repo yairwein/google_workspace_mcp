@@ -136,8 +136,12 @@ async def handle_proxy_token_exchange(request: Request):
                                         issuer="https://accounts.google.com"
                                     )
                                     user_email = id_token_claims.get("email")
+                                    email_verified = id_token_claims.get("email_verified")
                                     
-                                    if user_email:
+                                    if not email_verified:
+                                        logger.error(f"Email address for user {user_email} is not verified by Google. Aborting session creation.")
+                                        return Response(content="Email address not verified", status_code=403)
+                                    elif user_email:
                                         # Try to get FastMCP session ID from request context for binding
                                         mcp_session_id = None
                                         try:

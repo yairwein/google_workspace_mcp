@@ -66,7 +66,7 @@ async def get_authenticated_google_service_oauth21(
 
     # Build service
     service = build(service_name, version, credentials=credentials)
-    logger.info(f"[{tool_name}] Successfully authenticated {service_name} service using OAuth 2.1 for user: {user_google_email}")
+    logger.info(f"[{tool_name}] Authenticated {service_name} for {user_google_email}")
 
     return service, user_google_email
 
@@ -329,20 +329,17 @@ def require_google_service(
                                 from core.context import set_fastmcp_session_id
                                 set_fastmcp_session_id(mcp_session_id)
 
-                            logger.info(f"[{tool_name}] Authentication from middleware: user={authenticated_user}, method={auth_method}")
+                            logger.debug(f"[{tool_name}] Auth from middleware: {authenticated_user} via {auth_method}")
                     except Exception as e:
                         logger.debug(f"[{tool_name}] Could not get FastMCP context: {e}")
 
                     # Log authentication status
-                    logger.info(f"[{tool_name}] Authentication Status:"
-                              f" Method={auth_method or 'none'},"
-                              f" User={authenticated_user or 'none'},"
-                              f" MCPSessionID={mcp_session_id or 'none'}")
+                    logger.debug(f"[{tool_name}] Auth: {authenticated_user or 'none'} via {auth_method or 'none'} (session: {mcp_session_id[:8] if mcp_session_id else 'none'})")
 
                     from auth.oauth21_integration import is_oauth21_enabled
 
                     if is_oauth21_enabled():
-                        logger.debug(f"[{tool_name}] Attempting OAuth 2.1 authentication flow.")
+                        logger.debug(f"[{tool_name}] Using OAuth 2.1 flow")
                         # The downstream get_authenticated_google_service_oauth21 will handle
                         # whether the user's token is valid for the requested resource.
                         # This decorator should not block the call here.
@@ -358,7 +355,7 @@ def require_google_service(
                         )
                     else:
                         # If OAuth 2.1 is not enabled, always use the legacy authentication method.
-                        logger.debug(f"[{tool_name}] Using legacy authentication flow (OAuth 2.1 disabled).")
+                        logger.debug(f"[{tool_name}] Using legacy OAuth flow")
                         service, actual_user_email = await get_authenticated_google_service(
                             service_name=service_name,
                             version=service_version,
@@ -371,7 +368,12 @@ def require_google_service(
                     if cache_enabled:
                         cache_key = _get_cache_key(user_google_email, service_name, service_version, resolved_scopes)
                         _cache_service(cache_key, service, actual_user_email)
-                except GoogleAuthenticationError:
+                except GoogleAuthenticationError as e:
+                    logger.error(
+                        f"[{tool_name}] GoogleAuthenticationError during authentication. "
+                        f"Method={auth_method or 'none'}, User={authenticated_user or 'none'}, "
+                        f"Service={service_name} v{service_version}, MCPSessionID={mcp_session_id or 'none'}: {e}"
+                    )
                     # Re-raise the original error without wrapping it
                     raise
 
@@ -493,7 +495,10 @@ def require_multiple_services(service_configs: List[Dict[str, Any]]):
                     # Inject service with specified parameter name
                     kwargs[param_name] = service
 
-                except GoogleAuthenticationError:
+                except GoogleAuthenticationError as e:
+                    logger.error(
+                        f"[{tool_name}] GoogleAuthenticationError for service '{service_type}' (user: {user_google_email}): {e}"
+                    )
                     # Re-raise the original error without wrapping it
                     raise
 

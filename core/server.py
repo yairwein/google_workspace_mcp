@@ -67,8 +67,6 @@ class CORSEnabledFastMCP(FastMCP):
 # --- Server Instance ---
 server = CORSEnabledFastMCP(
     name="google_workspace",
-    port=WORKSPACE_MCP_PORT,
-    host="0.0.0.0",
     auth=None,
 )
 
@@ -80,7 +78,7 @@ server.add_middleware(auth_info_middleware)
 def set_transport_mode(mode: str):
     """Sets the transport mode for the server."""
     _set_transport_mode(mode)
-    logger.info(f"Transport mode set to: {mode}")
+    logger.info(f"🔌 Transport: {mode}")
 
 def configure_server_for_http():
     """
@@ -97,11 +95,11 @@ def configure_server_for_http():
 
     if oauth21_enabled:
         if not os.getenv("GOOGLE_OAUTH_CLIENT_ID"):
-            logger.warning("OAuth 2.1 is enabled, but GOOGLE_OAUTH_CLIENT_ID is not set.")
+            logger.warning("⚠️  OAuth 2.1 enabled but GOOGLE_OAUTH_CLIENT_ID not set")
             return
 
         if GOOGLE_REMOTE_AUTH_AVAILABLE:
-            logger.info("OAuth 2.1 is ENABLED. Initializing and attaching GoogleRemoteAuthProvider.")
+            logger.info("🔐 OAuth 2.1 enabled")
             try:
                 _auth_provider = GoogleRemoteAuthProvider()
                 server.auth = _auth_provider

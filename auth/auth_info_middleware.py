@@ -39,17 +39,17 @@ class AuthInfoMiddleware(Middleware):
             # Use the new FastMCP method to get HTTP headers
             headers = get_http_headers()
             if headers:
-                logger.info(f"Got HTTP headers: {type(headers)}")
+                logger.debug("Processing HTTP headers for authentication")
                 
                 # Get the Authorization header
                 auth_header = headers.get("authorization", "")
                 if auth_header.startswith("Bearer "):
                     token_str = auth_header[7:]  # Remove "Bearer " prefix
-                    logger.info("Found Bearer token in HTTP request")
+                    logger.debug("Found Bearer token")
                     
                     # For Google OAuth tokens (ya29.*), we need to verify them differently
                     if token_str.startswith("ya29."):
-                        logger.info("Detected Google OAuth access token")
+                        logger.debug("Detected Google OAuth access token format")
                         
                         # Verify the token to get user info
                         from core.server import get_auth_provider
@@ -95,7 +95,7 @@ class AuthInfoMiddleware(Middleware):
                                     context.fastmcp_context.set_state("authenticated_user_email", user_email)
                                     context.fastmcp_context.set_state("authenticated_via", "bearer_token")
                                     
-                                    logger.info(f"Stored verified Google OAuth token for user: {user_email}")
+                                    logger.info(f"Authenticated via Google OAuth: {user_email}")
                                 else:
                                     logger.error("Failed to verify Google OAuth token")
                                 # Don't set authenticated_user_email if verification failed
@@ -167,7 +167,7 @@ class AuthInfoMiddleware(Middleware):
                                 context.fastmcp_context.set_state("authenticated_user_email", user_email)
                                 context.fastmcp_context.set_state("authenticated_via", "jwt_token")
                             
-                            logger.info("Successfully extracted and stored auth info from HTTP request")
+                            logger.debug("JWT token processed successfully")
                             
                         except jwt.DecodeError as e:
                             logger.error(f"Failed to decode JWT: {e}")
@@ -209,7 +209,7 @@ class AuthInfoMiddleware(Middleware):
                         
                         # Check if user has a recent session
                         if store.has_session(requested_user):
-                            logger.info(f"User {requested_user} has recent auth session in stdio mode")
+                            logger.debug(f"Using recent stdio session for {requested_user}")
                             # In stdio mode, we can trust the user has authenticated recently
                             context.fastmcp_context.set_state("authenticated_user_email", requested_user)
                             context.fastmcp_context.set_state("authenticated_via", "stdio_session")
@@ -228,7 +228,7 @@ class AuthInfoMiddleware(Middleware):
                         # Check if this MCP session is bound to a user
                         bound_user = store.get_user_by_mcp_session(mcp_session_id)
                         if bound_user:
-                            logger.info(f"MCP session {mcp_session_id} is bound to user {bound_user}")
+                            logger.debug(f"MCP session bound to {bound_user}")
                             context.fastmcp_context.set_state("authenticated_user_email", bound_user)
                             context.fastmcp_context.set_state("authenticated_via", "mcp_session_binding")
                             context.fastmcp_context.set_state("auth_provider_type", "oauth21_session")
@@ -237,14 +237,14 @@ class AuthInfoMiddleware(Middleware):
     
     async def on_call_tool(self, context: MiddlewareContext, call_next):
         """Extract auth info from token and set in context state"""
-        logger.info("on_call_tool called")
+        logger.debug("Processing tool call authentication")
         
         try:
             await self._process_request_for_auth(context)
             
-            logger.info("Calling next middleware/handler")
+            logger.debug("Passing to next handler")
             result = await call_next(context)
-            logger.info("Successfully completed call_next()")
+            logger.debug("Handler completed")
             return result
             
         except Exception as e:
@@ -257,14 +257,14 @@ class AuthInfoMiddleware(Middleware):
     
     async def on_get_prompt(self, context: MiddlewareContext, call_next):
         """Extract auth info for prompt requests too"""
-        logger.info("on_get_prompt called")
+        logger.debug("Processing prompt authentication")
         
         try:
             await self._process_request_for_auth(context)
             
-            logger.info("Calling next middleware/handler for prompt")
+            logger.debug("Passing prompt to next handler")
             result = await call_next(context)
-            logger.info("Successfully completed prompt call_next()")
+            logger.debug("Prompt handler completed")
             return result
             
         except Exception as e:

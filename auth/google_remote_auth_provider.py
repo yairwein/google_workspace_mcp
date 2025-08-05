@@ -65,14 +65,14 @@ class GoogleRemoteAuthProvider(RemoteAuthProvider):
         self.port = int(os.getenv("PORT", os.getenv("WORKSPACE_MCP_PORT", 8000)))
         
         if not self.client_id:
-            logger.warning("GOOGLE_OAUTH_CLIENT_ID not set - OAuth 2.1 authentication will not work")
-            # Still initialize to avoid errors, but auth won't work
+            logger.error("GOOGLE_OAUTH_CLIENT_ID not set - OAuth 2.1 authentication will not work")
+            raise ValueError("GOOGLE_OAUTH_CLIENT_ID environment variable is required for OAuth 2.1 authentication")
         
         # Configure JWT verifier for Google tokens
         token_verifier = JWTVerifier(
             jwks_uri="https://www.googleapis.com/oauth2/v3/certs",
             issuer="https://accounts.google.com",
-            audience=self.client_id or "placeholder",  # Use placeholder if not configured
+            audience=self.client_id,  # Always use actual client_id
             algorithm="RS256"
         )
         
@@ -84,7 +84,7 @@ class GoogleRemoteAuthProvider(RemoteAuthProvider):
             resource_server_url=f"{self.base_url}:{self.port}"
         )
         
-        logger.info("GoogleRemoteAuthProvider initialized with RemoteAuthProvider pattern")
+        logger.debug("GoogleRemoteAuthProvider initialized")
     
     def get_routes(self) -> List[Route]:
         """
@@ -97,9 +97,7 @@ class GoogleRemoteAuthProvider(RemoteAuthProvider):
         routes = super().get_routes()
         
         # Log what routes we're getting from the parent
-        logger.info(f"GoogleRemoteAuthProvider: Parent provided {len(routes)} routes")
-        for route in routes:
-            logger.info(f"  - {route.path} ({', '.join(route.methods)})")
+        logger.debug(f"Registered {len(routes)} OAuth routes from parent")
         
         # Add our custom proxy endpoints using common handlers
         routes.append(Route("/oauth2/authorize", handle_oauth_authorize, methods=["GET", "OPTIONS"]))
@@ -198,7 +196,7 @@ class GoogleRemoteAuthProvider(RemoteAuthProvider):
                                 issuer="https://accounts.google.com"
                             )
                             
-                            logger.info(f"Successfully verified Google OAuth token for user: {user_email}")
+                            logger.info(f"Verified OAuth token: {user_email}")
                         
                         return access_token
                         

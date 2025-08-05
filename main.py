@@ -5,6 +5,9 @@ import sys
 from importlib import metadata
 from dotenv import load_dotenv
 from core.server import server, set_transport_mode, configure_server_for_http
+
+# Suppress googleapiclient discovery cache warning
+logging.getLogger('googleapiclient.discovery_cache').setLevel(logging.ERROR)
 from core.utils import check_credentials_directory_permissions
 
 # Load environment variables from .env file, specifying an explicit path
@@ -87,7 +90,7 @@ def main():
     safe_print("")
 
     # Active Configuration
-    safe_print("엑 Active Configuration:")
+    safe_print("⚙️ Active Configuration:")
 
     # Redact client secret for security
     client_secret = os.getenv('GOOGLE_OAUTH_CLIENT_SECRET', 'Not Set')
@@ -174,14 +177,11 @@ def main():
         # Configure auth initialization for FastMCP lifecycle events
         if args.transport == 'streamable-http':
             configure_server_for_http()
-            safe_print("🔐 HTTP server configured for authentication.")
+            safe_print(f"")
+            safe_print(f"🚀 Starting HTTP server on {base_uri}:{port}")
         else:
-            safe_print("🔐 Using legacy authentication for stdio mode.")
-
-        if args.transport == 'streamable-http':
-            safe_print(f"🚀 Starting server on {base_uri}:{port}")
-        else:
-            safe_print("🚀 Starting server in stdio mode")
+            safe_print(f"")
+            safe_print("🚀 Starting STDIO server")
             # Start minimal OAuth callback server for stdio mode
             from auth.oauth_callback_server import ensure_oauth_callback_available
             success, error_msg = ensure_oauth_callback_available('stdio', port, base_uri)
@@ -193,12 +193,12 @@ def main():
                     warning_msg += f": {error_msg}"
                 safe_print(warning_msg)
 
-        safe_print("   Ready for MCP connections!")
+        safe_print("✅ Ready for MCP connections")
         safe_print("")
 
         if args.transport == 'streamable-http':
             # The server has CORS middleware built-in via CORSEnabledFastMCP
-            server.run(transport="streamable-http")
+            server.run(transport="streamable-http", host="0.0.0.0", port=port)
         else:
             server.run()
     except KeyboardInterrupt:

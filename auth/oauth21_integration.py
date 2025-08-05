@@ -176,7 +176,7 @@ def enable_oauth21():
     """
     global _oauth21_enabled
     _oauth21_enabled = True
-    logger.info("OAuth 2.1 authentication has been enabled.")
+    logger.debug("OAuth 2.1 authentication enabled")
 
 
 async def get_legacy_auth_service(

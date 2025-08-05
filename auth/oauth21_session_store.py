@@ -464,7 +464,7 @@ def set_auth_provider(provider):
     """Set the global auth provider instance."""
     global _auth_provider
     _auth_provider = provider
-    logger.info("OAuth 2.1 auth provider configured for Google credential bridging")
+    logger.debug("OAuth 2.1 session store configured")
 
 
 def get_auth_provider():
