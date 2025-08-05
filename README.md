@@ -155,10 +155,20 @@ Claude Desktop stores these securely in the OS keychain; set them once in the ex
      - Download credentials as `client_secret.json` in project root
      - To use a different location, set `GOOGLE_CLIENT_SECRET_PATH` (or legacy `GOOGLE_CLIENT_SECRETS`) environment variable with the file path
 
+     **Option C: .env File (Recommended for Development)**
+     - Copy the provided `.env.oauth21` example file to `.env` in the project root:
+     ```bash
+     cp .env.oauth21 .env
+     ```
+     - Edit the `.env` file to add your `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET`.
+     - The server automatically loads variables from this file on startup, simplifying local development.
+
    **Credential Loading Priority**:
-   1. Environment variables (`GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`)
-   2. File specified by `GOOGLE_CLIENT_SECRET_PATH` or `GOOGLE_CLIENT_SECRETS` environment variable
-   3. Default file (`client_secret.json` in project root)
+   The server loads credentials in the following order of precedence:
+   1. Manually set environment variables (e.g., `export VAR=value`).
+   2. Variables defined in a `.env` file in the project root.
+   3. `client_secret.json` file specified by `GOOGLE_CLIENT_SECRET_PATH`.
+   4. Default `client_secret.json` file in the project root.
 
    **Why Environment Variables?**
    - ✅ Containerized deployments (Docker, Kubernetes)
