@@ -9,7 +9,7 @@
 [![Website](https://img.shields.io/badge/Website-workspacemcp.com-green.svg)](https://workspacemcp.com)
 [![Verified on MseeP](https://mseep.ai/badge.svg)](https://mseep.ai/app/eebbc4a6-0f8c-41b2-ace8-038e5516dba0)
 
-**This is the single most feature-complete Google Workspace MCP server** now with 1-click Claude installation
+**The most feature-complete Google Workspace MCP server**, now with multi-user support and 1-click Claude installation
 
 *Full natural language control over Google Calendar, Drive, Gmail, Docs, Sheets, Slides, Forms, Tasks, and Chat through all MCP clients, AI assistants and developer tools.*
 
@@ -49,7 +49,7 @@
 
 ## Overview
 
-A production-ready MCP server that integrates all major Google Workspace services with AI assistants. Built with FastMCP for optimal performance, featuring advanced authentication handling, service caching, and streamlined development patterns.
+A production-ready MCP server that integrates all major Google Workspace services with AI assistants. It supports both single-user operation and multi-user authentication via OAuth 2.1, making it a powerful backend for custom applications. Built with FastMCP for optimal performance, featuring advanced authentication handling, service caching, and streamlined development patterns.
 
 ## Features
 
@@ -248,19 +248,22 @@ uv run main.py --transport streamable-http
 # and initialize OAuth 2.1 if available
 ```
 
-**Innovative CORS Proxy Architecture:**
+<details>
+<summary><b>Innovative CORS Proxy Architecture</b></summary>
 
 This implementation solves two critical challenges when using Google OAuth in browser environments:
 
-1. **Dynamic Client Registration**: Google doesn't support OAuth 2.1 dynamic client registration. Our server provides a clever proxy that accepts any client registration request and returns the pre-configured Google OAuth credentials, allowing standards-compliant clients to work seamlessly.
+1.  **Dynamic Client Registration**: Google doesn't support OAuth 2.1 dynamic client registration. Our server provides a clever proxy that accepts any client registration request and returns the pre-configured Google OAuth credentials, allowing standards-compliant clients to work seamlessly.
 
-2. **CORS Issues**: Google's OAuth endpoints don't include CORS headers, blocking browser-based clients. We implement intelligent proxy endpoints that:
+2.  **CORS Issues**: Google's OAuth endpoints don't include CORS headers, blocking browser-based clients. We implement intelligent proxy endpoints that:
    - Proxy authorization server discovery requests through `/auth/discovery/authorization-server/{server}`
-   - Proxy token exchange requests through `/oauth2/token` 
+   - Proxy token exchange requests through `/oauth2/token`
    - Add proper CORS headers to all responses
    - Maintain security by only proxying to known Google OAuth endpoints
 
 This architecture enables any OAuth 2.1 compliant client to authenticate users through Google, even from browser environments, without requiring changes to the client implementation.
+
+</details>
 
 For detailed OAuth 2.1 setup and client implementation, see [docs/oauth21-setup.md](docs/oauth21-setup.md).
 
