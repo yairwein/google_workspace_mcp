@@ -7,8 +7,10 @@ from dotenv import load_dotenv
 from core.server import server, set_transport_mode
 from core.utils import check_credentials_directory_permissions
 
-# Load environment variables from .env file
-load_dotenv()
+# Load environment variables from .env file, specifying an explicit path
+# This prevents accidentally loading a .env file from a different directory
+dotenv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+load_dotenv(dotenv_path=dotenv_path)
 
 logging.basicConfig(
     level=logging.INFO,
