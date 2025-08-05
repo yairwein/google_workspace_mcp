@@ -253,7 +253,8 @@ async def get_page_thumbnail(
         service.presentations().pages().getThumbnail(
             presentationId=presentation_id,
             pageObjectId=page_object_id,
-            thumbnailPropertiesImageSize=thumbnail_size
+            thumbnailProperties_thumbnailSize=thumbnail_size,
+            thumbnailProperties_mimeType='PNG'
         ).execute
     )
 
