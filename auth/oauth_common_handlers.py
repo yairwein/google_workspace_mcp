@@ -140,7 +140,7 @@ async def handle_proxy_token_exchange(request: Request):
                                     
                                     if not email_verified:
                                         logger.error(f"Email address for user {user_email} is not verified by Google. Aborting session creation.")
-                                        return Response(content="Email address not verified", status_code=403)
+                                        return JSONResponse(content={"error": "Email address not verified"}, status_code=403)
                                     elif user_email:
                                         # Try to get FastMCP session ID from request context for binding
                                         mcp_session_id = None
