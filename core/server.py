@@ -20,6 +20,7 @@ from auth.fastmcp_google_auth import GoogleWorkspaceAuthProvider
 from auth.scopes import SCOPES
 from core.config import (
     WORKSPACE_MCP_PORT,
+    WORKSPACE_MCP_BASE_URI,
     USER_GOOGLE_EMAIL,
     get_transport_mode,
     set_transport_mode as _set_transport_mode,
@@ -217,3 +218,22 @@ async def start_google_auth(service_name: str, user_google_email: str = USER_GOO
     except Exception as e:
         logger.error(f"Failed to start Google authentication flow: {e}", exc_info=True)
         return f"**Error:** An unexpected error occurred: {e}"
+
+# OAuth 2.1 Discovery Endpoints - register manually when OAuth 2.1 is enabled but GoogleRemoteAuthProvider is not available
+# These will only be registered if MCP_ENABLE_OAUTH21=true and we're in fallback mode
+if os.getenv("MCP_ENABLE_OAUTH21", "false").lower() == "true" and not GOOGLE_REMOTE_AUTH_AVAILABLE:
+    from auth.oauth_common_handlers import (
+        handle_oauth_authorize,
+        handle_proxy_token_exchange,
+        handle_oauth_protected_resource,
+        handle_oauth_authorization_server,
+        handle_oauth_client_config,
+        handle_oauth_register
+    )
+    
+    server.custom_route("/.well-known/oauth-protected-resource", methods=["GET", "OPTIONS"])(handle_oauth_protected_resource)
+    server.custom_route("/.well-known/oauth-authorization-server", methods=["GET", "OPTIONS"])(handle_oauth_authorization_server)
+    server.custom_route("/.well-known/oauth-client", methods=["GET", "OPTIONS"])(handle_oauth_client_config)
+    server.custom_route("/oauth2/authorize", methods=["GET", "OPTIONS"])(handle_oauth_authorize)
+    server.custom_route("/oauth2/token", methods=["POST", "OPTIONS"])(handle_proxy_token_exchange)
+    server.custom_route("/oauth2/register", methods=["POST", "OPTIONS"])(handle_oauth_register)
