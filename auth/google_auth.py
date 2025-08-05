@@ -561,7 +561,8 @@ def handle_auth_callback(
             client_secret=credentials.client_secret,
             scopes=credentials.scopes,
             expiry=credentials.expiry,
-            mcp_session_id=session_id
+            mcp_session_id=session_id,
+            issuer="https://accounts.google.com"  # Add issuer for Google tokens
         )
 
         # If session_id is provided, also save to session cache for compatibility
@@ -762,7 +763,8 @@ def get_credentials(
                     client_secret=credentials.client_secret,
                     scopes=credentials.scopes,
                     expiry=credentials.expiry,
-                    mcp_session_id=session_id
+                    mcp_session_id=session_id,
+                    issuer="https://accounts.google.com"  # Add issuer for Google tokens
                 )
                 
             if session_id:  # Update session cache if it was the source or is active

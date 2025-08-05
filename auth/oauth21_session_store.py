@@ -37,6 +37,7 @@ class SessionContext:
     auth_context: Optional[Any] = None
     request: Optional[Any] = None
     metadata: Dict[str, Any] = None
+    issuer: Optional[str] = None
 
     def __post_init__(self):
         if self.metadata is None:
@@ -172,6 +173,7 @@ class OAuth21SessionStore:
         expiry: Optional[Any] = None,
         session_id: Optional[str] = None,
         mcp_session_id: Optional[str] = None,
+        issuer: Optional[str] = None,
     ):
         """
         Store OAuth 2.1 session information.
@@ -187,6 +189,7 @@ class OAuth21SessionStore:
             expiry: Token expiry time
             session_id: OAuth 2.1 session ID
             mcp_session_id: FastMCP session ID to map to this user
+            issuer: Token issuer (e.g., "https://accounts.google.com")
         """
         with self._lock:
             session_info = {
@@ -199,6 +202,7 @@ class OAuth21SessionStore:
                 "expiry": expiry,
                 "session_id": session_id,
                 "mcp_session_id": mcp_session_id,
+                "issuer": issuer,
             }
             
             self._sessions[user_email] = session_info
@@ -337,11 +341,25 @@ class OAuth21SessionStore:
                     return self.get_credentials(requested_user_email)
             
             # Special case: Allow access if user has recently authenticated (for clients that don't send tokens)
-            # This is a temporary workaround for MCP clients that complete OAuth but don't send bearer tokens
+            # CRITICAL SECURITY: This is ONLY allowed in stdio mode, NEVER in OAuth 2.1 mode
             if allow_recent_auth and requested_user_email in self._sessions:
+                # Check transport mode to ensure this is only used in stdio
+                try:
+                    from core.config import get_transport_mode
+                    transport_mode = get_transport_mode()
+                    if transport_mode != "stdio":
+                        logger.error(
+                            f"SECURITY: Attempted to use allow_recent_auth in {transport_mode} mode. "
+                            f"This is only allowed in stdio mode!"
+                        )
+                        return None
+                except Exception as e:
+                    logger.error(f"Failed to check transport mode: {e}")
+                    return None
+                
                 logger.info(
                     f"Allowing credential access for {requested_user_email} based on recent authentication "
-                    f"(client not sending bearer token)"
+                    f"(stdio mode only - client not sending bearer token)"
                 )
                 return self.get_credentials(requested_user_email)
             
@@ -363,6 +381,19 @@ class OAuth21SessionStore:
         """
         with self._lock:
             return self._mcp_session_mapping.get(mcp_session_id)
+    
+    def get_session_info(self, user_email: str) -> Optional[Dict[str, Any]]:
+        """
+        Get complete session information including issuer.
+        
+        Args:
+            user_email: User's email address
+            
+        Returns:
+            Session information dictionary or None
+        """
+        with self._lock:
+            return self._sessions.get(user_email)
     
     def remove_session(self, user_email: str):
         """Remove session for a user."""
@@ -530,6 +561,7 @@ def store_token_session(token_response: dict, user_email: str, mcp_session_id: O
             expiry=datetime.utcnow() + timedelta(seconds=token_response.get("expires_in", 3600)),
             session_id=session_id,
             mcp_session_id=mcp_session_id,
+            issuer="https://accounts.google.com",  # Add issuer for Google tokens
         )
         
         if mcp_session_id:

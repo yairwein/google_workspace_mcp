@@ -39,8 +39,9 @@ async def _extract_and_verify_bearer_token() -> tuple[Optional[str], Optional[st
             logger.debug("No HTTP headers available for bearer token extraction")
             return None, None
             
-        # Look for Authorization header
+        # Look for Authorization header (Google OAuth token)
         auth_header = headers.get("authorization") or headers.get("Authorization")
+        
         if not auth_header:
             logger.debug("No Authorization header found in request")
             return None, None
@@ -55,26 +56,35 @@ async def _extract_and_verify_bearer_token() -> tuple[Optional[str], Optional[st
             logger.debug("Empty bearer token found")
             return None, None
         
-        logger.debug(f"Found bearer token in Authorization header: {token[:20]}...")
+        logger.info(f"Found bearer token in Authorization header: {token[:20]}...")
         
         # Verify token using GoogleWorkspaceAuthProvider
         try:
             from core.server import get_auth_provider
             auth_provider = get_auth_provider()
             if not auth_provider:
-                logger.debug("No auth provider available for token verification")
+                logger.error("No auth provider available for token verification")
                 return None, None
                 
+            logger.debug(f"Auth provider type: {type(auth_provider).__name__}")
+            
             # Verify the token
             access_token = await auth_provider.verify_token(token)
             if not access_token:
-                logger.debug("Bearer token verification failed")
+                logger.error("Bearer token verification failed")
                 return None, None
                 
+            logger.debug(f"Token verified, access_token type: {type(access_token).__name__}")
+            
             # Extract user email from verified token
-            user_email = access_token.claims.get("email")
+            if hasattr(access_token, 'claims'):
+                user_email = access_token.claims.get("email")
+            else:
+                logger.error(f"Access token has no claims attribute: {dir(access_token)}")
+                return None, None
+                
             if not user_email:
-                logger.debug("No email claim found in verified token")
+                logger.error(f"No email claim found in verified token. Available claims: {list(access_token.claims.keys()) if hasattr(access_token, 'claims') else 'N/A'}")
                 return None, None
                 
             logger.info(f"Successfully verified bearer token for user: {user_email}")
@@ -418,14 +428,27 @@ def require_google_service(
                         try:
                             from fastmcp.server.dependencies import get_context
                             ctx = get_context()
-                            if ctx and hasattr(ctx, 'auth') and ctx.auth:
-                                # We have authentication info from FastMCP
-                                is_authenticated_request = True
-                                if hasattr(ctx.auth, 'claims'):
-                                    authenticated_user = ctx.auth.claims.get('email')
-                                logger.debug(f"[{tool_name}] Authenticated via FastMCP context: {authenticated_user}")
-                        except Exception:
-                            pass
+                            if ctx:
+                                # Check if AuthInfoMiddleware has stored the access token
+                                access_token = ctx.get_state("access_token")
+                                if access_token:
+                                    # We have authentication info from the middleware
+                                    is_authenticated_request = True
+                                    authenticated_user = ctx.get_state("username") or ctx.get_state("user_email")
+                                    bearer_token = access_token.token if hasattr(access_token, 'token') else str(access_token)
+                                    logger.info(f"[{tool_name}] Authenticated via FastMCP context state: {authenticated_user}")
+                                    
+                                    # Store auth info for later use
+                                    auth_token_email = authenticated_user
+                                else:
+                                    # Check legacy auth field
+                                    if hasattr(ctx, 'auth') and ctx.auth:
+                                        is_authenticated_request = True
+                                        if hasattr(ctx.auth, 'claims'):
+                                            authenticated_user = ctx.auth.claims.get('email')
+                                        logger.debug(f"[{tool_name}] Authenticated via legacy FastMCP auth: {authenticated_user}")
+                        except Exception as e:
+                            logger.debug(f"[{tool_name}] Error checking FastMCP context: {e}")
                         
                         # If FastMCP context didn't provide authentication, check HTTP headers directly
                         if not is_authenticated_request:
@@ -538,8 +561,9 @@ def require_google_service(
                         # Must use OAuth 2.1 authentication
                         logger.info(f"[{tool_name}] Using OAuth 2.1 authentication (required for OAuth 2.1 mode)")
                         
-                        # Check if we're allowing recent auth (for clients that don't send bearer tokens)
-                        allow_recent = not authenticated_user and not auth_token_email and not mcp_session_id
+                        # CRITICAL SECURITY: Never use allow_recent_auth in OAuth 2.1 mode
+                        # This should always be False in streamable-http mode
+                        allow_recent = False  # Explicitly disable for OAuth 2.1 mode
                         
                         service, actual_user_email = await get_authenticated_google_service_oauth21(
                             service_name=service_name,
@@ -568,14 +592,48 @@ def require_google_service(
                         if transport_mode == "stdio":
                             session_id_for_legacy = mcp_session_id if mcp_session_id else (session_ctx.session_id if session_ctx else None)
                             logger.info(f"[{tool_name}] Using legacy authentication (stdio mode)")
-                            service, actual_user_email = await get_authenticated_google_service(
-                                service_name=service_name,
-                                version=service_version,
-                                tool_name=tool_name,
-                                user_google_email=user_google_email,
-                                required_scopes=resolved_scopes,
-                                session_id=session_id_for_legacy,
-                            )
+                            
+                            # In stdio mode, first try to get credentials from OAuth21 store with allow_recent_auth
+                            # This handles the case where user just completed OAuth flow
+                            # CRITICAL SECURITY: allow_recent_auth=True is ONLY safe in stdio mode because:
+                            # 1. Stdio mode is single-user by design
+                            # 2. No bearer tokens are available in stdio mode
+                            # 3. This allows access immediately after OAuth callback
+                            # NEVER use allow_recent_auth=True in multi-user OAuth 2.1 mode!
+                            if OAUTH21_INTEGRATION_AVAILABLE:
+                                try:
+                                    service, actual_user_email = await get_authenticated_google_service_oauth21(
+                                        service_name=service_name,
+                                        version=service_version,
+                                        tool_name=tool_name,
+                                        user_google_email=user_google_email,
+                                        required_scopes=resolved_scopes,
+                                        session_id=session_id_for_legacy,
+                                        auth_token_email=None,
+                                        allow_recent_auth=True,  # ONLY safe in stdio single-user mode!
+                                    )
+                                    logger.info(f"[{tool_name}] Successfully used OAuth21 store in stdio mode")
+                                except Exception as oauth_error:
+                                    logger.debug(f"[{tool_name}] OAuth21 store failed in stdio mode, falling back to legacy: {oauth_error}")
+                                    # Fall back to traditional file-based auth
+                                    service, actual_user_email = await get_authenticated_google_service(
+                                        service_name=service_name,
+                                        version=service_version,
+                                        tool_name=tool_name,
+                                        user_google_email=user_google_email,
+                                        required_scopes=resolved_scopes,
+                                        session_id=session_id_for_legacy,
+                                    )
+                            else:
+                                # No OAuth21 integration, use legacy directly
+                                service, actual_user_email = await get_authenticated_google_service(
+                                    service_name=service_name,
+                                    version=service_version,
+                                    tool_name=tool_name,
+                                    user_google_email=user_google_email,
+                                    required_scopes=resolved_scopes,
+                                    session_id=session_id_for_legacy,
+                                )
                         else:
                             logger.error(f"[{tool_name}] No authentication available in {transport_mode} mode")
                             raise Exception(f"Authentication not available in {transport_mode} mode")
