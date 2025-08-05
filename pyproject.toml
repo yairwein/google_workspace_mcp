@@ -60,6 +60,11 @@ Changelog = "https://github.com/taylorwilsdon/google_workspace_mcp/releases"
 [project.scripts]
 workspace-mcp = "main:main"
 
+[project.optional-dependencies]
+dev = [
+    "twine>=5.0.0",
+]
+
 [tool.setuptools]
 packages = [ "auth", "gcalendar", "core", "gdocs", "gdrive", "gmail", "gchat", "gsheets", "gforms", "gslides", "gtasks", "gsearch"]
 py-modules = [ "main"]
