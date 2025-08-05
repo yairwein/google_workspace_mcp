@@ -642,7 +642,8 @@ def require_google_service(
                         cache_key = _get_cache_key(user_google_email, service_name, service_version, resolved_scopes)
                         _cache_service(cache_key, service, actual_user_email)
                 except GoogleAuthenticationError as e:
-                    raise Exception(str(e))
+                    # Re-raise the original error without wrapping it
+                    raise
 
             # --- Call the original function with the service object injected ---
             try:
@@ -773,7 +774,8 @@ def require_multiple_services(service_configs: List[Dict[str, Any]]):
                     kwargs[param_name] = service
 
                 except GoogleAuthenticationError as e:
-                    raise Exception(str(e))
+                    # Re-raise the original error without wrapping it
+                    raise
 
             # Call the original function with refresh error handling
             try:
