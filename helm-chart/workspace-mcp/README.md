@@ -28,7 +28,7 @@ The following table lists the configurable parameters and their default values:
 |-----------|-------------|---------|
 | `replicaCount` | Number of replicas | `1` |
 | `image.repository` | Container image repository | `workspace-mcp` |
-| `image.tag` | Container image tag | `"1.2.0"` |
+| `image.tag` | Container image tag | `""` (uses Chart.AppVersion) |
 | `image.pullPolicy` | Image pull policy | `IfNotPresent` |
 | `secrets.googleOAuth.clientId` | Google OAuth Client ID | `""` (required) |
 | `secrets.googleOAuth.clientSecret` | Google OAuth Client Secret | `""` (required) |
