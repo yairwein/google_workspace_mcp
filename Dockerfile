@@ -10,24 +10,14 @@ RUN apt-get update && apt-get install -y \
 # Install uv for faster dependency management
 RUN pip install --no-cache-dir uv
 
-# Copy dependency files
-COPY pyproject.toml uv.lock ./
-
-# Install Python dependencies from pyproject.toml
-RUN uv pip install --system --no-cache \
-    fastapi>=0.115.12 \
-    fastmcp>=2.3.3 \
-    google-api-python-client>=2.168.0 \
-    google-auth-httplib2>=0.2.0 \
-    google-auth-oauthlib>=1.2.2 \
-    httpx>=0.28.1 \
-    "mcp[cli]>=1.6.0" \
-    sse-starlette>=2.3.3 \
-    uvicorn>=0.34.2 \
-    pyjwt>=2.10.1
-
-# Copy application code
+# Copy all application code first (needed for uv sync to work with local package)
 COPY . .
+
+# Install Python dependencies using uv sync
+RUN uv sync --frozen --no-dev
+
+# Activate virtual environment for all subsequent commands
+ENV PATH="/app/.venv/bin:$PATH"
 
 # Create placeholder client_secrets.json for lazy loading capability
 RUN echo '{"installed":{"client_id":"placeholder","client_secret":"placeholder","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","redirect_uris":["http://localhost:8000/oauth2callback"]}}' > /app/client_secrets.json
@@ -68,5 +58,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
 RUN echo "=== Debug: Final startup test ===" && \
     python -c "print('Testing main.py import...'); import main; print('Main.py import successful')"
 
-# Command to run the application
-CMD ["python", "main.py", "--transport", "streamable-http"]
+# Command to run the application (use uv run to ensure virtual environment)
+CMD ["uv", "run", "main.py", "--transport", "streamable-http"]
