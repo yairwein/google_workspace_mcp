@@ -128,7 +128,7 @@
       "type": "string",
       "title": "User Google Email",
       "description": "Your Google email address for authentication (e.g., your.email@gmail.com)",
-      "required": true,
+      "required": false,
       "sensitive": false,
       "validation": {
         "pattern": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
