@@ -4,7 +4,8 @@ replicaCount: 1
 image:
   repository: workspace-mcp
   pullPolicy: IfNotPresent
-  tag: "1.2.0"
+  # Uses Chart.AppVersion if not specified
+  tag: ""
 
 imagePullSecrets: []
 nameOverride: ""
@@ -74,7 +75,10 @@ affinity: {}
 env:
   # Server configuration
   WORKSPACE_MCP_PORT: "8000"
-  WORKSPACE_MCP_BASE_URI: "http://localhost"
+  # Set the base URI for your Kubernetes environment
+  # For internal cluster access: "http://{{ include "workspace-mcp.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local"
+  # For external access: "https://your-domain.com" or "http://your-ingress-host"
+  WORKSPACE_MCP_BASE_URI: ""
   
   # OAuth 2.1 support
   MCP_ENABLE_OAUTH21: "false"
