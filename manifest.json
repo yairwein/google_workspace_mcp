@@ -131,7 +131,7 @@
       "required": false,
       "sensitive": false,
       "validation": {
-        "pattern": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+        "pattern": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
       }
     },
     "GOOGLE_OAUTH_REDIRECT_URI": {
