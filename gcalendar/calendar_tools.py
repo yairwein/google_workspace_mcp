@@ -360,14 +360,19 @@ async def create_event(
 
     # Handle reminders
     if reminders is not None or not use_default_reminders:
+        # If custom reminders are provided, automatically disable default reminders
+        effective_use_default = use_default_reminders and reminders is None
+        
         reminder_data = {
-            "useDefault": use_default_reminders
+            "useDefault": effective_use_default
         }
-        if reminders is not None and not use_default_reminders:
+        if reminders is not None:
             validated_reminders = _parse_reminders_json(reminders, "create_event")
             if validated_reminders:
                 reminder_data["overrides"] = validated_reminders
                 logger.info(f"[create_event] Added {len(validated_reminders)} custom reminders")
+                if use_default_reminders:
+                    logger.info("[create_event] Custom reminders provided - disabling default reminders")
         
         event_body["reminders"] = reminder_data
 
@@ -541,7 +546,12 @@ async def modify_event(
                 logger.warning(f"[modify_event] Could not fetch existing event for reminders: {e}")
                 reminder_data["useDefault"] = True  # Fallback to True if unable to fetch
         
-        if reminders is not None and not reminder_data.get("useDefault", False):
+        # If custom reminders are provided, automatically disable default reminders
+        if reminders is not None:
+            if reminder_data.get("useDefault", False):
+                reminder_data["useDefault"] = False
+                logger.info("[modify_event] Custom reminders provided - disabling default reminders")
+            
             validated_reminders = _parse_reminders_json(reminders, "modify_event")
             if reminders and not validated_reminders:
                 logger.warning("[modify_event] Reminders provided but failed validation. No custom reminders will be set.")
