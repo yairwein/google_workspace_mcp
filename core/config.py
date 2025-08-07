@@ -29,7 +29,18 @@ def get_transport_mode() -> str:
     return _current_transport_mode
 
 
+# OAuth Redirect URI Configuration
+# This is determined once at startup and used throughout the application
+_OAUTH_REDIRECT_URI = os.getenv("GOOGLE_OAUTH_REDIRECT_URI")
+if not _OAUTH_REDIRECT_URI:
+    # Construct from base URI and port if not explicitly set
+    _OAUTH_REDIRECT_URI = f"{WORKSPACE_MCP_BASE_URI}:{WORKSPACE_MCP_PORT}/oauth2callback"
+
 def get_oauth_redirect_uri() -> str:
-    """Get OAuth redirect URI based on current configuration."""
-    # Use the standard OAuth callback path
-    return f"{WORKSPACE_MCP_BASE_URI}:{WORKSPACE_MCP_PORT}/oauth2callback"
+    """Get OAuth redirect URI based on current configuration.
+    
+    Returns the redirect URI configured at startup, either from
+    GOOGLE_OAUTH_REDIRECT_URI environment variable or constructed
+    from WORKSPACE_MCP_BASE_URI and WORKSPACE_MCP_PORT.
+    """
+    return _OAUTH_REDIRECT_URI

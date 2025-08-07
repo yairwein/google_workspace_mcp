@@ -149,7 +149,7 @@ Claude Desktop stores these securely in the OS keychain; set them once in the ex
      ```bash
      export GOOGLE_OAUTH_CLIENT_ID="your-client-id.apps.googleusercontent.com"
      export GOOGLE_OAUTH_CLIENT_SECRET="your-client-secret"
-     export GOOGLE_OAUTH_REDIRECT_URI="http://localhost:8000/oauth2callback"  # Optional
+     export GOOGLE_OAUTH_REDIRECT_URI="http://localhost:8000/oauth2callback"  # Optional - see Reverse Proxy Setup below
      ```
 
      **Option B: File-based (Traditional)**
@@ -188,8 +188,9 @@ Claude Desktop stores these securely in the OS keychain; set them once in the ex
 
 3. **Server Configuration**:
    The server's base URL and port can be customized using environment variables:
-   - `WORKSPACE_MCP_BASE_URI`: Sets the base URI for the server (default: http://localhost). This affects the `server_url` used to construct the default `OAUTH_REDIRECT_URI` if `GOOGLE_OAUTH_REDIRECT_URI` is not set. Note: do not include a port in `WORKSPACE_MCP_BASE_URI` - set that with the variable below. 
-   - `WORKSPACE_MCP_PORT`: Sets the port the server listens on (default: 8000). This affects the server_url, port, and OAUTH_REDIRECT_URI.
+   - `WORKSPACE_MCP_BASE_URI`: Sets the base URI for the server (default: http://localhost). Note: do not include a port in `WORKSPACE_MCP_BASE_URI` - set that with the variable below.
+   - `WORKSPACE_MCP_PORT`: Sets the port the server listens on (default: 8000).
+   - `GOOGLE_OAUTH_REDIRECT_URI`: Override the OAuth redirect URI (useful for reverse proxy setups - see below).
    - `USER_GOOGLE_EMAIL`: Optional default email for authentication flows. If set, the LLM won't need to specify your email when calling `start_google_auth`.
 
 ### Google Custom Search Setup
@@ -333,10 +334,26 @@ uvx workspace-mcp --tools gmail drive calendar
 
 > Run instantly without manual installation - you must configure OAuth credentials when using uvx. You can use either environment variables (recommended for production) or set the `GOOGLE_CLIENT_SECRET_PATH` (or legacy `GOOGLE_CLIENT_SECRETS`) environment variable to point to your `client_secret.json` file.
 
-#### Custom Authentication Server
-> [!CAUTION]
-> - `GOOGLE_OAUTH_REDIRECT_URI`: *WARNING* - Do not use this unless you are planning to write your own separate OAuth Logic. This sets an override for OAuth redirect, must include a full address (i.e. include port if necessary).
-> - Only use this if you want to run your OAuth redirect separately from the MCP. This is not recommended outside of very specific cases and will break the MCP if set without you writing your own compatible auth logic. This is intended specifically for enterprise use cases where you may already have an existing auth proxy or gateway in place.
+#### Reverse Proxy Setup
+
+If you're running the MCP server behind a reverse proxy (nginx, Apache, Cloudflare, etc.), you'll need to configure `GOOGLE_OAUTH_REDIRECT_URI` to match your external URL:
+
+**Problem**: When behind a reverse proxy, the server constructs redirect URIs using internal ports (e.g., `http://localhost:8000/oauth2callback`) but Google expects the external URL (e.g., `https://your-domain.com/oauth2callback`).
+
+**Solution**: Set `GOOGLE_OAUTH_REDIRECT_URI` to your external URL:
+
+```bash
+# External URL without port (nginx/Apache handling HTTPS)
+export GOOGLE_OAUTH_REDIRECT_URI="https://your-domain.com/oauth2callback"
+
+# Or with custom port if needed
+export GOOGLE_OAUTH_REDIRECT_URI="https://your-domain.com:8443/oauth2callback"
+```
+
+**Important**: 
+- The redirect URI must exactly match what's configured in your Google Cloud Console
+- The server will use this value for all OAuth flows instead of constructing it from `WORKSPACE_MCP_BASE_URI` and `WORKSPACE_MCP_PORT`
+- Your reverse proxy must forward `/oauth2callback` requests to the MCP server
 
 ```bash
 # Set OAuth credentials via environment variables (recommended)
