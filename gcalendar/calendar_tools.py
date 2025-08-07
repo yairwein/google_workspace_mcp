@@ -9,6 +9,7 @@ import logging
 import asyncio
 import re
 import uuid
+import json
 from typing import List, Optional, Dict, Any
 
 from googleapiclient.errors import HttpError
@@ -22,6 +23,58 @@ from core.server import server
 
 # Configure module logger
 logger = logging.getLogger(__name__)
+
+
+def _parse_reminders_json(reminders_json: Optional[str], function_name: str) -> List[Dict[str, Any]]:
+    """
+    Parse reminders from JSON string and validate them.
+    
+    Args:
+        reminders_json: JSON string containing reminder objects
+        function_name: Name of calling function for logging
+        
+    Returns:
+        List of validated reminder objects
+    """
+    if not reminders_json:
+        return []
+    
+    try:
+        reminders = json.loads(reminders_json)
+        if not isinstance(reminders, list):
+            logger.warning(f"[{function_name}] Reminders must be a JSON array, got {type(reminders).__name__}")
+            return []
+    except json.JSONDecodeError as e:
+        logger.warning(f"[{function_name}] Invalid JSON for reminders: {e}")
+        return []
+    
+    # Validate reminders
+    if len(reminders) > 5:
+        logger.warning(f"[{function_name}] More than 5 reminders provided, truncating to first 5")
+        reminders = reminders[:5]
+    
+    validated_reminders = []
+    for reminder in reminders:
+        if not isinstance(reminder, dict) or "method" not in reminder or "minutes" not in reminder:
+            logger.warning(f"[{function_name}] Invalid reminder format: {reminder}, skipping")
+            continue
+        
+        method = reminder["method"].lower()
+        if method not in ["popup", "email"]:
+            logger.warning(f"[{function_name}] Invalid reminder method '{method}', must be 'popup' or 'email', skipping")
+            continue
+        
+        minutes = reminder["minutes"]
+        if not isinstance(minutes, int) or minutes < 0 or minutes > 40320:
+            logger.warning(f"[{function_name}] Invalid reminder minutes '{minutes}', must be integer 0-40320, skipping")
+            continue
+        
+        validated_reminders.append({
+            "method": method,
+            "minutes": minutes
+        })
+    
+    return validated_reminders
 
 
 def _preserve_existing_fields(event_body: Dict[str, Any], existing_event: Dict[str, Any], field_mappings: Dict[str, Any]) -> None:
@@ -243,6 +296,8 @@ async def create_event(
     timezone: Optional[str] = None,
     attachments: Optional[List[str]] = None,
     add_google_meet: bool = False,
+    reminders: Optional[str] = None,
+    use_default_reminders: bool = True,
 ) -> str:
     """
     Creates a new event.
@@ -259,6 +314,8 @@ async def create_event(
         timezone (Optional[str]): Timezone (e.g., "America/New_York").
         attachments (Optional[List[str]]): List of Google Drive file URLs or IDs to attach to the event.
         add_google_meet (bool): Whether to add a Google Meet video conference to the event. Defaults to False.
+        reminders (Optional[str]): JSON string of reminder objects. Each should have 'method' ("popup" or "email") and 'minutes' (0-40320). Max 5 reminders. Example: '[{"method": "popup", "minutes": 15}, {"method": "email", "minutes": 60}]'
+        use_default_reminders (bool): Whether to use calendar's default reminders. If False, uses custom reminders. Defaults to True.
 
     Returns:
         str: Confirmation message of the successful event creation with event link.
@@ -293,6 +350,19 @@ async def create_event(
             event_body["end"]["timeZone"] = timezone
     if attendees:
         event_body["attendees"] = [{"email": email} for email in attendees]
+
+    # Handle reminders
+    if reminders is not None or not use_default_reminders:
+        reminder_data = {
+            "useDefault": use_default_reminders
+        }
+        if reminders and not use_default_reminders:
+            validated_reminders = _parse_reminders_json(reminders, "create_event")
+            if validated_reminders:
+                reminder_data["overrides"] = validated_reminders
+                logger.info(f"[create_event] Added {len(validated_reminders)} custom reminders")
+        
+        event_body["reminders"] = reminder_data
 
     if add_google_meet:
         request_id = str(uuid.uuid4())
@@ -397,6 +467,8 @@ async def modify_event(
     attendees: Optional[List[str]] = None,
     timezone: Optional[str] = None,
     add_google_meet: Optional[bool] = None,
+    reminders: Optional[str] = None,
+    use_default_reminders: Optional[bool] = None,
 ) -> str:
     """
     Modifies an existing event.
@@ -413,6 +485,8 @@ async def modify_event(
         attendees (Optional[List[str]]): New attendee email addresses.
         timezone (Optional[str]): New timezone (e.g., "America/New_York").
         add_google_meet (Optional[bool]): Whether to add or remove Google Meet video conference. If True, adds Google Meet; if False, removes it; if None, leaves unchanged.
+        reminders (Optional[str]): JSON string of reminder objects to replace existing reminders. Each should have 'method' ("popup" or "email") and 'minutes' (0-40320). Max 5 reminders. Example: '[{"method": "popup", "minutes": 15}]'
+        use_default_reminders (Optional[bool]): Whether to use calendar's default reminders. If specified, overrides current reminder settings.
 
     Returns:
         str: Confirmation message of the successful event modification with event link.
@@ -445,6 +519,22 @@ async def modify_event(
         event_body["location"] = location
     if attendees is not None:
         event_body["attendees"] = [{"email": email} for email in attendees]
+    
+    # Handle reminders
+    if reminders is not None or use_default_reminders is not None:
+        reminder_data = {}
+        if use_default_reminders is not None:
+            reminder_data["useDefault"] = use_default_reminders
+        else:
+            reminder_data["useDefault"] = False  # Default to custom when reminders are provided
+        
+        if reminders is not None and not reminder_data.get("useDefault", False):
+            validated_reminders = _parse_reminders_json(reminders, "modify_event")
+            reminder_data["overrides"] = validated_reminders
+            logger.info(f"[modify_event] Updated reminders with {len(validated_reminders)} custom reminders")
+        
+        event_body["reminders"] = reminder_data
+
     if (
         timezone is not None
         and "start" not in event_body
