@@ -34,11 +34,7 @@ def get_transport_mode() -> str:
 _OAUTH_REDIRECT_URI = os.getenv("GOOGLE_OAUTH_REDIRECT_URI")
 if _OAUTH_REDIRECT_URI:
     # Extract base URL from the redirect URI (remove the /oauth2callback path)
-    if _OAUTH_REDIRECT_URI.endswith("/oauth2callback"):
-        _OAUTH_BASE_URL = _OAUTH_REDIRECT_URI[:-15]  # Remove "/oauth2callback"
-    else:
-        # If it doesn't end with the expected path, use it as-is but warn
-        _OAUTH_BASE_URL = _OAUTH_REDIRECT_URI
+    _OAUTH_BASE_URL = _OAUTH_REDIRECT_URI.removesuffix("/oauth2callback")
 else:
     # Construct from base URI and port if not explicitly set
     _OAUTH_BASE_URL = f"{WORKSPACE_MCP_BASE_URI}:{WORKSPACE_MCP_PORT}"

@@ -251,6 +251,9 @@ async def handle_oauth_authorization_server(request: Request):
             }
         )
 
+    # Get base URL once and reuse
+    base_url = get_oauth_base_url()
+
     try:
         # Fetch metadata from Google
         async with aiohttp.ClientSession() as session:
@@ -264,7 +267,6 @@ async def handle_oauth_authorization_server(request: Request):
                     metadata.setdefault("pkce_required", True)
 
                     # Override endpoints to use our proxies
-                    base_url = get_oauth_base_url()
                     metadata["token_endpoint"] = f"{base_url}/oauth2/token"
                     metadata["authorization_endpoint"] = f"{base_url}/oauth2/authorize"
                     metadata["enable_dynamic_registration"] = True
@@ -278,7 +280,6 @@ async def handle_oauth_authorization_server(request: Request):
                     )
 
         # Fallback metadata
-        base_url = get_oauth_base_url()
         return JSONResponse(
             content={
                 "issuer": "https://accounts.google.com",
