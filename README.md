@@ -447,8 +447,8 @@ When calling a tool:
 | `list_calendars` | List accessible calendars |
 | `get_events` | Retrieve events with time range filtering |
 | `get_event` | Fetch detailed information of a single event by ID |
-| `create_event` | Create events (all-day or timed) with optional Drive file attachments |
-| `modify_event` | Update existing events |
+| `create_event` | Create events (all-day or timed) with optional Drive file attachments and custom reminders |
+| `modify_event` | Update existing events with intelligent reminder handling |
 | `delete_event` | Remove events |
 
 ### 📁 Google Drive ([`drive_tools.py`](gdrive/drive_tools.py))
