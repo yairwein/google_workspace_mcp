@@ -202,17 +202,12 @@ async def start_google_auth(service_name: str, user_google_email: str = USER_GOO
         return f"**Authentication Error:** {error_message}"
 
     try:
-        auth_url, _ = start_auth_flow(
-            scopes=SCOPES,
-            redirect_uri=get_oauth_redirect_uri_for_current_mode(),
-            login_hint=user_google_email
+        auth_message = await start_auth_flow(
+            user_google_email=user_google_email,
+            service_name=service_name,
+            redirect_uri=get_oauth_redirect_uri_for_current_mode()
         )
-        return (
-            "**Action Required: Authenticate with Google**\n\n"
-            "Please visit this URL to authenticate:\n\n"
-            f"**[Authenticate with Google]({auth_url})**\n\n"
-            "After authenticating, retry your request."
-        )
+        return auth_message
     except Exception as e:
         logger.error(f"Failed to start Google authentication flow: {e}", exc_info=True)
         return f"**Error:** An unexpected error occurred: {e}"
