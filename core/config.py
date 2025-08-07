@@ -29,7 +29,30 @@ def get_transport_mode() -> str:
     return _current_transport_mode
 
 
+# OAuth Configuration
+# Determine base URL and redirect URI once at startup
+_OAUTH_REDIRECT_URI = os.getenv("GOOGLE_OAUTH_REDIRECT_URI")
+if _OAUTH_REDIRECT_URI:
+    # Extract base URL from the redirect URI (remove the /oauth2callback path)
+    _OAUTH_BASE_URL = _OAUTH_REDIRECT_URI.removesuffix("/oauth2callback")
+else:
+    # Construct from base URI and port if not explicitly set
+    _OAUTH_BASE_URL = f"{WORKSPACE_MCP_BASE_URI}:{WORKSPACE_MCP_PORT}"
+    _OAUTH_REDIRECT_URI = f"{_OAUTH_BASE_URL}/oauth2callback"
+
+def get_oauth_base_url() -> str:
+    """Get OAuth base URL for constructing OAuth endpoints.
+    
+    Returns the base URL (without paths) for OAuth endpoints,
+    respecting GOOGLE_OAUTH_REDIRECT_URI for reverse proxy scenarios.
+    """
+    return _OAUTH_BASE_URL
+
 def get_oauth_redirect_uri() -> str:
-    """Get OAuth redirect URI based on current configuration."""
-    # Use the standard OAuth callback path
-    return f"{WORKSPACE_MCP_BASE_URI}:{WORKSPACE_MCP_PORT}/oauth2callback"
+    """Get OAuth redirect URI based on current configuration.
+    
+    Returns the redirect URI configured at startup, either from
+    GOOGLE_OAUTH_REDIRECT_URI environment variable or constructed
+    from WORKSPACE_MCP_BASE_URI and WORKSPACE_MCP_PORT.
+    """
+    return _OAUTH_REDIRECT_URI

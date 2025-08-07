@@ -17,9 +17,10 @@ from fastapi import FastAPI, Request
 from typing import Optional
 from urllib.parse import urlparse
 
-# Import moved inside functions to avoid circular import
 from auth.scopes import SCOPES
 from auth.oauth_responses import create_error_response, create_success_response, create_server_error_response
+from auth.google_auth import handle_auth_callback, check_client_secrets
+from core.config import get_oauth_redirect_uri
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +63,6 @@ class MinimalOAuthServer:
 
             try:
                 # Check if we have credentials available (environment variables or file)
-                from auth.google_auth import check_client_secrets
                 error_message = check_client_secrets()
                 if error_message:
                     return create_server_error_response(error_message)
@@ -72,8 +72,7 @@ class MinimalOAuthServer:
                 # Session ID tracking removed - not needed
 
                 # Exchange code for credentials
-                from auth.google_auth import handle_auth_callback
-                redirect_uri = get_oauth_redirect_uri(port=self.port, base_uri=self.base_uri)
+                redirect_uri = get_oauth_redirect_uri()
                 verified_user_id, credentials = handle_auth_callback(
                     scopes=SCOPES,
                     authorization_response=str(request.url),
@@ -180,32 +179,6 @@ class MinimalOAuthServer:
 
 # Global instance for stdio mode
 _minimal_oauth_server: Optional[MinimalOAuthServer] = None
-
-def get_oauth_redirect_uri(port: int = 8000, base_uri: str = "http://localhost") -> str:
-    """
-    Get the appropriate OAuth redirect URI.
-
-    Priority:
-    1. GOOGLE_OAUTH_REDIRECT_URI environment variable
-    2. Constructed from port and base URI
-
-    Args:
-        port: Port number (default 8000)
-        base_uri: Base URI (default "http://localhost")
-
-    Returns:
-        OAuth redirect URI
-    """
-    # Highest priority: Use the environment variable if it's set
-    env_redirect_uri = os.getenv("GOOGLE_OAUTH_REDIRECT_URI")
-    if env_redirect_uri:
-        logger.info(f"Using redirect URI from GOOGLE_OAUTH_REDIRECT_URI: {env_redirect_uri}")
-        return env_redirect_uri
-
-    # Fallback to constructing the URI based on server settings
-    constructed_uri = f"{base_uri}:{port}/oauth2callback"
-    logger.info(f"Constructed redirect URI: {constructed_uri}")
-    return constructed_uri
 
 def ensure_oauth_callback_available(transport_mode: str = "stdio", port: int = 8000, base_uri: str = "http://localhost") -> tuple[bool, str]:
     """
