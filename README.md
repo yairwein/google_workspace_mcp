@@ -188,10 +188,9 @@ Claude Desktop stores these securely in the OS keychain; set them once in the ex
 
 3. **Server Configuration**:
    The server's base URL and port can be customized using environment variables:
-   - `WORKSPACE_MCP_BASE_URI`: Sets the base URI for the server (default: http://localhost). This affects the `server_url` used to construct the default `OAUTH_REDIRECT_URI` if `GOOGLE_OAUTH_REDIRECT_URI` is not set.
+   - `WORKSPACE_MCP_BASE_URI`: Sets the base URI for the server (default: http://localhost). This affects the `server_url` used to construct the default `OAUTH_REDIRECT_URI` if `GOOGLE_OAUTH_REDIRECT_URI` is not set. Note: do not include a port in `WORKSPACE_MCP_BASE_URI` - set that with the variable below. 
    - `WORKSPACE_MCP_PORT`: Sets the port the server listens on (default: 8000). This affects the server_url, port, and OAUTH_REDIRECT_URI.
    - `USER_GOOGLE_EMAIL`: Optional default email for authentication flows. If set, the LLM won't need to specify your email when calling `start_google_auth`.
-   - `GOOGLE_OAUTH_REDIRECT_URI`: Sets an override for OAuth redirect specifically, must include a full address (i.e. include port if necessary). Use this if you want to run your OAuth redirect separately from the MCP. This is not recommended outside of very specific cases
 
 ### Google Custom Search Setup
 
@@ -333,6 +332,11 @@ uvx workspace-mcp --tools gmail drive calendar
 ```
 
 > Run instantly without manual installation - you must configure OAuth credentials when using uvx. You can use either environment variables (recommended for production) or set the `GOOGLE_CLIENT_SECRET_PATH` (or legacy `GOOGLE_CLIENT_SECRETS`) environment variable to point to your `client_secret.json` file.
+
+#### Custom Authentication Server
+> [!CAUTION]
+> - `GOOGLE_OAUTH_REDIRECT_URI`: *WARNING* - Do not use this unless you are planning to write your own separate OAuth Logic. This sets an override for OAuth redirect, must include a full address (i.e. include port if necessary).
+> - Only use this if you want to run your OAuth redirect separately from the MCP. This is not recommended outside of very specific cases and will break the MCP if set without you writing your own compatible auth logic. This is intended specifically for enterprise use cases where you may already have an existing auth proxy or gateway in place.
 
 ```bash
 # Set OAuth credentials via environment variables (recommended)
