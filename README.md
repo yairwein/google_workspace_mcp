@@ -95,6 +95,11 @@ A production-ready MCP server that integrates all major Google Workspace service
 | `GOOGLE_PSE_API_KEY` *(optional)* | API key for Google Custom Search - see [Custom Search Setup](#google-custom-search-setup) |
 | `GOOGLE_PSE_ENGINE_ID` *(optional)* | Programmable Search Engine ID for Custom Search |
 | `MCP_ENABLE_OAUTH21` *(optional)* | Set to `true` to enable OAuth 2.1 support (requires streamable-http transport) |
+| `VSCODE_OAUTH_CALLBACK_PORT` *(optional)* | VS Code OAuth callback port (default: 33418) |
+| `VSCODE_OAUTH_CALLBACK_HOSTS` *(optional)* | Comma-separated list of VS Code callback hosts (default: "127.0.0.1,localhost") |
+| `OAUTH_DEVELOPMENT_PORTS` *(optional)* | Comma-separated list of development ports for redirect URIs (default: "3000,5173,8080") |
+| `OAUTH_CUSTOM_REDIRECT_URIS` *(optional)* | Comma-separated list of additional redirect URIs |
+| `OAUTH_ALLOWED_ORIGINS` *(optional)* | Comma-separated list of additional CORS origins |
 | `OAUTHLIB_INSECURE_TRANSPORT=1` | Development only (allows `http://` redirect) |
 
 Claude Desktop stores these securely in the OS keychain; set them once in the extension pane.
@@ -119,7 +124,13 @@ Claude Desktop stores these securely in the OS keychain; set them once in the ex
    - Navigate to APIs & Services → Credentials.
    - Click Create Credentials → OAuth Client ID.
    - Choose Web Application as the application type.
-   - Add redirect URI: `http://localhost:8000/oauth2callback`
+   - Add redirect URIs:
+     - `http://localhost:8000/oauth2callback` (primary)
+     - `http://127.0.0.1:33418/callback` (VS Code)
+     - `http://localhost:33418/callback` (VS Code)
+     - `http://127.0.0.1:33418/` (VS Code with trailing slash)
+     - `http://localhost:33418/` (VS Code with trailing slash)
+     - Additional development URIs as needed (see configuration section)
 
    - **Enable APIs**:
    - In the Google Cloud Console, go to APIs & Services → Library.
@@ -277,6 +288,47 @@ This implementation solves two critical challenges when using Google OAuth in br
 This architecture enables any OAuth 2.1 compliant client to authenticate users through Google, even from browser environments, without requiring changes to the client implementation.
 
 </details>
+
+**Required Google OAuth Setup for MCP Inspector**:
+Add these redirect URIs to your Google Cloud Console OAuth client:
+- `http:/localhost:6274/callback`
+
+
+### VS Code MCP Client Support
+
+The server includes native support for VS Code's MCP client with transparent path normalization:
+
+- **Automatic Path Handling**: VS Code's non-standard OAuth discovery paths (`/mcp/.well-known/*`) are automatically normalized to canonical locations (`/.well-known/*`)
+- **No Configuration Required**: Works out-of-the-box with VS Code's MCP extension
+- **Performance Optimized**: Uses middleware-based path rewriting instead of HTTP redirects
+- **Standards Compliant**: Maintains full OAuth 2.1 compliance while accommodating VS Code quirks
+
+**VS Code mcp.json Configuration Example**:
+```json
+{
+    "servers": {
+        "google-workspace": {
+            "url": "http://localhost:8000/mcp/",
+            "type": "http"
+        }
+    }
+}
+```
+
+**Required Google OAuth Setup for VS Code**:
+Add these redirect URIs to your Google Cloud Console OAuth client:
+- `http://127.0.0.1:33418/callback`
+- `http://127.0.0.1:33418/`
+
+
+### Modular Architecture
+
+The server uses a clean, modular architecture for maintainability and security with broad OAuth2.1 MCP Client support:
+
+- **Middleware Layer**: [`VSCodePathNormalizationMiddleware`](auth/vscode_compatibility_middleware.py) handles VS Code compatibility transparently
+- **Centralized Configuration**: [`OAuthConfig`](auth/oauth_config.py) eliminates hardcoded values and provides environment-based configuration
+- **Standardized Error Handling**: [`oauth_error_handling.py`](auth/oauth_error_handling.py) provides consistent error responses and input validation
+- **Security-First Design**: Proper CORS handling, input sanitization, and comprehensive validation throughout
 
 ### Connect to Claude Desktop
 
