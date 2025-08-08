@@ -291,7 +291,7 @@ This architecture enables any OAuth 2.1 compliant client to authenticate users t
 
 **Required Google OAuth Setup for MCP Inspector**:
 Add these redirect URIs to your Google Cloud Console OAuth client:
-- `http:/localhost:6274/callback`
+- `http://localhost:6274/callback`
 
 
 ### VS Code MCP Client Support
