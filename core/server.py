@@ -7,7 +7,6 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.middleware import Middleware
-from fastapi.middleware.cors import CORSMiddleware
 
 from fastmcp import FastMCP
 
@@ -21,8 +20,6 @@ from auth.vscode_compatibility_middleware import VSCodePathNormalizationMiddlewa
 from auth.cors_security_middleware import CORSSecurityMiddleware
 from auth.scopes import SCOPES
 from core.config import (
-    WORKSPACE_MCP_PORT,
-    WORKSPACE_MCP_BASE_URI,
     USER_GOOGLE_EMAIL,
     get_transport_mode,
     set_transport_mode as _set_transport_mode,

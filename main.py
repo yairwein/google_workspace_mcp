@@ -182,10 +182,10 @@ def main():
         # Configure auth initialization for FastMCP lifecycle events
         if args.transport == 'streamable-http':
             configure_server_for_http()
-            safe_print(f"")
+            safe_print("")
             safe_print(f"🚀 Starting HTTP server on {base_uri}:{port}")
         else:
-            safe_print(f"")
+            safe_print("")
             safe_print("🚀 Starting STDIO server")
             # Start minimal OAuth callback server for stdio mode
             from auth.oauth_callback_server import ensure_oauth_callback_available

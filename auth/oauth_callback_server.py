@@ -5,7 +5,6 @@ In streamable-http mode: Uses the existing FastAPI server
 In stdio mode: Starts a minimal HTTP server just for OAuth callbacks
 """
 
-import os
 import asyncio
 import logging
 import threading

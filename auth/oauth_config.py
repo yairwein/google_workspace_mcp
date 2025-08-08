@@ -8,7 +8,6 @@ sensible defaults for all OAuth-related settings.
 
 import os
 from typing import List
-from urllib.parse import urlparse
 
 
 class OAuthConfig:
