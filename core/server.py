@@ -17,6 +17,8 @@ from auth.mcp_session_middleware import MCPSessionMiddleware
 from auth.oauth_responses import create_error_response, create_success_response, create_server_error_response
 from auth.auth_info_middleware import AuthInfoMiddleware
 from auth.fastmcp_google_auth import GoogleWorkspaceAuthProvider
+from auth.vscode_compatibility_middleware import VSCodePathNormalizationMiddleware
+from auth.cors_security_middleware import CORSSecurityMiddleware
 from auth.scopes import SCOPES
 from core.config import (
     WORKSPACE_MCP_PORT,
@@ -41,32 +43,33 @@ logger = logging.getLogger(__name__)
 _auth_provider: Optional[Union[GoogleWorkspaceAuthProvider, GoogleRemoteAuthProvider]] = None
 
 # --- Middleware Definitions ---
-cors_middleware = Middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Note: The old wildcard CORS middleware is replaced with secure CORS middleware
 session_middleware = Middleware(MCPSessionMiddleware)
+vscode_middleware = Middleware(VSCodePathNormalizationMiddleware, debug=False)
+cors_security_middleware = Middleware(CORSSecurityMiddleware, debug=True)
 
-# Custom FastMCP that adds CORS to streamable HTTP
-class CORSEnabledFastMCP(FastMCP):
+# Custom FastMCP that adds secure middleware stack for OAuth 2.1
+class SecureFastMCP(FastMCP):
     def streamable_http_app(self) -> "Starlette":
-        """Override to add CORS and session middleware to the app."""
+        """Override to add secure middleware stack for OAuth 2.1."""
         app = super().streamable_http_app()
-        # Add session middleware first (to set context before other middleware)
-        app.user_middleware.insert(0, session_middleware)
-        # Add CORS as the second middleware
-        app.user_middleware.insert(1, cors_middleware)
+        
+        # Add middleware in order (first added = outermost layer)
+        # 1. CORS Security - handles CORS with proper origin validation
+        app.user_middleware.insert(0, cors_security_middleware)
+        # 2. VS Code Path Normalization - rewrites VS Code paths transparently  
+        app.user_middleware.insert(1, vscode_middleware)
+        # 3. Session Management - extracts session info for MCP context
+        app.user_middleware.insert(2, session_middleware)
+        
         # Rebuild middleware stack
         app.middleware_stack = app.build_middleware_stack()
-        logger.info("Added session and CORS middleware to streamable HTTP app")
+        logger.info("Added secure middleware stack: CORS Security, VS Code Compatibility, Session Management")
         return app
 
 # --- Server Instance ---
-server = CORSEnabledFastMCP(
-    name="google_workspace",
+server = SecureFastMCP(
+    name="google_workspace", 
     auth=None,
 )
 
