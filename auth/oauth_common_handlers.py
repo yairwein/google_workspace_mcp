@@ -228,7 +228,7 @@ async def handle_proxy_token_exchange(request: Request):
 
 async def handle_oauth_protected_resource(request: Request):
     """
-    Handle OAuth protected resource metadata requests with VS Code compatibility.
+    Handle OAuth protected resource metadata requests.
     """
     origin = request.headers.get("origin")
     
@@ -242,9 +242,13 @@ async def handle_oauth_protected_resource(request: Request):
     config = get_oauth_config()
     base_url = config.get_oauth_base_url()
     
+    # For streamable-http transport, the MCP server runs at /mcp/
+    # This is the actual resource being protected
+    resource_url = f"{base_url}/mcp/"
+    
     # Build metadata response per RFC 9449
     metadata = {
-        "resource": base_url,  # MUST identify the actual resource server
+        "resource": resource_url,  # The MCP server endpoint that needs protection
         "authorization_servers": [base_url],  # Our proxy acts as the auth server
         "bearer_methods_supported": ["header"],
         "scopes_supported": get_current_scopes(),
