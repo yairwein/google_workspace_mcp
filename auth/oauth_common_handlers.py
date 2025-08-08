@@ -206,119 +206,102 @@ async def handle_proxy_token_exchange(request: Request):
 
 
 async def handle_oauth_protected_resource(request: Request):
-    """Common handler for OAuth protected resource metadata."""
+    """
+    Handle OAuth protected resource metadata requests with VS Code compatibility.
+    """
+    # Handle CORS preflight
     if request.method == "OPTIONS":
         return JSONResponse(
             content={},
             headers={
                 "Access-Control-Allow-Origin": "*",
                 "Access-Control-Allow-Methods": "GET, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type"
+                "Access-Control-Allow-Headers": "Authorization, Content-Type, Accept",
+                "Access-Control-Allow-Credentials": "true"
             }
         )
-
+    
     base_url = get_oauth_base_url()
+    
+    # Build metadata response per RFC 9449
     metadata = {
-        "resource": base_url,
-        "authorization_servers": [
-            base_url
-        ],
+        "resource": base_url,  # MUST identify the actual resource server
+        "authorization_servers": [base_url],  # Our proxy acts as the auth server
         "bearer_methods_supported": ["header"],
         "scopes_supported": get_current_scopes(),
         "resource_documentation": "https://developers.google.com/workspace",
         "client_registration_required": True,
         "client_configuration_endpoint": f"{base_url}/.well-known/oauth-client",
     }
-
+    
+    # Log the response for debugging
+    logger.debug(f"Returning protected resource metadata: {metadata}")
+    
     return JSONResponse(
         content=metadata,
         headers={
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*"
+            "Content-Type": "application/json; charset=utf-8",  # Explicit charset
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Credentials": "true",
+            "Cache-Control": "public, max-age=3600"  # Allow caching
         }
     )
 
 
 async def handle_oauth_authorization_server(request: Request):
-    """Common handler for OAuth authorization server metadata."""
+    """
+    Handle OAuth authorization server metadata with VS Code compatibility.
+    """
     if request.method == "OPTIONS":
         return JSONResponse(
             content={},
             headers={
                 "Access-Control-Allow-Origin": "*",
                 "Access-Control-Allow-Methods": "GET, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type"
+                "Access-Control-Allow-Headers": "Authorization, Content-Type, Accept",
+                "Access-Control-Allow-Credentials": "true"
             }
         )
-
-    # Get base URL once and reuse
+    
     base_url = get_oauth_base_url()
-
-    try:
-        # Fetch metadata from Google
-        async with aiohttp.ClientSession() as session:
-            url = "https://accounts.google.com/.well-known/openid-configuration"
-            async with session.get(url) as response:
-                if response.status == 200:
-                    metadata = await response.json()
-
-                    # Add OAuth 2.1 required fields
-                    metadata.setdefault("code_challenge_methods_supported", ["S256"])
-                    metadata.setdefault("pkce_required", True)
-
-                    # Override endpoints to use our proxies
-                    metadata["token_endpoint"] = f"{base_url}/oauth2/token"
-                    metadata["authorization_endpoint"] = f"{base_url}/oauth2/authorize"
-                    metadata["enable_dynamic_registration"] = True
-                    metadata["registration_endpoint"] = f"{base_url}/oauth2/register"
-                    return JSONResponse(
-                        content=metadata,
-                        headers={
-                            "Content-Type": "application/json",
-                            "Access-Control-Allow-Origin": "*"
-                        }
-                    )
-
-        # Fallback metadata
-        return JSONResponse(
-            content={
-                "issuer": "https://accounts.google.com",
-                "authorization_endpoint": f"{base_url}/oauth2/authorize",
-                "token_endpoint": f"{base_url}/oauth2/token",
-                "userinfo_endpoint": "https://www.googleapis.com/oauth2/v2/userinfo",
-                "revocation_endpoint": "https://oauth2.googleapis.com/revoke",
-                "jwks_uri": "https://www.googleapis.com/oauth2/v3/certs",
-                "response_types_supported": ["code"],
-                "code_challenge_methods_supported": ["S256"],
-                "pkce_required": True,
-                "grant_types_supported": ["authorization_code", "refresh_token"],
-                "scopes_supported": get_current_scopes(),
-                "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"]
-            },
-            headers={
-                "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*"
-            }
-        )
-
-    except Exception as e:
-        logger.error(f"Error fetching auth server metadata: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": "Failed to fetch authorization server metadata"},
-            headers={"Access-Control-Allow-Origin": "*"}
-        )
+    
+    # Build authorization server metadata per RFC 8414
+    metadata = {
+        "issuer": base_url,
+        "authorization_endpoint": f"{base_url}/oauth2/authorize",
+        "token_endpoint": f"{base_url}/oauth2/token",
+        "registration_endpoint": f"{base_url}/oauth2/register",
+        "jwks_uri": "https://www.googleapis.com/oauth2/v3/certs",
+        "response_types_supported": ["code", "token"],
+        "grant_types_supported": ["authorization_code", "refresh_token"],
+        "token_endpoint_auth_methods_supported": ["client_secret_post", "client_secret_basic"],
+        "scopes_supported": get_current_scopes(),
+        "code_challenge_methods_supported": ["S256", "plain"],
+    }
+    
+    logger.debug(f"Returning authorization server metadata: {metadata}")
+    
+    return JSONResponse(
+        content=metadata,
+        headers={
+            "Content-Type": "application/json; charset=utf-8",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Credentials": "true",
+            "Cache-Control": "public, max-age=3600"
+        }
+    )
 
 
 async def handle_oauth_client_config(request: Request):
-    """Common handler for OAuth client configuration."""
+    """Common handler for OAuth client configuration with VS Code support."""
     if request.method == "OPTIONS":
         return JSONResponse(
             content={},
             headers={
                 "Access-Control-Allow-Origin": "*",
                 "Access-Control-Allow-Methods": "GET, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type"
+                "Access-Control-Allow-Headers": "Authorization, Content-Type, Accept",
+                "Access-Control-Allow-Credentials": "true"
             }
         )
 
@@ -337,7 +320,11 @@ async def handle_oauth_client_config(request: Request):
             "client_uri": f"{WORKSPACE_MCP_BASE_URI}:{WORKSPACE_MCP_PORT}",
             "redirect_uris": [
                 f"{WORKSPACE_MCP_BASE_URI}:{WORKSPACE_MCP_PORT}/oauth2callback",
-                "http://localhost:5173/auth/callback"
+                "http://localhost:5173/auth/callback",
+                "http://127.0.0.1:33418/callback",  # VS Code callback server
+                "http://localhost:33418/callback",   # VS Code callback server
+                "http://127.0.0.1:33418/",          # VS Code callback server (with trailing slash)
+                "http://localhost:33418/"           # VS Code callback server (with trailing slash)
             ],
             "grant_types": ["authorization_code", "refresh_token"],
             "response_types": ["code"],
@@ -346,8 +333,10 @@ async def handle_oauth_client_config(request: Request):
             "code_challenge_methods": ["S256"]
         },
         headers={
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*"
+            "Content-Type": "application/json; charset=utf-8",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Credentials": "true",
+            "Cache-Control": "public, max-age=3600"
         }
     )
 
@@ -384,7 +373,11 @@ async def handle_oauth_register(request: Request):
         if not redirect_uris:
             redirect_uris = [
                 f"{WORKSPACE_MCP_BASE_URI}:{WORKSPACE_MCP_PORT}/oauth2callback",
-                "http://localhost:5173/auth/callback"
+                "http://localhost:5173/auth/callback",
+                "http://127.0.0.1:33418/callback",  # VS Code callback server
+                "http://localhost:33418/callback",   # VS Code callback server
+                "http://127.0.0.1:33418/",          # VS Code callback server (with trailing slash)
+                "http://localhost:33418/"           # VS Code callback server (with trailing slash)
             ]
 
         # Build the registration response with our pre-configured credentials

@@ -19,6 +19,8 @@ import aiohttp
 from typing import Optional, List
 
 from starlette.routing import Route
+from starlette.responses import RedirectResponse, JSONResponse
+from starlette.requests import Request
 from pydantic import AnyHttpUrl
 
 try:
@@ -35,6 +37,7 @@ except ImportError:
 from auth.oauth_common_handlers import (
     handle_oauth_authorize,
     handle_proxy_token_exchange,
+    handle_oauth_protected_resource,
     handle_oauth_authorization_server,
     handle_oauth_client_config,
     handle_oauth_register
@@ -45,11 +48,12 @@ logger = logging.getLogger(__name__)
 
 class GoogleRemoteAuthProvider(RemoteAuthProvider):
     """
-    RemoteAuthProvider implementation for Google Workspace using FastMCP v2.11.1+.
+    RemoteAuthProvider implementation for Google Workspace with VS Code compatibility.
     
     This provider extends RemoteAuthProvider to add:
     - OAuth proxy endpoints for CORS workaround
     - Dynamic client registration support
+    - VS Code MCP client compatibility via path redirects
     - Enhanced session management with issuer tracking
     """
     
@@ -76,49 +80,136 @@ class GoogleRemoteAuthProvider(RemoteAuthProvider):
             algorithm="RS256"
         )
         
-        # Initialize RemoteAuthProvider with local server as the authorization server
-        # This ensures OAuth discovery points to our proxy endpoints instead of Google directly
+        # Initialize RemoteAuthProvider with correct resource URL (no /mcp suffix)
         super().__init__(
             token_verifier=token_verifier,
             authorization_servers=[AnyHttpUrl(f"{self.base_url}:{self.port}")],
-            resource_server_url=f"{self.base_url}:{self.port}"
+            resource_server_url=f"{self.base_url}:{self.port}"  # Correct: identifies the actual server
         )
         
-        logger.debug("GoogleRemoteAuthProvider initialized")
+        logger.debug("GoogleRemoteAuthProvider initialized with VS Code compatibility")
     
     def get_routes(self) -> List[Route]:
         """
-        Add custom OAuth proxy endpoints to the standard protected resource routes.
-        
-        These endpoints work around Google's CORS restrictions and provide
-        dynamic client registration support.
+        Add OAuth routes with VS Code compatibility redirects.
         """
         # Get the standard OAuth protected resource routes from RemoteAuthProvider
         routes = super().get_routes()
         
-        # Log what routes we're getting from the parent
-        logger.debug(f"Registered {len(routes)} OAuth routes from parent")
+        # Add standard OAuth discovery endpoints at canonical locations
+        routes.append(Route(
+            "/.well-known/oauth-protected-resource",
+            self._handle_discovery_with_logging,
+            methods=["GET", "OPTIONS"]
+        ))
         
-        # Add our custom proxy endpoints using common handlers
+        routes.append(Route(
+            "/.well-known/oauth-authorization-server",
+            handle_oauth_authorization_server,
+            methods=["GET", "OPTIONS"]
+        ))
+        
+        routes.append(Route(
+            "/.well-known/oauth-client",
+            handle_oauth_client_config,
+            methods=["GET", "OPTIONS"]
+        ))
+        
+        # VS Code Compatibility: Redirect /mcp/.well-known/* to canonical locations
+        routes.append(Route(
+            "/mcp/.well-known/oauth-protected-resource",
+            self._redirect_to_canonical_discovery,
+            methods=["GET", "OPTIONS"]
+        ))
+        
+        routes.append(Route(
+            "/mcp/.well-known/oauth-authorization-server",
+            self._redirect_to_canonical_discovery,
+            methods=["GET", "OPTIONS"]
+        ))
+        
+        routes.append(Route(
+            "/mcp/.well-known/oauth-client",
+            self._redirect_to_canonical_discovery,
+            methods=["GET", "OPTIONS"]
+        ))
+        
+        # Add OAuth flow endpoints
         routes.append(Route("/oauth2/authorize", handle_oauth_authorize, methods=["GET", "OPTIONS"]))
-        
         routes.append(Route("/oauth2/token", handle_proxy_token_exchange, methods=["POST", "OPTIONS"]))
-        
         routes.append(Route("/oauth2/register", handle_oauth_register, methods=["POST", "OPTIONS"]))
         
-        routes.append(Route("/.well-known/oauth-authorization-server", handle_oauth_authorization_server, methods=["GET", "OPTIONS"]))
-        
-        routes.append(Route("/.well-known/oauth-client", handle_oauth_client_config, methods=["GET", "OPTIONS"]))
-        
+        logger.info(f"Registered {len(routes)} OAuth routes with VS Code compatibility")
         return routes
+    
+    async def _handle_discovery_with_logging(self, request: Request):
+        """
+        Handle discovery requests with enhanced logging for debugging VS Code integration.
+        """
+        # Log request details for debugging
+        user_agent = request.headers.get("user-agent", "unknown")
+        logger.info(f"Discovery request from: {user_agent}")
+        logger.info(f"Request path: {request.url.path}")
+        logger.debug(f"Request headers: {dict(request.headers)}")
+        
+        # Detect VS Code client
+        if self._is_vscode_client(request):
+            logger.info("VS Code MCP client detected")
+        
+        # Return standard OAuth discovery response
+        return await handle_oauth_protected_resource(request)
+    
+    async def _redirect_to_canonical_discovery(self, request: Request):
+        """
+        Redirect VS Code's /mcp/.well-known/* requests to canonical locations.
+        
+        This maintains OAuth 2.1 compliance while accommodating VS Code's path behavior.
+        """
+        # Handle OPTIONS for CORS preflight
+        if request.method == "OPTIONS":
+            return JSONResponse(
+                content={},
+                headers=self._get_cors_headers()
+            )
+        
+        # Extract the discovery endpoint from the path
+        path = request.url.path
+        canonical_path = path.replace("/mcp/", "/", 1)
+        
+        logger.info(f"Redirecting VS Code discovery request from {path} to {canonical_path}")
+        
+        # Use 301 Permanent Redirect to help VS Code cache the correct location
+        return RedirectResponse(
+            url=canonical_path,
+            status_code=301,
+            headers=self._get_cors_headers()
+        )
+    
+    def _is_vscode_client(self, request: Request) -> bool:
+        """
+        Detect if the request is from VS Code's MCP client.
+        """
+        user_agent = request.headers.get("user-agent", "").lower()
+        return "vscode" in user_agent or "electron" in user_agent or "code" in user_agent
+    
+    def _get_cors_headers(self) -> dict:
+        """
+        Get CORS headers for VS Code's Electron app.
+        """
+        return {
+            "Access-Control-Allow-Origin": "*",  # VS Code may use various origins
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Authorization, Content-Type, Accept",
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Max-Age": "3600"
+        }
     
     async def verify_token(self, token: str) -> Optional[object]:
         """
-        Override verify_token to handle Google OAuth access tokens.
-        
-        Google OAuth access tokens (ya29.*) are opaque tokens that need to be
-        verified using the tokeninfo endpoint, not JWT verification.
+        Verify OAuth tokens with enhanced logging for VS Code debugging.
         """
+        logger.debug(f"Verifying token: {token[:10]}..." if token else "No token provided")
+        
         # Check if this is a Google OAuth access token (starts with ya29.)
         if token.startswith("ya29."):
             logger.debug("Detected Google OAuth access token, using tokeninfo verification")
