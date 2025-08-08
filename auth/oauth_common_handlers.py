@@ -331,6 +331,9 @@ async def handle_oauth_client_config(request: Request):
             headers=get_safe_cors_headers(origin)
         )
 
+    # Get OAuth configuration
+    config = get_oauth_config()
+    
     # Add CORS headers to the response
     cors_headers = get_safe_cors_headers(origin)
     response_headers = {
@@ -343,9 +346,9 @@ async def handle_oauth_client_config(request: Request):
         content={
             "client_id": client_id,
             "client_name": "Google Workspace MCP Server",
-            "client_uri": f"{WORKSPACE_MCP_BASE_URI}:{WORKSPACE_MCP_PORT}",
+            "client_uri": config.base_url,
             "redirect_uris": [
-                f"{WORKSPACE_MCP_BASE_URI}:{WORKSPACE_MCP_PORT}/oauth2callback",
+                f"{config.base_url}/oauth2callback",
                 "http://localhost:5173/auth/callback",
                 "http://127.0.0.1:33418/callback",  # VS Code callback server
                 "http://localhost:33418/callback",   # VS Code callback server
