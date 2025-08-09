@@ -160,21 +160,6 @@ def set_auth_layer(auth_layer):
     logger.info("set_auth_layer called - OAuth is now handled by FastMCP")
 
 
-def is_oauth21_enabled() -> bool:
-    """
-    Check if the OAuth 2.1 authentication layer is active.
-    Uses centralized configuration from oauth_config.
-    """
-    from auth.oauth_config import is_oauth21_enabled as config_oauth21_enabled
-    return config_oauth21_enabled()
-
-
-def enable_oauth21():
-    """
-    Enable the OAuth 2.1 authentication layer.
-    Note: This is now controlled by MCP_ENABLE_OAUTH21 env var via oauth_config.
-    """
-    logger.debug("OAuth 2.1 authentication enable request - controlled by MCP_ENABLE_OAUTH21 env var")
 
 
 async def get_legacy_auth_service(
@@ -274,7 +259,6 @@ async def get_authenticated_google_service_oauth21_v2(
     Returns:
         Tuple of (service instance, actual user email)
     """
-    from auth.oauth_types import OAuth21ServiceRequest
     
     # Delegate to the original function for now
     # This provides a migration path while maintaining backward compatibility

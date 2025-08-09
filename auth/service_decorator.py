@@ -486,7 +486,7 @@ def require_multiple_services(service_configs: List[Dict[str, Any]]):
                         logger.debug(f"[{tool_name}] Could not get FastMCP context: {e}")
 
                     # Use the same logic as single service decorator
-                    from auth.oauth21_integration import is_oauth21_enabled
+                    from auth.oauth_config import is_oauth21_enabled
 
                     if is_oauth21_enabled():
                         logger.debug(f"[{tool_name}] Attempting OAuth 2.1 authentication flow for {service_type}.")

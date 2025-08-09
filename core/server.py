@@ -101,8 +101,7 @@ def configure_server_for_http():
                 _auth_provider = GoogleRemoteAuthProvider()
                 server.auth = _auth_provider
                 set_auth_provider(_auth_provider)
-                from auth.oauth21_integration import enable_oauth21
-                enable_oauth21()  # This is now just a logging call
+                logger.debug("OAuth 2.1 authentication enabled")
             except Exception as e:
                 logger.error(f"Failed to initialize GoogleRemoteAuthProvider: {e}", exc_info=True)
         else:

@@ -6,14 +6,10 @@ from importlib import metadata
 from dotenv import load_dotenv
 
 # Load environment variables from .env file BEFORE any other imports
-# This ensures OAuth config gets the right environment variables
 dotenv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
 load_dotenv(dotenv_path=dotenv_path)
 
-# Now import modules that depend on environment variables
 from core.server import server, set_transport_mode, configure_server_for_http
-
-# Reload OAuth config after loading .env to pick up credentials
 from auth.oauth_config import reload_oauth_config
 reload_oauth_config()
 

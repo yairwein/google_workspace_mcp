@@ -9,7 +9,7 @@
 [![Website](https://img.shields.io/badge/Website-workspacemcp.com-green.svg)](https://workspacemcp.com)
 [![Verified on MseeP](https://mseep.ai/badge.svg)](https://mseep.ai/app/eebbc4a6-0f8c-41b2-ace8-038e5516dba0)
 
-**The most feature-complete Google Workspace MCP server**, now with Remote OAuth2.1 multi-user support and 1-click Claude installation. 
+**The most feature-complete Google Workspace MCP server**, now with Remote OAuth2.1 multi-user support and 1-click Claude installation.
 
 *Full natural language control over Google Calendar, Drive, Gmail, Docs, Sheets, Slides, Forms, Tasks, and Chat through all MCP clients, AI assistants and developer tools.*
 
@@ -282,8 +282,9 @@ This architecture enables any OAuth 2.1 compliant client to authenticate users t
 
 </details>
 
-**For MCP Inspector**: No additional configuration needed with desktop OAuth client.
+**MCP Inspector**: No additional configuration needed with desktop OAuth client.
 
+**Claude Code Inspector**: No additional configuration needed with desktop OAuth client.
 
 ### VS Code MCP Client Support
 
@@ -303,17 +304,6 @@ The server includes native support for VS Code's MCP client:
     }
 }
 ```
-
-**For VS Code**: No additional configuration needed with desktop OAuth client.
-
-
-### Modular Architecture
-
-The server uses a clean, modular architecture for maintainability and security with broad OAuth2.1 MCP Client support:
-
-- **Centralized Configuration**: [`OAuthConfig`](auth/oauth_config.py) eliminates hardcoded values and provides environment-based configuration
-- **Standardized Error Handling**: [`oauth_error_handling.py`](auth/oauth_error_handling.py) provides consistent error responses and input validation
-- **Security-First Design**: Proper CORS handling, input sanitization, and comprehensive validation throughout
 
 ### Connect to Claude Desktop
 
@@ -387,7 +377,7 @@ export GOOGLE_OAUTH_REDIRECT_URI="https://your-domain.com/oauth2callback"
 export GOOGLE_OAUTH_REDIRECT_URI="https://your-domain.com:8443/oauth2callback"
 ```
 
-**Important**: 
+**Important**:
 - The redirect URI must exactly match what's configured in your Google Cloud Console
 - The server will use this value for all OAuth flows instead of constructing it from `WORKSPACE_MCP_BASE_URI` and `WORKSPACE_MCP_PORT`
 - Your reverse proxy must forward `/oauth2callback` requests to the MCP server
