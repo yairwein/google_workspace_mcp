@@ -13,7 +13,7 @@
 
 *Full natural language control over Google Calendar, Drive, Gmail, Docs, Sheets, Slides, Forms, Tasks, and Chat through all MCP clients, AI assistants and developer tools.*
 
-###### Support for all free Google accounts (Gmail, Docs, Drive etc) & Google Workspace plans (Starter, Standard, Plus, Enterprise, Non Profit etc) with their expanded app options like Chat & Spaces.
+###### Support for all free Google accounts (Gmail, Docs, Drive etc) & Google Workspace plans (Starter, Standard, Plus, Enterprise, Non Profit etc) with expanded app options like Chat & Spaces.
 
 </div>
 
@@ -42,16 +42,16 @@
 
 **This README was written with AI assistance, and here's why that matters**
 >
-> As a solo dev building open source tools that many never see outside use, comprehensive documentation often wouldn't happen without AI help. Using agentic dev tools like **Roo** & **Claude Code** that understand the entire codebase, AI doesn't just regurgitate generic content - it extracts real implementation details and creates accurate, specific documentation.
+> As a solo dev building open source tools, comprehensive documentation often wouldn't happen without AI help. Using agentic dev tools like **Roo** & **Claude Code** that understand the entire codebase, AI doesn't just regurgitate generic content - it extracts real implementation details and creates accurate, specific documentation.
 >
-> In this case, Sonnet 4 took a pass & a human (me) verified them 7/10/25.
+> In this case, Sonnet 4 took a pass & a human (me) verified them 8/9/25.
 </details>
 
 ## Overview
 
 A production-ready MCP server that integrates all major Google Workspace services with AI assistants. It supports both single-user operation and multi-user authentication via OAuth 2.1, making it a powerful backend for custom applications. Built with FastMCP for optimal performance, featuring advanced authentication handling, service caching, and streamlined development patterns.
 
-**🎉 Simplified Setup**: Now uses Google Desktop OAuth clients - no redirect URIs or port configuration needed!
+**Simplified Setup**: Now uses Google Desktop OAuth clients - no redirect URIs or port configuration needed!
 
 ## Features
 
@@ -68,7 +68,7 @@ A production-ready MCP server that integrates all major Google Workspace service
 - **🔍 Google Custom Search**: Programmable Search Engine (PSE) integration for custom web searches
 - **🔄 All Transports**: Stdio, Streamable HTTP & SSE, OpenAPI compatibility via `mcpo`
 - **⚡ High Performance**: Service caching, thread-safe sessions, FastMCP integration
-- **🧩 Developer Friendly**: Minimal boilerplate, automatic service injection, centralized configuration
+- **Developer Friendly**: Minimal boilerplate, automatic service injection, centralized configuration
 
 ---
 
@@ -97,8 +97,6 @@ A production-ready MCP server that integrates all major Google Workspace service
 | `GOOGLE_PSE_API_KEY` *(optional)* | API key for Google Custom Search - see [Custom Search Setup](#google-custom-search-setup) |
 | `GOOGLE_PSE_ENGINE_ID` *(optional)* | Programmable Search Engine ID for Custom Search |
 | `MCP_ENABLE_OAUTH21` *(optional)* | Set to `true` to enable OAuth 2.1 support (requires streamable-http transport) |
-| `OAUTH_CUSTOM_REDIRECT_URIS` *(optional)* | Comma-separated list of additional redirect URIs |
-| `OAUTH_ALLOWED_ORIGINS` *(optional)* | Comma-separated list of additional CORS origins |
 | `OAUTHLIB_INSECURE_TRANSPORT=1` | Development only (allows `http://` redirect) |
 
 Claude Desktop stores these securely in the OS keychain; set them once in the extension pane.
@@ -287,13 +285,8 @@ This architecture enables any OAuth 2.1 compliant client to authenticate users t
 **Claude Code Inspector**: No additional configuration needed with desktop OAuth client.
 
 ### VS Code MCP Client Support
-
-The server includes native support for VS Code's MCP client:
-
-- **No Configuration Required**: Works out-of-the-box with VS Code's MCP extension
-- **Standards Compliant**: Full OAuth 2.1 compliance with desktop OAuth clients
-
 **VS Code mcp.json Configuration Example**:
+
 ```json
 {
     "servers": {
@@ -367,6 +360,10 @@ If you're running the MCP server behind a reverse proxy (nginx, Apache, Cloudfla
 
 **Problem**: When behind a reverse proxy, the server constructs redirect URIs using internal ports (e.g., `http://localhost:8000/oauth2callback`) but Google expects the external URL (e.g., `https://your-domain.com/oauth2callback`).
 
+You also have options for:
+| `OAUTH_CUSTOM_REDIRECT_URIS` *(optional)* | Comma-separated list of additional redirect URIs |
+| `OAUTH_ALLOWED_ORIGINS` *(optional)* | Comma-separated list of additional CORS origins |
+
 **Solution**: Set `GOOGLE_OAUTH_REDIRECT_URI` to your external URL:
 
 ```bash
@@ -386,9 +383,6 @@ export GOOGLE_OAUTH_REDIRECT_URI="https://your-domain.com:8443/oauth2callback"
 # Set OAuth credentials via environment variables (recommended)
 export GOOGLE_OAUTH_CLIENT_ID="your-client-id.apps.googleusercontent.com"
 export GOOGLE_OAUTH_CLIENT_SECRET="your-client-secret"
-
-# Start the server with all Google Workspace tools
-uvx workspace-mcp
 
 # Start with specific tools only
 uvx workspace-mcp --tools gmail drive calendar tasks
@@ -623,10 +617,10 @@ async def your_new_tool(service, param1: str, param2: int = 10):
 
 ## 🔒 Security
 
-- **Credentials**: Never commit `client_secret.json` or `.credentials/` directory
+- **Credentials**: Never commit `.env`, `client_secret.json` or the `.credentials/` directory to source control!
 - **OAuth Callback**: Uses `http://localhost:8000/oauth2callback` for development (requires `OAUTHLIB_INSECURE_TRANSPORT=1`)
 - **Transport-Aware Callbacks**: Stdio mode starts a minimal HTTP server only for OAuth, ensuring callbacks work in all modes
-- **Production**: Use HTTPS for callback URIs and configure accordingly
+- **Production**: Use HTTPS & OAuth 2.1 and configure accordingly
 - **Network Exposure**: Consider authentication when using `mcpo` over networks
 - **Scope Minimization**: Tools request only necessary permissions
 
