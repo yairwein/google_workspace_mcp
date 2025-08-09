@@ -19,7 +19,7 @@ from auth.scopes import get_current_scopes
 from auth.oauth_config import get_oauth_config
 from auth.oauth_error_handling import (
     OAuthError, OAuthValidationError, OAuthConfigurationError,
-    create_oauth_error_response, validate_token_request, 
+    create_oauth_error_response, validate_token_request,
     validate_registration_request, get_safe_cors_headers,
     log_security_event
 )
@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 async def handle_oauth_authorize(request: Request):
     """Common handler for OAuth authorization proxy."""
     origin = request.headers.get("origin")
-    
+
     if request.method == "OPTIONS":
         return JSONResponse(
             content={},
@@ -71,7 +71,7 @@ async def handle_oauth_authorize(request: Request):
 async def handle_proxy_token_exchange(request: Request):
     """Common handler for OAuth token exchange proxy with comprehensive error handling."""
     origin = request.headers.get("origin")
-    
+
     if request.method == "OPTIONS":
         return JSONResponse(
             content={},
@@ -84,32 +84,32 @@ async def handle_proxy_token_exchange(request: Request):
             content_type = request.headers.get("content-type", "application/x-www-form-urlencoded")
         except Exception as e:
             raise OAuthValidationError(f"Failed to read request body: {e}")
-        
+
         # Parse and validate form data
         if content_type and "application/x-www-form-urlencoded" in content_type:
             try:
                 form_data = parse_qs(body.decode('utf-8'))
             except Exception as e:
                 raise OAuthValidationError(f"Invalid form data: {e}")
-            
+
             # Convert to single values and validate
             request_data = {k: v[0] if v else '' for k, v in form_data.items()}
             validate_token_request(request_data)
-            
+
             # Check if client_id is missing (public client)
             if 'client_id' not in form_data or not form_data['client_id'][0]:
                 client_id = os.getenv("GOOGLE_OAUTH_CLIENT_ID")
                 if client_id:
                     form_data['client_id'] = [client_id]
                     logger.debug("Added missing client_id to token request")
-            
+
             # Check if client_secret is missing (public client using PKCE)
             if 'client_secret' not in form_data:
                 client_secret = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET")
                 if client_secret:
                     form_data['client_secret'] = [client_secret]
                     logger.debug("Added missing client_secret to token request")
-            
+
             # Reconstruct body with added credentials
             body = urlencode(form_data, doseq=True).encode('utf-8')
 
@@ -149,7 +149,7 @@ async def handle_proxy_token_exchange(request: Request):
                                     )
                                     user_email = id_token_claims.get("email")
                                     email_verified = id_token_claims.get("email_verified")
-                                    
+
                                     if not email_verified:
                                         logger.error(f"Email address for user {user_email} is not verified by Google. Aborting session creation.")
                                         return JSONResponse(content={"error": "Email address not verified"}, status_code=403)
@@ -163,7 +163,7 @@ async def handle_proxy_token_exchange(request: Request):
                                                 logger.info(f"Found MCP session ID for binding: {mcp_session_id}")
                                         except Exception as e:
                                             logger.debug(f"Could not get MCP session ID: {e}")
-                                        
+
                                         # Store the token session with MCP session binding
                                         session_id = store_token_session(response_data, user_email, mcp_session_id)
                                         logger.info(f"Stored OAuth session for {user_email} (session: {session_id}, mcp: {mcp_session_id})")
@@ -204,7 +204,7 @@ async def handle_proxy_token_exchange(request: Request):
                     "Cache-Control": "no-store"
                 }
                 response_headers.update(cors_headers)
-                
+
                 return JSONResponse(
                     status_code=response.status,
                     content=response_data,
@@ -231,21 +231,21 @@ async def handle_oauth_protected_resource(request: Request):
     Handle OAuth protected resource metadata requests.
     """
     origin = request.headers.get("origin")
-    
+
     # Handle CORS preflight
     if request.method == "OPTIONS":
         return JSONResponse(
             content={},
             headers=get_safe_cors_headers(origin)
         )
-    
+
     config = get_oauth_config()
     base_url = config.get_oauth_base_url()
-    
-    # For streamable-http transport, the MCP server runs at /mcp/
+
+    # For streamable-http transport, the MCP server runs at /mcp
     # This is the actual resource being protected
     resource_url = f"{base_url}/mcp/"
-    
+
     # Build metadata response per RFC 9449
     metadata = {
         "resource": resource_url,  # The MCP server endpoint that needs protection
@@ -256,17 +256,17 @@ async def handle_oauth_protected_resource(request: Request):
         "client_registration_required": True,
         "client_configuration_endpoint": f"{base_url}/.well-known/oauth-client",
     }
-    
+
     # Log the response for debugging
     logger.debug(f"Returning protected resource metadata: {metadata}")
-    
+
     cors_headers = get_safe_cors_headers(origin)
     response_headers = {
         "Content-Type": "application/json; charset=utf-8",  # Explicit charset
         "Cache-Control": "public, max-age=3600"  # Allow caching
     }
     response_headers.update(cors_headers)
-    
+
     return JSONResponse(
         content=metadata,
         headers=response_headers
@@ -278,16 +278,16 @@ async def handle_oauth_authorization_server(request: Request):
     Handle OAuth authorization server metadata with VS Code compatibility.
     """
     origin = request.headers.get("origin")
-    
+
     if request.method == "OPTIONS":
         return JSONResponse(
             content={},
             headers=get_safe_cors_headers(origin)
         )
-    
-    config = get_oauth_config() 
+
+    config = get_oauth_config()
     base_url = config.get_oauth_base_url()
-    
+
     # Build authorization server metadata per RFC 8414
     metadata = {
         "issuer": base_url,
@@ -301,16 +301,16 @@ async def handle_oauth_authorization_server(request: Request):
         "scopes_supported": get_current_scopes(),
         "code_challenge_methods_supported": ["S256", "plain"],
     }
-    
+
     logger.debug(f"Returning authorization server metadata: {metadata}")
-    
+
     cors_headers = get_safe_cors_headers(origin)
     response_headers = {
         "Content-Type": "application/json; charset=utf-8",
         "Cache-Control": "public, max-age=3600"
     }
     response_headers.update(cors_headers)
-    
+
     return JSONResponse(
         content=metadata,
         headers=response_headers
@@ -320,7 +320,7 @@ async def handle_oauth_authorization_server(request: Request):
 async def handle_oauth_client_config(request: Request):
     """Common handler for OAuth client configuration with VS Code support."""
     origin = request.headers.get("origin")
-    
+
     if request.method == "OPTIONS":
         return JSONResponse(
             content={},
@@ -337,7 +337,7 @@ async def handle_oauth_client_config(request: Request):
 
     # Get OAuth configuration
     config = get_oauth_config()
-    
+
     # Add CORS headers to the response
     cors_headers = get_safe_cors_headers(origin)
     response_headers = {
@@ -345,7 +345,7 @@ async def handle_oauth_client_config(request: Request):
         "Cache-Control": "public, max-age=3600"
     }
     response_headers.update(cors_headers)
-    
+
     return JSONResponse(
         content={
             "client_id": client_id,
@@ -372,7 +372,7 @@ async def handle_oauth_client_config(request: Request):
 async def handle_oauth_register(request: Request):
     """Common handler for OAuth dynamic client registration with comprehensive error handling."""
     origin = request.headers.get("origin")
-    
+
     if request.method == "OPTIONS":
         return JSONResponse(
             content={},
@@ -380,7 +380,7 @@ async def handle_oauth_register(request: Request):
         )
 
     config = get_oauth_config()
-    
+
     if not config.is_configured():
         error = OAuthConfigurationError("OAuth client credentials not configured")
         return create_oauth_error_response(error, get_safe_cors_headers(origin))
@@ -391,7 +391,7 @@ async def handle_oauth_register(request: Request):
             body = await request.json()
         except Exception as e:
             raise OAuthValidationError(f"Invalid JSON in registration request: {e}")
-        
+
         validate_registration_request(body)
         logger.info("Dynamic client registration request received")
 
