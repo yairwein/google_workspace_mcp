@@ -471,7 +471,6 @@ def require_multiple_services(service_configs: List[Dict[str, Any]]):
 
                     # SIMPLIFIED: Get authentication state from context (set by AuthInfoMiddleware)
                     authenticated_user = None
-                    auth_method = None
                     mcp_session_id = None
 
                     try:
@@ -479,7 +478,6 @@ def require_multiple_services(service_configs: List[Dict[str, Any]]):
                         ctx = get_context()
                         if ctx:
                             authenticated_user = ctx.get_state("authenticated_user_email")
-                            auth_method = ctx.get_state("authenticated_via")
                             if hasattr(ctx, 'session_id'):
                                 mcp_session_id = ctx.session_id
                     except Exception as e:

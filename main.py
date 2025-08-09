@@ -5,17 +5,17 @@ import sys
 from importlib import metadata
 from dotenv import load_dotenv
 
-# Load environment variables from .env file BEFORE any other imports
+from auth.oauth_config import reload_oauth_config
+from core.utils import check_credentials_directory_permissions
+from core.server import server, set_transport_mode, configure_server_for_http
+
 dotenv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
 load_dotenv(dotenv_path=dotenv_path)
 
-from core.server import server, set_transport_mode, configure_server_for_http
-from auth.oauth_config import reload_oauth_config
-reload_oauth_config()
-
 # Suppress googleapiclient discovery cache warning
 logging.getLogger('googleapiclient.discovery_cache').setLevel(logging.ERROR)
-from core.utils import check_credentials_directory_permissions
+
+reload_oauth_config()
 
 logging.basicConfig(
     level=logging.INFO,
