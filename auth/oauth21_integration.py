@@ -160,23 +160,6 @@ def set_auth_layer(auth_layer):
     logger.info("set_auth_layer called - OAuth is now handled by FastMCP")
 
 
-_oauth21_enabled = False
-
-def is_oauth21_enabled() -> bool:
-    """
-    Check if the OAuth 2.1 authentication layer is active.
-    """
-    global _oauth21_enabled
-    return _oauth21_enabled
-
-
-def enable_oauth21():
-    """
-    Enable the OAuth 2.1 authentication layer.
-    """
-    global _oauth21_enabled
-    _oauth21_enabled = True
-    logger.debug("OAuth 2.1 authentication enabled")
 
 
 async def get_legacy_auth_service(
@@ -206,13 +189,16 @@ async def get_authenticated_google_service_oauth21(
     tool_name: str,
     user_google_email: str,
     required_scopes: list[str],
+    session_id: Optional[str] = None,
+    auth_token_email: Optional[str] = None,
+    allow_recent_auth: bool = False,
     context: Optional[Dict[str, Any]] = None,
 ) -> Tuple[Any, str]:
     """
     Enhanced version of get_authenticated_google_service that supports OAuth 2.1.
 
     This function checks for OAuth 2.1 session context and uses it if available,
-    otherwise falls back to legacy authentication.
+    otherwise falls back to legacy authentication based on configuration.
 
     Args:
         service_name: Google service name
@@ -220,20 +206,32 @@ async def get_authenticated_google_service_oauth21(
         tool_name: Tool name for logging
         user_google_email: User's Google email
         required_scopes: Required OAuth scopes
+        session_id: Optional OAuth session ID
+        auth_token_email: Optional authenticated user email from token
+        allow_recent_auth: Whether to allow recently authenticated sessions
         context: Optional context containing session information
 
     Returns:
         Tuple of (service instance, actual user email)
     """
+    # Check if OAuth 2.1 is truly enabled
+    if not is_oauth21_enabled():
+        logger.debug(f"[{tool_name}] OAuth 2.1 disabled, using legacy authentication")
+        return await get_legacy_auth_service(
+            service_name=service_name,
+            version=version,
+            tool_name=tool_name,
+            user_google_email=user_google_email,
+            required_scopes=required_scopes,
+        )
+    
     builder = get_oauth21_service_builder()
 
     # FastMCP handles context now - extract any session info
-    session_id = None
-    auth_context = None
-
-    if context:
+    if not session_id and context:
         session_id = builder.extract_session_from_context(context)
-        auth_context = context.get("auth_context")
+    
+    auth_context = context.get("auth_context") if context else None
 
     return await builder.get_authenticated_service_with_session(
         service_name=service_name,
@@ -243,4 +241,35 @@ async def get_authenticated_google_service_oauth21(
         required_scopes=required_scopes,
         session_id=session_id,
         auth_context=auth_context,
+    )
+
+
+async def get_authenticated_google_service_oauth21_v2(
+    request: "OAuth21ServiceRequest",
+) -> Tuple[Any, str]:
+    """
+    Enhanced version of get_authenticated_google_service that supports OAuth 2.1.
+    
+    This version uses a parameter object to reduce function complexity and
+    improve maintainability. It's the recommended approach for new code.
+    
+    Args:
+        request: OAuth21ServiceRequest object containing all parameters
+        
+    Returns:
+        Tuple of (service instance, actual user email)
+    """
+    
+    # Delegate to the original function for now
+    # This provides a migration path while maintaining backward compatibility
+    return await get_authenticated_google_service_oauth21(
+        service_name=request.service_name,
+        version=request.version,
+        tool_name=request.tool_name,
+        user_google_email=request.user_google_email,
+        required_scopes=request.required_scopes,
+        session_id=request.session_id,
+        auth_token_email=request.auth_token_email,
+        allow_recent_auth=request.allow_recent_auth,
+        context=request.context,
     )

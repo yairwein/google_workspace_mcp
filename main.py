@@ -4,16 +4,18 @@ import os
 import sys
 from importlib import metadata
 from dotenv import load_dotenv
+
+# Load environment variables from .env file BEFORE any other imports
+dotenv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+load_dotenv(dotenv_path=dotenv_path)
+
 from core.server import server, set_transport_mode, configure_server_for_http
+from auth.oauth_config import reload_oauth_config
+reload_oauth_config()
 
 # Suppress googleapiclient discovery cache warning
 logging.getLogger('googleapiclient.discovery_cache').setLevel(logging.ERROR)
 from core.utils import check_credentials_directory_permissions
-
-# Load environment variables from .env file, specifying an explicit path
-# This prevents accidentally loading a .env file from a different directory
-dotenv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
-load_dotenv(dotenv_path=dotenv_path)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -92,6 +94,7 @@ def main():
     # Active Configuration
     safe_print("⚙️ Active Configuration:")
 
+
     # Redact client secret for security
     client_secret = os.getenv('GOOGLE_OAUTH_CLIENT_SECRET', 'Not Set')
     redacted_secret = f"{client_secret[:4]}...{client_secret[-4:]}" if len(client_secret) > 8 else "Invalid or too short"
@@ -140,11 +143,11 @@ def main():
 
     # Import specified tools or all tools if none specified
     tools_to_import = args.tools if args.tools is not None else tool_imports.keys()
-    
+
     # Set enabled tools for scope management
     from auth.scopes import set_enabled_tools
     set_enabled_tools(list(tools_to_import))
-    
+
     safe_print(f"🛠️  Loading {len(tools_to_import)} tool module{'s' if len(tools_to_import) != 1 else ''}:")
     for tool in tools_to_import:
         tool_imports[tool]()
@@ -153,7 +156,6 @@ def main():
 
     safe_print("📊 Configuration Summary:")
     safe_print(f"   🔧 Tools Enabled: {len(tools_to_import)}/{len(tool_imports)}")
-    safe_print("   🔑 Auth Method: OAuth 2.0 with PKCE")
     safe_print(f"   📝 Log Level: {logging.getLogger().getEffectiveLevel()}")
     safe_print("")
 
@@ -182,10 +184,10 @@ def main():
         # Configure auth initialization for FastMCP lifecycle events
         if args.transport == 'streamable-http':
             configure_server_for_http()
-            safe_print(f"")
+            safe_print("")
             safe_print(f"🚀 Starting HTTP server on {base_uri}:{port}")
         else:
-            safe_print(f"")
+            safe_print("")
             safe_print("🚀 Starting STDIO server")
             # Start minimal OAuth callback server for stdio mode
             from auth.oauth_callback_server import ensure_oauth_callback_available

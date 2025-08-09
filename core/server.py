@@ -7,7 +7,6 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.middleware import Middleware
-from fastapi.middleware.cors import CORSMiddleware
 
 from fastmcp import FastMCP
 
@@ -19,8 +18,6 @@ from auth.auth_info_middleware import AuthInfoMiddleware
 from auth.fastmcp_google_auth import GoogleWorkspaceAuthProvider
 from auth.scopes import SCOPES
 from core.config import (
-    WORKSPACE_MCP_PORT,
-    WORKSPACE_MCP_BASE_URI,
     USER_GOOGLE_EMAIL,
     get_transport_mode,
     set_transport_mode as _set_transport_mode,
@@ -41,31 +38,25 @@ logger = logging.getLogger(__name__)
 _auth_provider: Optional[Union[GoogleWorkspaceAuthProvider, GoogleRemoteAuthProvider]] = None
 
 # --- Middleware Definitions ---
-cors_middleware = Middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 session_middleware = Middleware(MCPSessionMiddleware)
 
-# Custom FastMCP that adds CORS to streamable HTTP
-class CORSEnabledFastMCP(FastMCP):
+# Custom FastMCP that adds secure middleware stack for OAuth 2.1
+class SecureFastMCP(FastMCP):
     def streamable_http_app(self) -> "Starlette":
-        """Override to add CORS and session middleware to the app."""
+        """Override to add secure middleware stack for OAuth 2.1."""
         app = super().streamable_http_app()
-        # Add session middleware first (to set context before other middleware)
+
+        # Add middleware in order (first added = outermost layer)
+        # Session Management - extracts session info for MCP context
         app.user_middleware.insert(0, session_middleware)
-        # Add CORS as the second middleware
-        app.user_middleware.insert(1, cors_middleware)
+
         # Rebuild middleware stack
         app.middleware_stack = app.build_middleware_stack()
-        logger.info("Added session and CORS middleware to streamable HTTP app")
+        logger.info("Added middleware stack: Session Management")
         return app
 
 # --- Server Instance ---
-server = CORSEnabledFastMCP(
+server = SecureFastMCP(
     name="google_workspace",
     auth=None,
 )
@@ -86,32 +77,37 @@ def configure_server_for_http():
     This must be called BEFORE server.run().
     """
     global _auth_provider
+
     transport_mode = get_transport_mode()
 
     if transport_mode != "streamable-http":
         return
 
-    oauth21_enabled = os.getenv("MCP_ENABLE_OAUTH21", "false").lower() == "true"
+    # Use centralized OAuth configuration
+    from auth.oauth_config import get_oauth_config
+    config = get_oauth_config()
+    
+    # Check if OAuth 2.1 is enabled via centralized config
+    oauth21_enabled = config.is_oauth21_enabled()
 
     if oauth21_enabled:
-        if not os.getenv("GOOGLE_OAUTH_CLIENT_ID"):
-            logger.warning("⚠️  OAuth 2.1 enabled but GOOGLE_OAUTH_CLIENT_ID not set")
+        if not config.is_configured():
+            logger.warning("⚠️  OAuth 2.1 enabled but OAuth credentials not configured")
             return
 
         if GOOGLE_REMOTE_AUTH_AVAILABLE:
-            logger.info("🔐 OAuth 2.1 enabled")
+            logger.info("🔐 OAuth 2.1 enabled with automatic OAuth 2.0 fallback for legacy clients")
             try:
                 _auth_provider = GoogleRemoteAuthProvider()
                 server.auth = _auth_provider
                 set_auth_provider(_auth_provider)
-                from auth.oauth21_integration import enable_oauth21
-                enable_oauth21()
+                logger.debug("OAuth 2.1 authentication enabled")
             except Exception as e:
                 logger.error(f"Failed to initialize GoogleRemoteAuthProvider: {e}", exc_info=True)
         else:
             logger.error("OAuth 2.1 is enabled, but GoogleRemoteAuthProvider is not available.")
     else:
-        logger.info("OAuth 2.1 is DISABLED. Server will use legacy tool-based authentication.")
+        logger.info("OAuth 2.0 mode - Server will use legacy authentication.")
         server.auth = None
 
 def get_auth_provider() -> Optional[Union[GoogleWorkspaceAuthProvider, GoogleRemoteAuthProvider]]:
@@ -223,7 +219,7 @@ if os.getenv("MCP_ENABLE_OAUTH21", "false").lower() == "true" and not GOOGLE_REM
         handle_oauth_client_config,
         handle_oauth_register
     )
-    
+
     server.custom_route("/.well-known/oauth-protected-resource", methods=["GET", "OPTIONS"])(handle_oauth_protected_resource)
     server.custom_route("/.well-known/oauth-authorization-server", methods=["GET", "OPTIONS"])(handle_oauth_authorization_server)
     server.custom_route("/.well-known/oauth-client", methods=["GET", "OPTIONS"])(handle_oauth_client_config)

@@ -9,7 +9,7 @@
 [![Website](https://img.shields.io/badge/Website-workspacemcp.com-green.svg)](https://workspacemcp.com)
 [![Verified on MseeP](https://mseep.ai/badge.svg)](https://mseep.ai/app/eebbc4a6-0f8c-41b2-ace8-038e5516dba0)
 
-**The most feature-complete Google Workspace MCP server**, now with Remote OAuth2.1 multi-user support and 1-click Claude installation. 
+**The most feature-complete Google Workspace MCP server**, now with Remote OAuth2.1 multi-user support and 1-click Claude installation.
 
 *Full natural language control over Google Calendar, Drive, Gmail, Docs, Sheets, Slides, Forms, Tasks, and Chat through all MCP clients, AI assistants and developer tools.*
 
@@ -50,6 +50,8 @@
 ## Overview
 
 A production-ready MCP server that integrates all major Google Workspace services with AI assistants. It supports both single-user operation and multi-user authentication via OAuth 2.1, making it a powerful backend for custom applications. Built with FastMCP for optimal performance, featuring advanced authentication handling, service caching, and streamlined development patterns.
+
+**🎉 Simplified Setup**: Now uses Google Desktop OAuth clients - no redirect URIs or port configuration needed!
 
 ## Features
 
@@ -95,6 +97,8 @@ A production-ready MCP server that integrates all major Google Workspace service
 | `GOOGLE_PSE_API_KEY` *(optional)* | API key for Google Custom Search - see [Custom Search Setup](#google-custom-search-setup) |
 | `GOOGLE_PSE_ENGINE_ID` *(optional)* | Programmable Search Engine ID for Custom Search |
 | `MCP_ENABLE_OAUTH21` *(optional)* | Set to `true` to enable OAuth 2.1 support (requires streamable-http transport) |
+| `OAUTH_CUSTOM_REDIRECT_URIS` *(optional)* | Comma-separated list of additional redirect URIs |
+| `OAUTH_ALLOWED_ORIGINS` *(optional)* | Comma-separated list of additional CORS origins |
 | `OAUTHLIB_INSECURE_TRANSPORT=1` | Development only (allows `http://` redirect) |
 
 Claude Desktop stores these securely in the OS keychain; set them once in the extension pane.
@@ -114,12 +118,12 @@ Claude Desktop stores these securely in the OS keychain; set them once in the ex
 ### Configuration
 
 1. **Google Cloud Setup**:
-   - Create OAuth 2.0 credentials (web application) in [Google Cloud Console](https://console.cloud.google.com/)
+   - Create OAuth 2.0 credentials in [Google Cloud Console](https://console.cloud.google.com/)
    - Create a new project (or use an existing one) for your MCP server.
    - Navigate to APIs & Services → Credentials.
    - Click Create Credentials → OAuth Client ID.
-   - Choose Web Application as the application type.
-   - Add redirect URI: `http://localhost:8000/oauth2callback`
+   - **Choose Desktop Application as the application type** (simpler setup, no redirect URIs needed!)
+   - Download your credentials and note the Client ID and Client Secret
 
    - **Enable APIs**:
    - In the Google Cloud Console, go to APIs & Services → Library.
@@ -278,6 +282,29 @@ This architecture enables any OAuth 2.1 compliant client to authenticate users t
 
 </details>
 
+**MCP Inspector**: No additional configuration needed with desktop OAuth client.
+
+**Claude Code Inspector**: No additional configuration needed with desktop OAuth client.
+
+### VS Code MCP Client Support
+
+The server includes native support for VS Code's MCP client:
+
+- **No Configuration Required**: Works out-of-the-box with VS Code's MCP extension
+- **Standards Compliant**: Full OAuth 2.1 compliance with desktop OAuth clients
+
+**VS Code mcp.json Configuration Example**:
+```json
+{
+    "servers": {
+        "google-workspace": {
+            "url": "http://localhost:8000/mcp/",
+            "type": "http"
+        }
+    }
+}
+```
+
 ### Connect to Claude Desktop
 
 The server supports two transport modes:
@@ -350,7 +377,7 @@ export GOOGLE_OAUTH_REDIRECT_URI="https://your-domain.com/oauth2callback"
 export GOOGLE_OAUTH_REDIRECT_URI="https://your-domain.com:8443/oauth2callback"
 ```
 
-**Important**: 
+**Important**:
 - The redirect URI must exactly match what's configured in your Google Cloud Console
 - The server will use this value for all OAuth flows instead of constructing it from `WORKSPACE_MCP_BASE_URI` and `WORKSPACE_MCP_PORT`
 - Your reverse proxy must forward `/oauth2callback` requests to the MCP server
@@ -422,17 +449,18 @@ If you need to use HTTP mode with Claude Desktop:
 
 ### First-Time Authentication
 
-The server features **transport-aware OAuth callback handling**:
+The server uses **Google Desktop OAuth** for simplified authentication:
 
-- **Stdio Mode**: Automatically starts a minimal HTTP server on port 8000 for OAuth callbacks
-- **HTTP Mode**: Uses the existing FastAPI server for OAuth callbacks
-- **Same OAuth Flow**: Both modes use `http://localhost:8000/oauth2callback` for consistency
+- **No redirect URIs needed**: Desktop OAuth clients handle authentication without complex callback URLs
+- **Automatic flow**: The server manages the entire OAuth process transparently
+- **Transport-agnostic**: Works seamlessly in both stdio and HTTP modes
 
 When calling a tool:
 1. Server returns authorization URL
 2. Open URL in browser and authorize
-3. Server handles OAuth callback automatically (on port 8000 in both modes)
-4. Retry the original request
+3. Google provides an authorization code
+4. Paste the code when prompted (or it's handled automatically)
+5. Server completes authentication and retries your request
 
 ---
 

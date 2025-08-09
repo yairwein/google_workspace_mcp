@@ -5,7 +5,6 @@ In streamable-http mode: Uses the existing FastAPI server
 In stdio mode: Starts a minimal HTTP server just for OAuth callbacks
 """
 
-import os
 import asyncio
 import logging
 import threading
@@ -20,7 +19,7 @@ from urllib.parse import urlparse
 from auth.scopes import SCOPES
 from auth.oauth_responses import create_error_response, create_success_response, create_server_error_response
 from auth.google_auth import handle_auth_callback, check_client_secrets
-from core.config import get_oauth_redirect_uri
+from auth.oauth_config import get_oauth_redirect_uri
 
 logger = logging.getLogger(__name__)
 

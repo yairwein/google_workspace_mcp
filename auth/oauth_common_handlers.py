@@ -16,22 +16,24 @@ from google.oauth2.credentials import Credentials
 from auth.oauth21_session_store import store_token_session
 from auth.google_auth import save_credentials_to_file
 from auth.scopes import get_current_scopes
-from core.config import WORKSPACE_MCP_BASE_URI, WORKSPACE_MCP_PORT, get_oauth_base_url
+from auth.oauth_config import get_oauth_config
+from auth.oauth_error_handling import (
+    OAuthError, OAuthValidationError, OAuthConfigurationError,
+    create_oauth_error_response, validate_token_request,
+    validate_registration_request, get_development_cors_headers,
+    log_security_event
+)
 
 logger = logging.getLogger(__name__)
 
 
 async def handle_oauth_authorize(request: Request):
     """Common handler for OAuth authorization proxy."""
+    origin = request.headers.get("origin")
+    
     if request.method == "OPTIONS":
-        return JSONResponse(
-            content={},
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type"
-            }
-        )
+        cors_headers = get_development_cors_headers(origin)
+        return JSONResponse(content={}, headers=cors_headers)
 
     # Get query parameters
     params = dict(request.query_params)
@@ -55,50 +57,55 @@ async def handle_oauth_authorize(request: Request):
     # Build Google authorization URL
     google_auth_url = "https://accounts.google.com/o/oauth2/v2/auth?" + urlencode(params)
 
-    # Return redirect
+    # Return redirect with development CORS headers if needed
+    cors_headers = get_development_cors_headers(origin)
     return RedirectResponse(
         url=google_auth_url,
         status_code=302,
-        headers={
-            "Access-Control-Allow-Origin": "*"
-        }
+        headers=cors_headers
     )
 
 
 async def handle_proxy_token_exchange(request: Request):
-    """Common handler for OAuth token exchange proxy."""
+    """Common handler for OAuth token exchange proxy with comprehensive error handling."""
+    origin = request.headers.get("origin")
+    
     if request.method == "OPTIONS":
-        return JSONResponse(
-            content={},
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "POST, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type, Authorization"
-            }
-        )
+        cors_headers = get_development_cors_headers(origin)
+        return JSONResponse(content={}, headers=cors_headers)
     try:
-        # Get form data
-        body = await request.body()
-        content_type = request.headers.get("content-type", "application/x-www-form-urlencoded")
-        
-        # Parse form data to add missing client credentials
+        # Get form data with validation
+        try:
+            body = await request.body()
+            content_type = request.headers.get("content-type", "application/x-www-form-urlencoded")
+        except Exception as e:
+            raise OAuthValidationError(f"Failed to read request body: {e}")
+
+        # Parse and validate form data
         if content_type and "application/x-www-form-urlencoded" in content_type:
-            form_data = parse_qs(body.decode('utf-8'))
-            
+            try:
+                form_data = parse_qs(body.decode('utf-8'))
+            except Exception as e:
+                raise OAuthValidationError(f"Invalid form data: {e}")
+
+            # Convert to single values and validate
+            request_data = {k: v[0] if v else '' for k, v in form_data.items()}
+            validate_token_request(request_data)
+
             # Check if client_id is missing (public client)
             if 'client_id' not in form_data or not form_data['client_id'][0]:
                 client_id = os.getenv("GOOGLE_OAUTH_CLIENT_ID")
                 if client_id:
                     form_data['client_id'] = [client_id]
                     logger.debug("Added missing client_id to token request")
-            
+
             # Check if client_secret is missing (public client using PKCE)
             if 'client_secret' not in form_data:
                 client_secret = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET")
                 if client_secret:
                     form_data['client_secret'] = [client_secret]
                     logger.debug("Added missing client_secret to token request")
-            
+
             # Reconstruct body with added credentials
             body = urlencode(form_data, doseq=True).encode('utf-8')
 
@@ -138,7 +145,7 @@ async def handle_proxy_token_exchange(request: Request):
                                     )
                                     user_email = id_token_claims.get("email")
                                     email_verified = id_token_claims.get("email_verified")
-                                    
+
                                     if not email_verified:
                                         logger.error(f"Email address for user {user_email} is not verified by Google. Aborting session creation.")
                                         return JSONResponse(content={"error": "Email address not verified"}, status_code=403)
@@ -152,7 +159,7 @@ async def handle_proxy_token_exchange(request: Request):
                                                 logger.info(f"Found MCP session ID for binding: {mcp_session_id}")
                                         except Exception as e:
                                             logger.debug(f"Could not get MCP session ID: {e}")
-                                        
+
                                         # Store the token session with MCP session binding
                                         session_id = store_token_session(response_data, user_email, mcp_session_id)
                                         logger.info(f"Stored OAuth session for {user_email} (session: {session_id}, mcp: {mcp_session_id})")
@@ -186,43 +193,57 @@ async def handle_proxy_token_exchange(request: Request):
                         except Exception as e:
                             logger.error(f"Failed to store OAuth session: {e}")
 
+                # Add development CORS headers
+                cors_headers = get_development_cors_headers(origin)
+                response_headers = {
+                    "Content-Type": "application/json",
+                    "Cache-Control": "no-store"
+                }
+                response_headers.update(cors_headers)
+                
                 return JSONResponse(
                     status_code=response.status,
                     content=response_data,
-                    headers={
-                        "Content-Type": "application/json",
-                        "Access-Control-Allow-Origin": "*",
-                        "Cache-Control": "no-store"
-                    }
+                    headers=response_headers
                 )
 
+    except OAuthError as e:
+        log_security_event("oauth_token_exchange_error", {
+            "error_code": e.error_code,
+            "description": e.description
+        }, request)
+        return create_oauth_error_response(e, origin)
     except Exception as e:
-        logger.error(f"Error in token proxy: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": "server_error", "error_description": str(e)},
-            headers={"Access-Control-Allow-Origin": "*"}
-        )
+        logger.error(f"Unexpected error in token proxy: {e}", exc_info=True)
+        log_security_event("oauth_token_exchange_unexpected_error", {
+            "error": str(e)
+        }, request)
+        error = OAuthConfigurationError("Internal server error")
+        return create_oauth_error_response(error, origin)
 
 
 async def handle_oauth_protected_resource(request: Request):
-    """Common handler for OAuth protected resource metadata."""
+    """
+    Handle OAuth protected resource metadata requests.
+    """
+    origin = request.headers.get("origin")
+    
+    # Handle preflight
     if request.method == "OPTIONS":
-        return JSONResponse(
-            content={},
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type"
-            }
-        )
+        cors_headers = get_development_cors_headers(origin)
+        return JSONResponse(content={}, headers=cors_headers)
 
-    base_url = get_oauth_base_url()
+    config = get_oauth_config()
+    base_url = config.get_oauth_base_url()
+
+    # For streamable-http transport, the MCP server runs at /mcp
+    # This is the actual resource being protected
+    resource_url = f"{base_url}/mcp"
+
+    # Build metadata response per RFC 9449
     metadata = {
-        "resource": base_url,
-        "authorization_servers": [
-            base_url
-        ],
+        "resource": resource_url,  # The MCP server endpoint that needs protection
+        "authorization_servers": [base_url],  # Our proxy acts as the auth server
         "bearer_methods_supported": ["header"],
         "scopes_supported": get_current_scopes(),
         "resource_documentation": "https://developers.google.com/workspace",
@@ -230,179 +251,143 @@ async def handle_oauth_protected_resource(request: Request):
         "client_configuration_endpoint": f"{base_url}/.well-known/oauth-client",
     }
 
+    # Log the response for debugging
+    logger.debug(f"Returning protected resource metadata: {metadata}")
+
+    # Add development CORS headers
+    cors_headers = get_development_cors_headers(origin)
+    response_headers = {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "public, max-age=3600"
+    }
+    response_headers.update(cors_headers)
+    
     return JSONResponse(
         content=metadata,
-        headers={
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*"
-        }
+        headers=response_headers
     )
 
 
 async def handle_oauth_authorization_server(request: Request):
-    """Common handler for OAuth authorization server metadata."""
+    """
+    Handle OAuth authorization server metadata.
+    """
+    origin = request.headers.get("origin")
+    
     if request.method == "OPTIONS":
-        return JSONResponse(
-            content={},
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type"
-            }
-        )
+        cors_headers = get_development_cors_headers(origin)
+        return JSONResponse(content={}, headers=cors_headers)
 
-    # Get base URL once and reuse
-    base_url = get_oauth_base_url()
+    config = get_oauth_config()
+    
+    # Get authorization server metadata from centralized config
+    # Pass scopes directly to keep all metadata generation in one place
+    metadata = config.get_authorization_server_metadata(scopes=get_current_scopes())
 
-    try:
-        # Fetch metadata from Google
-        async with aiohttp.ClientSession() as session:
-            url = "https://accounts.google.com/.well-known/openid-configuration"
-            async with session.get(url) as response:
-                if response.status == 200:
-                    metadata = await response.json()
+    logger.debug(f"Returning authorization server metadata: {metadata}")
 
-                    # Add OAuth 2.1 required fields
-                    metadata.setdefault("code_challenge_methods_supported", ["S256"])
-                    metadata.setdefault("pkce_required", True)
-
-                    # Override endpoints to use our proxies
-                    metadata["token_endpoint"] = f"{base_url}/oauth2/token"
-                    metadata["authorization_endpoint"] = f"{base_url}/oauth2/authorize"
-                    metadata["enable_dynamic_registration"] = True
-                    metadata["registration_endpoint"] = f"{base_url}/oauth2/register"
-                    return JSONResponse(
-                        content=metadata,
-                        headers={
-                            "Content-Type": "application/json",
-                            "Access-Control-Allow-Origin": "*"
-                        }
-                    )
-
-        # Fallback metadata
-        return JSONResponse(
-            content={
-                "issuer": "https://accounts.google.com",
-                "authorization_endpoint": f"{base_url}/oauth2/authorize",
-                "token_endpoint": f"{base_url}/oauth2/token",
-                "userinfo_endpoint": "https://www.googleapis.com/oauth2/v2/userinfo",
-                "revocation_endpoint": "https://oauth2.googleapis.com/revoke",
-                "jwks_uri": "https://www.googleapis.com/oauth2/v3/certs",
-                "response_types_supported": ["code"],
-                "code_challenge_methods_supported": ["S256"],
-                "pkce_required": True,
-                "grant_types_supported": ["authorization_code", "refresh_token"],
-                "scopes_supported": get_current_scopes(),
-                "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"]
-            },
-            headers={
-                "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*"
-            }
-        )
-
-    except Exception as e:
-        logger.error(f"Error fetching auth server metadata: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": "Failed to fetch authorization server metadata"},
-            headers={"Access-Control-Allow-Origin": "*"}
-        )
+    # Add development CORS headers
+    cors_headers = get_development_cors_headers(origin)
+    response_headers = {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "public, max-age=3600"
+    }
+    response_headers.update(cors_headers)
+    
+    return JSONResponse(
+        content=metadata,
+        headers=response_headers
+    )
 
 
 async def handle_oauth_client_config(request: Request):
     """Common handler for OAuth client configuration."""
+    origin = request.headers.get("origin")
+    
     if request.method == "OPTIONS":
-        return JSONResponse(
-            content={},
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type"
-            }
-        )
+        cors_headers = get_development_cors_headers(origin)
+        return JSONResponse(content={}, headers=cors_headers)
 
     client_id = os.getenv("GOOGLE_OAUTH_CLIENT_ID")
     if not client_id:
+        cors_headers = get_development_cors_headers(origin)
         return JSONResponse(
             status_code=404,
             content={"error": "OAuth not configured"},
-            headers={"Access-Control-Allow-Origin": "*"}
+            headers=cors_headers
         )
+
+    # Get OAuth configuration
+    config = get_oauth_config()
 
     return JSONResponse(
         content={
             "client_id": client_id,
             "client_name": "Google Workspace MCP Server",
-            "client_uri": f"{WORKSPACE_MCP_BASE_URI}:{WORKSPACE_MCP_PORT}",
+            "client_uri": config.base_url,
             "redirect_uris": [
-                f"{WORKSPACE_MCP_BASE_URI}:{WORKSPACE_MCP_PORT}/oauth2callback",
+                f"{config.base_url}/oauth2callback",
                 "http://localhost:5173/auth/callback"
             ],
             "grant_types": ["authorization_code", "refresh_token"],
             "response_types": ["code"],
             "scope": " ".join(get_current_scopes()),
             "token_endpoint_auth_method": "client_secret_basic",
-            "code_challenge_methods": ["S256"]
+            "code_challenge_methods": config.supported_code_challenge_methods[:1]  # Primary method only
         },
         headers={
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*"
+            "Content-Type": "application/json; charset=utf-8",
+            "Cache-Control": "public, max-age=3600",
+            **get_development_cors_headers(origin)
         }
     )
 
 
 async def handle_oauth_register(request: Request):
-    """Common handler for OAuth dynamic client registration."""
+    """Common handler for OAuth dynamic client registration with comprehensive error handling."""
+    origin = request.headers.get("origin")
+    
     if request.method == "OPTIONS":
-        return JSONResponse(
-            content={},
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "POST, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type, Authorization"
-            }
-        )
+        cors_headers = get_development_cors_headers(origin)
+        return JSONResponse(content={}, headers=cors_headers)
 
-    client_id = os.getenv("GOOGLE_OAUTH_CLIENT_ID")
-    client_secret = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET")
+    config = get_oauth_config()
 
-    if not client_id or not client_secret:
-        return JSONResponse(
-            status_code=400,
-            content={"error": "invalid_request", "error_description": "OAuth not configured"},
-            headers={"Access-Control-Allow-Origin": "*"}
-        )
+    if not config.is_configured():
+        error = OAuthConfigurationError("OAuth client credentials not configured")
+        return create_oauth_error_response(error, origin)
 
     try:
-        # Parse the registration request
-        body = await request.json()
-        logger.info(f"Dynamic client registration request received: {body}")
+        # Parse and validate the registration request
+        try:
+            body = await request.json()
+        except Exception as e:
+            raise OAuthValidationError(f"Invalid JSON in registration request: {e}")
+
+        validate_registration_request(body)
+        logger.info("Dynamic client registration request received")
 
         # Extract redirect URIs from the request or use defaults
         redirect_uris = body.get("redirect_uris", [])
         if not redirect_uris:
-            redirect_uris = [
-                f"{WORKSPACE_MCP_BASE_URI}:{WORKSPACE_MCP_PORT}/oauth2callback",
-                "http://localhost:5173/auth/callback"
-            ]
+            redirect_uris = config.get_redirect_uris()
 
         # Build the registration response with our pre-configured credentials
         response_data = {
-            "client_id": client_id,
-            "client_secret": client_secret,
+            "client_id": config.client_id,
+            "client_secret": config.client_secret,
             "client_name": body.get("client_name", "Google Workspace MCP Server"),
-            "client_uri": body.get("client_uri", f"{WORKSPACE_MCP_BASE_URI}:{WORKSPACE_MCP_PORT}"),
+            "client_uri": body.get("client_uri", config.base_url),
             "redirect_uris": redirect_uris,
             "grant_types": body.get("grant_types", ["authorization_code", "refresh_token"]),
             "response_types": body.get("response_types", ["code"]),
             "scope": body.get("scope", " ".join(get_current_scopes())),
             "token_endpoint_auth_method": body.get("token_endpoint_auth_method", "client_secret_basic"),
-            "code_challenge_methods": ["S256"],
+            "code_challenge_methods": config.supported_code_challenge_methods,
             # Additional OAuth 2.1 fields
             "client_id_issued_at": int(time.time()),
             "registration_access_token": "not-required",  # We don't implement client management
-            "registration_client_uri": f"{get_oauth_base_url()}/oauth2/register/{client_id}"
+            "registration_client_uri": f"{config.get_oauth_base_url()}/oauth2/register/{config.client_id}"
         }
 
         logger.info("Dynamic client registration successful - returning pre-configured Google credentials")
@@ -412,15 +397,21 @@ async def handle_oauth_register(request: Request):
             content=response_data,
             headers={
                 "Content-Type": "application/json",
-                "Access-Control-Allow-Origin": "*",
-                "Cache-Control": "no-store"
+                "Cache-Control": "no-store",
+                **get_development_cors_headers(origin)
             }
         )
 
+    except OAuthError as e:
+        log_security_event("oauth_registration_error", {
+            "error_code": e.error_code,
+            "description": e.description
+        }, request)
+        return create_oauth_error_response(e, origin)
     except Exception as e:
-        logger.error(f"Error in dynamic client registration: {e}")
-        return JSONResponse(
-            status_code=400,
-            content={"error": "invalid_request", "error_description": str(e)},
-            headers={"Access-Control-Allow-Origin": "*"}
-        )
+        logger.error(f"Unexpected error in client registration: {e}", exc_info=True)
+        log_security_event("oauth_registration_unexpected_error", {
+            "error": str(e)
+        }, request)
+        error = OAuthConfigurationError("Internal server error")
+        return create_oauth_error_response(error, origin)
