@@ -51,6 +51,8 @@
 
 A production-ready MCP server that integrates all major Google Workspace services with AI assistants. It supports both single-user operation and multi-user authentication via OAuth 2.1, making it a powerful backend for custom applications. Built with FastMCP for optimal performance, featuring advanced authentication handling, service caching, and streamlined development patterns.
 
+**🎉 Simplified Setup**: Now uses Google Desktop OAuth clients - no redirect URIs or port configuration needed!
+
 ## Features
 
 - **🔐 Advanced OAuth 2.0 & OAuth 2.1**: Secure authentication with automatic token refresh, transport-aware callback handling, session management, centralized scope management, and OAuth 2.1 bearer token support for multi-user environments with innovative CORS proxy architecture
@@ -460,17 +462,18 @@ If you need to use HTTP mode with Claude Desktop:
 
 ### First-Time Authentication
 
-The server features **transport-aware OAuth callback handling**:
+The server uses **Google Desktop OAuth** for simplified authentication:
 
-- **Stdio Mode**: Automatically starts a minimal HTTP server on port 8000 for OAuth callbacks
-- **HTTP Mode**: Uses the existing FastAPI server for OAuth callbacks
-- **Same OAuth Flow**: Both modes use `http://localhost:8000/oauth2callback` for consistency
+- **No redirect URIs needed**: Desktop OAuth clients handle authentication without complex callback URLs
+- **Automatic flow**: The server manages the entire OAuth process transparently
+- **Transport-agnostic**: Works seamlessly in both stdio and HTTP modes
 
 When calling a tool:
 1. Server returns authorization URL
 2. Open URL in browser and authorize
-3. Server handles OAuth callback automatically (on port 8000 in both modes)
-4. Retry the original request
+3. Google provides an authorization code
+4. Paste the code when prompted (or it's handled automatically)
+5. Server completes authentication and retries your request
 
 ---
 
