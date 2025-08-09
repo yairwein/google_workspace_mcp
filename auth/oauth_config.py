@@ -42,13 +42,6 @@ class OAuthConfig:
         # Redirect URI configuration
         self.redirect_uri = self._get_redirect_uri()
 
-        # # VS Code OAuth callback configuration
-        # self.vscode_callback_port = int(os.getenv("VSCODE_OAUTH_CALLBACK_PORT", "33418"))
-        # self.vscode_callback_hosts = self._get_vscode_callback_hosts()
-
-        # # Development/testing configuration
-        # self.development_ports = self._get_development_ports()
-
     def _get_redirect_uri(self) -> str:
         """
         Get the OAuth redirect URI, supporting reverse proxy configurations.
@@ -61,30 +54,6 @@ class OAuthConfig:
             return explicit_uri
         return f"{self.base_url}/oauth2callback"
 
-    # def _get_vscode_callback_hosts(self) -> List[str]:
-    #     """
-    #     Get the list of VS Code callback hosts.
-
-    #     Returns:
-    #         List of VS Code callback hosts (localhost, 127.0.0.1)
-    #     """
-    #     custom_hosts = os.getenv("VSCODE_OAUTH_CALLBACK_HOSTS")
-    #     if custom_hosts:
-    #         return [host.strip() for host in custom_hosts.split(",")]
-    #     return ["127.0.0.1", "localhost"]
-
-    # def _get_development_ports(self) -> List[int]:
-    #     """
-    #     Get the list of development server ports for testing.
-
-    #     Returns:
-    #         List of common development ports
-    #     """
-    #     custom_ports = os.getenv("OAUTH_DEVELOPMENT_PORTS")
-    #     if custom_ports:
-    #         return [int(port.strip()) for port in custom_ports.split(",")]
-    #     return [3000, 5173, 8080]
-
     def get_redirect_uris(self) -> List[str]:
         """
         Get all valid OAuth redirect URIs.
@@ -96,19 +65,6 @@ class OAuthConfig:
 
         # Primary redirect URI
         uris.append(self.redirect_uri)
-
-        # # Development redirect URIs
-        # for port in self.development_ports:
-        #     uris.append(f"http://localhost:{port}/auth/callback")
-        #     uris.append(f"http://127.0.0.1:{port}/auth/callback")
-
-        # # VS Code callback URIs
-        # for host in self.vscode_callback_hosts:
-        #     base_uri = f"http://{host}:{self.vscode_callback_port}"
-        #     uris.extend([
-        #         f"{base_uri}/callback",  # Standard callback path
-        #         f"{base_uri}/",          # Root path with trailing slash
-        #     ])
 
         # Custom redirect URIs from environment
         custom_uris = os.getenv("OAUTH_CUSTOM_REDIRECT_URIS")
@@ -136,17 +92,6 @@ class OAuthConfig:
             "https://vscode.dev",
             "https://github.dev",
         ])
-
-        # Development origins
-        for port in self.development_ports:
-            origins.extend([
-                f"http://localhost:{port}",
-                f"http://127.0.0.1:{port}",
-            ])
-
-        # VS Code callback server origins
-        for host in self.vscode_callback_hosts:
-            origins.append(f"http://{host}:{self.vscode_callback_port}")
 
         # Custom origins from environment
         custom_origins = os.getenv("OAUTH_ALLOWED_ORIGINS")
@@ -200,9 +145,6 @@ class OAuthConfig:
             "oauth21_enabled": self.oauth21_enabled,
             "pkce_required": self.pkce_required,
             "transport_mode": self._transport_mode,
-            # "vscode_callback_port": self.vscode_callback_port,
-            # "vscode_callback_hosts": self.vscode_callback_hosts,
-            "development_ports": self.development_ports,
             "total_redirect_uris": len(self.get_redirect_uris()),
             "total_allowed_origins": len(self.get_allowed_origins()),
         }
