@@ -15,44 +15,44 @@ from typing import List, Optional, Dict, Any
 class OAuthConfig:
     """
     Centralized OAuth configuration management.
-    
+
     This class eliminates the hardcoded configuration anti-pattern identified
     in the challenge review by providing a single source of truth for all
     OAuth-related configuration values.
     """
-    
+
     def __init__(self):
         # Base server configuration
         self.base_uri = os.getenv("WORKSPACE_MCP_BASE_URI", "http://localhost")
         self.port = int(os.getenv("PORT", os.getenv("WORKSPACE_MCP_PORT", "8000")))
         self.base_url = f"{self.base_uri}:{self.port}"
-        
+
         # OAuth client configuration
         self.client_id = os.getenv("GOOGLE_OAUTH_CLIENT_ID")
         self.client_secret = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET")
-        
+
         # OAuth 2.1 configuration
         self.oauth21_enabled = os.getenv("MCP_ENABLE_OAUTH21", "false").lower() == "true"
         self.pkce_required = self.oauth21_enabled  # PKCE is mandatory in OAuth 2.1
         self.supported_code_challenge_methods = ["S256", "plain"] if not self.oauth21_enabled else ["S256"]
-        
+
         # Transport mode (will be set at runtime)
         self._transport_mode = "stdio"  # Default
-        
+
         # Redirect URI configuration
         self.redirect_uri = self._get_redirect_uri()
-        
-        # VS Code OAuth callback configuration
-        self.vscode_callback_port = int(os.getenv("VSCODE_OAUTH_CALLBACK_PORT", "33418"))
-        self.vscode_callback_hosts = self._get_vscode_callback_hosts()
-        
-        # Development/testing configuration
-        self.development_ports = self._get_development_ports()
-        
+
+        # # VS Code OAuth callback configuration
+        # self.vscode_callback_port = int(os.getenv("VSCODE_OAUTH_CALLBACK_PORT", "33418"))
+        # self.vscode_callback_hosts = self._get_vscode_callback_hosts()
+
+        # # Development/testing configuration
+        # self.development_ports = self._get_development_ports()
+
     def _get_redirect_uri(self) -> str:
         """
         Get the OAuth redirect URI, supporting reverse proxy configurations.
-        
+
         Returns:
             The configured redirect URI
         """
@@ -60,136 +60,136 @@ class OAuthConfig:
         if explicit_uri:
             return explicit_uri
         return f"{self.base_url}/oauth2callback"
-    
-    def _get_vscode_callback_hosts(self) -> List[str]:
-        """
-        Get the list of VS Code callback hosts.
-        
-        Returns:
-            List of VS Code callback hosts (localhost, 127.0.0.1)
-        """
-        custom_hosts = os.getenv("VSCODE_OAUTH_CALLBACK_HOSTS")
-        if custom_hosts:
-            return [host.strip() for host in custom_hosts.split(",")]
-        return ["127.0.0.1", "localhost"]
-    
-    def _get_development_ports(self) -> List[int]:
-        """
-        Get the list of development server ports for testing.
-        
-        Returns:
-            List of common development ports
-        """
-        custom_ports = os.getenv("OAUTH_DEVELOPMENT_PORTS")
-        if custom_ports:
-            return [int(port.strip()) for port in custom_ports.split(",")]
-        return [3000, 5173, 8080]
-    
+
+    # def _get_vscode_callback_hosts(self) -> List[str]:
+    #     """
+    #     Get the list of VS Code callback hosts.
+
+    #     Returns:
+    #         List of VS Code callback hosts (localhost, 127.0.0.1)
+    #     """
+    #     custom_hosts = os.getenv("VSCODE_OAUTH_CALLBACK_HOSTS")
+    #     if custom_hosts:
+    #         return [host.strip() for host in custom_hosts.split(",")]
+    #     return ["127.0.0.1", "localhost"]
+
+    # def _get_development_ports(self) -> List[int]:
+    #     """
+    #     Get the list of development server ports for testing.
+
+    #     Returns:
+    #         List of common development ports
+    #     """
+    #     custom_ports = os.getenv("OAUTH_DEVELOPMENT_PORTS")
+    #     if custom_ports:
+    #         return [int(port.strip()) for port in custom_ports.split(",")]
+    #     return [3000, 5173, 8080]
+
     def get_redirect_uris(self) -> List[str]:
         """
         Get all valid OAuth redirect URIs.
-        
+
         Returns:
             List of all supported redirect URIs
         """
         uris = []
-        
+
         # Primary redirect URI
         uris.append(self.redirect_uri)
-        
-        # Development redirect URIs
-        for port in self.development_ports:
-            uris.append(f"http://localhost:{port}/auth/callback")
-            uris.append(f"http://127.0.0.1:{port}/auth/callback")
-        
-        # VS Code callback URIs
-        for host in self.vscode_callback_hosts:
-            base_uri = f"http://{host}:{self.vscode_callback_port}"
-            uris.extend([
-                f"{base_uri}/callback",  # Standard callback path
-                f"{base_uri}/",          # Root path with trailing slash
-            ])
-        
+
+        # # Development redirect URIs
+        # for port in self.development_ports:
+        #     uris.append(f"http://localhost:{port}/auth/callback")
+        #     uris.append(f"http://127.0.0.1:{port}/auth/callback")
+
+        # # VS Code callback URIs
+        # for host in self.vscode_callback_hosts:
+        #     base_uri = f"http://{host}:{self.vscode_callback_port}"
+        #     uris.extend([
+        #         f"{base_uri}/callback",  # Standard callback path
+        #         f"{base_uri}/",          # Root path with trailing slash
+        #     ])
+
         # Custom redirect URIs from environment
         custom_uris = os.getenv("OAUTH_CUSTOM_REDIRECT_URIS")
         if custom_uris:
             uris.extend([uri.strip() for uri in custom_uris.split(",")])
-        
+
         # Remove duplicates while preserving order
         return list(dict.fromkeys(uris))
-    
+
     def get_allowed_origins(self) -> List[str]:
         """
         Get allowed CORS origins for OAuth endpoints.
-        
+
         Returns:
             List of allowed origins for CORS
         """
         origins = []
-        
+
         # Server's own origin
         origins.append(self.base_url)
-        
+
         # VS Code and development origins
         origins.extend([
             "vscode-webview://",
             "https://vscode.dev",
             "https://github.dev",
         ])
-        
+
         # Development origins
         for port in self.development_ports:
             origins.extend([
                 f"http://localhost:{port}",
                 f"http://127.0.0.1:{port}",
             ])
-        
+
         # VS Code callback server origins
         for host in self.vscode_callback_hosts:
             origins.append(f"http://{host}:{self.vscode_callback_port}")
-        
+
         # Custom origins from environment
         custom_origins = os.getenv("OAUTH_ALLOWED_ORIGINS")
         if custom_origins:
             origins.extend([origin.strip() for origin in custom_origins.split(",")])
-        
+
         return list(dict.fromkeys(origins))
-    
+
     def is_configured(self) -> bool:
         """
         Check if OAuth is properly configured.
-        
+
         Returns:
             True if OAuth client credentials are available
         """
         return bool(self.client_id and self.client_secret)
-    
+
     def get_oauth_base_url(self) -> str:
         """
         Get OAuth base URL for constructing OAuth endpoints.
-        
+
         Returns:
             Base URL for OAuth endpoints
         """
         return self.base_url
-    
+
     def validate_redirect_uri(self, uri: str) -> bool:
         """
         Validate if a redirect URI is allowed.
-        
+
         Args:
             uri: The redirect URI to validate
-            
+
         Returns:
             True if the URI is allowed, False otherwise
         """
         allowed_uris = self.get_redirect_uris()
         return uri in allowed_uris
-    
+
     def get_environment_summary(self) -> dict:
         """
         Get a summary of the current OAuth configuration.
-        
+
         Returns:
             Dictionary with configuration summary (excluding secrets)
         """
@@ -200,81 +200,81 @@ class OAuthConfig:
             "oauth21_enabled": self.oauth21_enabled,
             "pkce_required": self.pkce_required,
             "transport_mode": self._transport_mode,
-            "vscode_callback_port": self.vscode_callback_port,
-            "vscode_callback_hosts": self.vscode_callback_hosts,
+            # "vscode_callback_port": self.vscode_callback_port,
+            # "vscode_callback_hosts": self.vscode_callback_hosts,
             "development_ports": self.development_ports,
             "total_redirect_uris": len(self.get_redirect_uris()),
             "total_allowed_origins": len(self.get_allowed_origins()),
         }
-    
+
     def set_transport_mode(self, mode: str) -> None:
         """
         Set the current transport mode for OAuth callback handling.
-        
+
         Args:
             mode: Transport mode ("stdio", "streamable-http", etc.)
         """
         self._transport_mode = mode
-    
+
     def get_transport_mode(self) -> str:
         """
         Get the current transport mode.
-        
+
         Returns:
             Current transport mode
         """
         return self._transport_mode
-    
+
     def is_oauth21_enabled(self) -> bool:
         """
         Check if OAuth 2.1 mode is enabled.
-        
+
         Returns:
             True if OAuth 2.1 is enabled
         """
         return self.oauth21_enabled
-    
+
     def detect_oauth_version(self, request_params: Dict[str, Any]) -> str:
         """
         Detect OAuth version based on request parameters.
-        
+
         This method implements a conservative detection strategy:
         - Only returns "oauth21" when we have clear indicators
         - Defaults to "oauth20" for backward compatibility
         - Respects the global oauth21_enabled flag
-        
+
         Args:
             request_params: Request parameters from authorization or token request
-            
+
         Returns:
             "oauth21" or "oauth20" based on detection
         """
         # If OAuth 2.1 is not enabled globally, always return OAuth 2.0
         if not self.oauth21_enabled:
             return "oauth20"
-        
+
         # Use the structured type for cleaner detection logic
         from auth.oauth_types import OAuthVersionDetectionParams
         params = OAuthVersionDetectionParams.from_request(request_params)
-        
+
         # Clear OAuth 2.1 indicator: PKCE is present
         if params.has_pkce:
             return "oauth21"
-        
+
         # For public clients in OAuth 2.1 mode, we require PKCE
         # But since they didn't send PKCE, fall back to OAuth 2.0
         # This ensures backward compatibility
-        
+
         # Default to OAuth 2.0 for maximum compatibility
         return "oauth20"
-    
+
     def get_authorization_server_metadata(self, scopes: Optional[List[str]] = None) -> Dict[str, Any]:
         """
         Get OAuth authorization server metadata per RFC 8414.
-        
+
         Args:
             scopes: Optional list of supported scopes to include in metadata
-        
+
         Returns:
             Authorization server metadata dictionary
         """
@@ -289,11 +289,11 @@ class OAuthConfig:
             "token_endpoint_auth_methods_supported": ["client_secret_post", "client_secret_basic"],
             "code_challenge_methods_supported": self.supported_code_challenge_methods,
         }
-        
+
         # Include scopes if provided
         if scopes is not None:
             metadata["scopes_supported"] = scopes
-        
+
         # Add OAuth 2.1 specific metadata
         if self.oauth21_enabled:
             metadata["pkce_required"] = True
@@ -301,7 +301,7 @@ class OAuthConfig:
             metadata["response_types_supported"] = ["code"]
             # OAuth 2.1 requires exact redirect URI matching
             metadata["require_exact_redirect_uri"] = True
-        
+
         return metadata
 
 
@@ -312,7 +312,7 @@ _oauth_config = None
 def get_oauth_config() -> OAuthConfig:
     """
     Get the global OAuth configuration instance.
-    
+
     Returns:
         The singleton OAuth configuration instance
     """
@@ -325,9 +325,9 @@ def get_oauth_config() -> OAuthConfig:
 def reload_oauth_config() -> OAuthConfig:
     """
     Reload the OAuth configuration from environment variables.
-    
+
     This is useful for testing or when environment variables change.
-    
+
     Returns:
         The reloaded OAuth configuration instance
     """
@@ -343,7 +343,7 @@ def get_oauth_base_url() -> str:
 
 
 def get_redirect_uris() -> List[str]:
-    """Get all valid OAuth redirect URIs.""" 
+    """Get all valid OAuth redirect URIs."""
     return get_oauth_config().get_redirect_uris()
 
 
