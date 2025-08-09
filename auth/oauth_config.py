@@ -4,10 +4,12 @@ OAuth Configuration Management
 This module centralizes OAuth-related configuration to eliminate hardcoded values
 scattered throughout the codebase. It provides environment variable support and
 sensible defaults for all OAuth-related settings.
+
+Supports both OAuth 2.0 and OAuth 2.1 with automatic client capability detection.
 """
 
 import os
-from typing import List
+from typing import List, Optional, Dict, Any
 
 
 class OAuthConfig:
@@ -28,6 +30,14 @@ class OAuthConfig:
         # OAuth client configuration
         self.client_id = os.getenv("GOOGLE_OAUTH_CLIENT_ID")
         self.client_secret = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET")
+        
+        # OAuth 2.1 configuration
+        self.oauth21_enabled = os.getenv("MCP_ENABLE_OAUTH21", "false").lower() == "true"
+        self.pkce_required = self.oauth21_enabled  # PKCE is mandatory in OAuth 2.1
+        self.supported_code_challenge_methods = ["S256", "plain"] if not self.oauth21_enabled else ["S256"]
+        
+        # Transport mode (will be set at runtime)
+        self._transport_mode = "stdio"  # Default
         
         # Redirect URI configuration
         self.redirect_uri = self._get_redirect_uri()
@@ -187,12 +197,112 @@ class OAuthConfig:
             "base_url": self.base_url,
             "redirect_uri": self.redirect_uri,
             "client_configured": bool(self.client_id),
+            "oauth21_enabled": self.oauth21_enabled,
+            "pkce_required": self.pkce_required,
+            "transport_mode": self._transport_mode,
             "vscode_callback_port": self.vscode_callback_port,
             "vscode_callback_hosts": self.vscode_callback_hosts,
             "development_ports": self.development_ports,
             "total_redirect_uris": len(self.get_redirect_uris()),
             "total_allowed_origins": len(self.get_allowed_origins()),
         }
+    
+    def set_transport_mode(self, mode: str) -> None:
+        """
+        Set the current transport mode for OAuth callback handling.
+        
+        Args:
+            mode: Transport mode ("stdio", "streamable-http", etc.)
+        """
+        self._transport_mode = mode
+    
+    def get_transport_mode(self) -> str:
+        """
+        Get the current transport mode.
+        
+        Returns:
+            Current transport mode
+        """
+        return self._transport_mode
+    
+    def is_oauth21_enabled(self) -> bool:
+        """
+        Check if OAuth 2.1 mode is enabled.
+        
+        Returns:
+            True if OAuth 2.1 is enabled
+        """
+        return self.oauth21_enabled
+    
+    def detect_oauth_version(self, request_params: Dict[str, Any]) -> str:
+        """
+        Detect OAuth version based on request parameters.
+        
+        This method implements a conservative detection strategy:
+        - Only returns "oauth21" when we have clear indicators
+        - Defaults to "oauth20" for backward compatibility
+        - Respects the global oauth21_enabled flag
+        
+        Args:
+            request_params: Request parameters from authorization or token request
+            
+        Returns:
+            "oauth21" or "oauth20" based on detection
+        """
+        # If OAuth 2.1 is not enabled globally, always return OAuth 2.0
+        if not self.oauth21_enabled:
+            return "oauth20"
+        
+        # Use the structured type for cleaner detection logic
+        from auth.oauth_types import OAuthVersionDetectionParams
+        params = OAuthVersionDetectionParams.from_request(request_params)
+        
+        # Clear OAuth 2.1 indicator: PKCE is present
+        if params.has_pkce:
+            return "oauth21"
+        
+        # For public clients in OAuth 2.1 mode, we require PKCE
+        # But since they didn't send PKCE, fall back to OAuth 2.0
+        # This ensures backward compatibility
+        
+        # Default to OAuth 2.0 for maximum compatibility
+        return "oauth20"
+    
+    def get_authorization_server_metadata(self, scopes: Optional[List[str]] = None) -> Dict[str, Any]:
+        """
+        Get OAuth authorization server metadata per RFC 8414.
+        
+        Args:
+            scopes: Optional list of supported scopes to include in metadata
+        
+        Returns:
+            Authorization server metadata dictionary
+        """
+        metadata = {
+            "issuer": self.base_url,
+            "authorization_endpoint": f"{self.base_url}/oauth2/authorize",
+            "token_endpoint": f"{self.base_url}/oauth2/token",
+            "registration_endpoint": f"{self.base_url}/oauth2/register",
+            "jwks_uri": "https://www.googleapis.com/oauth2/v3/certs",
+            "response_types_supported": ["code", "token"],
+            "grant_types_supported": ["authorization_code", "refresh_token"],
+            "token_endpoint_auth_methods_supported": ["client_secret_post", "client_secret_basic"],
+            "code_challenge_methods_supported": self.supported_code_challenge_methods,
+        }
+        
+        # Include scopes if provided
+        if scopes is not None:
+            metadata["scopes_supported"] = scopes
+        
+        # Add OAuth 2.1 specific metadata
+        if self.oauth21_enabled:
+            metadata["pkce_required"] = True
+            # OAuth 2.1 deprecates implicit flow
+            metadata["response_types_supported"] = ["code"]
+            # OAuth 2.1 requires exact redirect URI matching
+            metadata["require_exact_redirect_uri"] = True
+        
+        return metadata
 
 
 # Global configuration instance
@@ -245,3 +355,23 @@ def get_allowed_origins() -> List[str]:
 def is_oauth_configured() -> bool:
     """Check if OAuth is properly configured."""
     return get_oauth_config().is_configured()
+
+
+def set_transport_mode(mode: str) -> None:
+    """Set the current transport mode."""
+    get_oauth_config().set_transport_mode(mode)
+
+
+def get_transport_mode() -> str:
+    """Get the current transport mode."""
+    return get_oauth_config().get_transport_mode()
+
+
+def is_oauth21_enabled() -> bool:
+    """Check if OAuth 2.1 is enabled."""
+    return get_oauth_config().is_oauth21_enabled()
+
+
+def get_oauth_redirect_uri() -> str:
+    """Get the primary OAuth redirect URI."""
+    return get_oauth_config().redirect_uri

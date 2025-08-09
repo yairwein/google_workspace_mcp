@@ -286,21 +286,10 @@ async def handle_oauth_authorization_server(request: Request):
         )
 
     config = get_oauth_config()
-    base_url = config.get_oauth_base_url()
-
-    # Build authorization server metadata per RFC 8414
-    metadata = {
-        "issuer": base_url,
-        "authorization_endpoint": f"{base_url}/oauth2/authorize",
-        "token_endpoint": f"{base_url}/oauth2/token",
-        "registration_endpoint": f"{base_url}/oauth2/register",
-        "jwks_uri": "https://www.googleapis.com/oauth2/v3/certs",
-        "response_types_supported": ["code", "token"],
-        "grant_types_supported": ["authorization_code", "refresh_token"],
-        "token_endpoint_auth_methods_supported": ["client_secret_post", "client_secret_basic"],
-        "scopes_supported": get_current_scopes(),
-        "code_challenge_methods_supported": ["S256", "plain"],
-    }
+    
+    # Get authorization server metadata from centralized config
+    # Pass scopes directly to keep all metadata generation in one place
+    metadata = config.get_authorization_server_metadata(scopes=get_current_scopes())
 
     logger.debug(f"Returning authorization server metadata: {metadata}")
 
@@ -363,7 +352,7 @@ async def handle_oauth_client_config(request: Request):
             "response_types": ["code"],
             "scope": " ".join(get_current_scopes()),
             "token_endpoint_auth_method": "client_secret_basic",
-            "code_challenge_methods": ["S256"]
+            "code_challenge_methods": config.supported_code_challenge_methods[:1]  # Primary method only
         },
         headers=response_headers
     )
@@ -411,7 +400,7 @@ async def handle_oauth_register(request: Request):
             "response_types": body.get("response_types", ["code"]),
             "scope": body.get("scope", " ".join(get_current_scopes())),
             "token_endpoint_auth_method": body.get("token_endpoint_auth_method", "client_secret_basic"),
-            "code_challenge_methods": ["S256"],
+            "code_challenge_methods": config.supported_code_challenge_methods,
             # Additional OAuth 2.1 fields
             "client_id_issued_at": int(time.time()),
             "registration_access_token": "not-required",  # We don't implement client management

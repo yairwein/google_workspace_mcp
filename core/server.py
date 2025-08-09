@@ -50,15 +50,15 @@ class SecureFastMCP(FastMCP):
     def streamable_http_app(self) -> "Starlette":
         """Override to add secure middleware stack for OAuth 2.1."""
         app = super().streamable_http_app()
-        
+
         # Add middleware in order (first added = outermost layer)
         # 1. CORS Security - handles CORS with proper origin validation
         app.user_middleware.insert(0, cors_security_middleware)
-        # 2. VS Code Path Normalization - rewrites VS Code paths transparently  
+        # 2. VS Code Path Normalization - rewrites VS Code paths transparently
         app.user_middleware.insert(1, vscode_middleware)
         # 3. Session Management - extracts session info for MCP context
         app.user_middleware.insert(2, session_middleware)
-        
+
         # Rebuild middleware stack
         app.middleware_stack = app.build_middleware_stack()
         logger.info("Added secure middleware stack: CORS Security, VS Code Compatibility, Session Management")
@@ -66,7 +66,7 @@ class SecureFastMCP(FastMCP):
 
 # --- Server Instance ---
 server = SecureFastMCP(
-    name="google_workspace", 
+    name="google_workspace",
     auth=None,
 )
 
@@ -86,32 +86,38 @@ def configure_server_for_http():
     This must be called BEFORE server.run().
     """
     global _auth_provider
+
     transport_mode = get_transport_mode()
 
     if transport_mode != "streamable-http":
         return
 
-    oauth21_enabled = os.getenv("MCP_ENABLE_OAUTH21", "false").lower() == "true"
+    # Use centralized OAuth configuration
+    from auth.oauth_config import get_oauth_config
+    config = get_oauth_config()
+    
+    # Check if OAuth 2.1 is enabled via centralized config
+    oauth21_enabled = config.is_oauth21_enabled()
 
     if oauth21_enabled:
-        if not os.getenv("GOOGLE_OAUTH_CLIENT_ID"):
-            logger.warning("⚠️  OAuth 2.1 enabled but GOOGLE_OAUTH_CLIENT_ID not set")
+        if not config.is_configured():
+            logger.warning("⚠️  OAuth 2.1 enabled but OAuth credentials not configured")
             return
 
         if GOOGLE_REMOTE_AUTH_AVAILABLE:
-            logger.info("🔐 OAuth 2.1 enabled")
+            logger.info("🔐 OAuth 2.1 enabled with automatic OAuth 2.0 fallback for legacy clients")
             try:
                 _auth_provider = GoogleRemoteAuthProvider()
                 server.auth = _auth_provider
                 set_auth_provider(_auth_provider)
                 from auth.oauth21_integration import enable_oauth21
-                enable_oauth21()
+                enable_oauth21()  # This is now just a logging call
             except Exception as e:
                 logger.error(f"Failed to initialize GoogleRemoteAuthProvider: {e}", exc_info=True)
         else:
             logger.error("OAuth 2.1 is enabled, but GoogleRemoteAuthProvider is not available.")
     else:
-        logger.info("OAuth 2.1 is DISABLED. Server will use legacy tool-based authentication.")
+        logger.info("OAuth 2.0 mode - Server will use legacy authentication.")
         server.auth = None
 
 def get_auth_provider() -> Optional[Union[GoogleWorkspaceAuthProvider, GoogleRemoteAuthProvider]]:
@@ -223,7 +229,7 @@ if os.getenv("MCP_ENABLE_OAUTH21", "false").lower() == "true" and not GOOGLE_REM
         handle_oauth_client_config,
         handle_oauth_register
     )
-    
+
     server.custom_route("/.well-known/oauth-protected-resource", methods=["GET", "OPTIONS"])(handle_oauth_protected_resource)
     server.custom_route("/.well-known/oauth-authorization-server", methods=["GET", "OPTIONS"])(handle_oauth_authorization_server)
     server.custom_route("/.well-known/oauth-client", methods=["GET", "OPTIONS"])(handle_oauth_client_config)

@@ -334,9 +334,31 @@ def require_google_service(
                     # Log authentication status
                     logger.debug(f"[{tool_name}] Auth: {authenticated_user or 'none'} via {auth_method or 'none'} (session: {mcp_session_id[:8] if mcp_session_id else 'none'})")
 
-                    from auth.oauth21_integration import is_oauth21_enabled
-
+                    from auth.oauth_config import is_oauth21_enabled, get_oauth_config
+                    
+                    # Smart OAuth version detection and fallback
+                    use_oauth21 = False
+                    oauth_version = "oauth20"  # Default
+                    
                     if is_oauth21_enabled():
+                        # OAuth 2.1 is enabled globally, check client capabilities
+                        # Try to detect from context if this is an OAuth 2.1 capable client
+                        config = get_oauth_config()
+                        
+                        # Build request params from context for version detection
+                        request_params = {}
+                        if authenticated_user:
+                            request_params["authenticated_user"] = authenticated_user
+                        if mcp_session_id:
+                            request_params["session_id"] = mcp_session_id
+                        
+                        # Detect OAuth version based on client capabilities
+                        oauth_version = config.detect_oauth_version(request_params)
+                        use_oauth21 = (oauth_version == "oauth21")
+                        
+                        logger.debug(f"[{tool_name}] OAuth version detected: {oauth_version}, will use OAuth 2.1: {use_oauth21}")
+
+                    if use_oauth21:
                         logger.debug(f"[{tool_name}] Using OAuth 2.1 flow")
                         # The downstream get_authenticated_google_service_oauth21 will handle
                         # whether the user's token is valid for the requested resource.
@@ -352,8 +374,8 @@ def require_google_service(
                             allow_recent_auth=False,
                         )
                     else:
-                        # If OAuth 2.1 is not enabled, always use the legacy authentication method.
-                        logger.debug(f"[{tool_name}] Using legacy OAuth flow")
+                        # Use legacy OAuth 2.0 authentication
+                        logger.debug(f"[{tool_name}] Using legacy OAuth 2.0 flow")
                         service, actual_user_email = await get_authenticated_google_service(
                             service_name=service_name,
                             version=service_version,
