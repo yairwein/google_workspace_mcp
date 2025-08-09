@@ -287,12 +287,10 @@ This architecture enables any OAuth 2.1 compliant client to authenticate users t
 
 ### VS Code MCP Client Support
 
-The server includes native support for VS Code's MCP client with transparent path normalization:
+The server includes native support for VS Code's MCP client:
 
-- **Automatic Path Handling**: VS Code's non-standard OAuth discovery paths (`/mcp/.well-known/*`) are automatically normalized to canonical locations (`/.well-known/*`)
 - **No Configuration Required**: Works out-of-the-box with VS Code's MCP extension
-- **Performance Optimized**: Uses middleware-based path rewriting instead of HTTP redirects
-- **Standards Compliant**: Maintains full OAuth 2.1 compliance while accommodating VS Code quirks
+- **Standards Compliant**: Full OAuth 2.1 compliance with desktop OAuth clients
 
 **VS Code mcp.json Configuration Example**:
 ```json
@@ -313,7 +311,6 @@ The server includes native support for VS Code's MCP client with transparent pat
 
 The server uses a clean, modular architecture for maintainability and security with broad OAuth2.1 MCP Client support:
 
-- **Middleware Layer**: [`VSCodePathNormalizationMiddleware`](auth/vscode_compatibility_middleware.py) handles VS Code compatibility transparently
 - **Centralized Configuration**: [`OAuthConfig`](auth/oauth_config.py) eliminates hardcoded values and provides environment-based configuration
 - **Standardized Error Handling**: [`oauth_error_handling.py`](auth/oauth_error_handling.py) provides consistent error responses and input validation
 - **Security-First Design**: Proper CORS handling, input sanitization, and comprehensive validation throughout
