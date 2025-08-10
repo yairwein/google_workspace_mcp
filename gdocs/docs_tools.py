@@ -311,56 +311,125 @@ async def create_doc(
 
 
 @server.tool()
-@handle_http_errors("update_doc_text", service_type="docs")
+@handle_http_errors("modify_doc_text", service_type="docs")
 @require_google_service("docs", "docs_write")
-async def update_doc_text(
+async def modify_doc_text(
     service,
     user_google_email: str,
     document_id: str,
-    text: str,
     start_index: int,
     end_index: int = None,
+    text: str = None,
+    bold: bool = None,
+    italic: bool = None,
+    underline: bool = None,
+    font_size: int = None,
+    font_family: str = None,
 ) -> str:
     """
-    Updates text at a specific location in a Google Doc.
+    Modifies text in a Google Doc - can insert/replace text and/or apply formatting in a single operation.
 
     Args:
         user_google_email: User's Google email address
         document_id: ID of the document to update
-        text: New text to insert or replace with
-        start_index: Start position for text update (0-based)
-        end_index: End position for text replacement (if not provided, text is inserted)
+        start_index: Start position for operation (0-based)
+        end_index: End position for text replacement/formatting (if not provided with text, text is inserted)
+        text: New text to insert or replace with (optional - can format existing text without changing it)
+        bold: Whether to make text bold (True/False/None to leave unchanged)
+        italic: Whether to make text italic (True/False/None to leave unchanged) 
+        underline: Whether to underline text (True/False/None to leave unchanged)
+        font_size: Font size in points
+        font_family: Font family name (e.g., "Arial", "Times New Roman")
 
     Returns:
-        str: Confirmation message with update details
+        str: Confirmation message with operation details
     """
-    logger.info(f"[update_doc_text] Doc={document_id}, start={start_index}, end={end_index}")
+    logger.info(f"[modify_doc_text] Doc={document_id}, start={start_index}, end={end_index}, text={text is not None}, formatting={any([bold, italic, underline, font_size, font_family])}")
+
+    # Input validation
+    validator = ValidationManager()
+    
+    is_valid, error_msg = validator.validate_document_id(document_id)
+    if not is_valid:
+        return f"Error: {error_msg}"
+    
+    # Validate that we have something to do
+    if text is None and not any([bold is not None, italic is not None, underline is not None, font_size, font_family]):
+        return "Error: Must provide either 'text' to insert/replace, or formatting parameters (bold, italic, underline, font_size, font_family)."
+    
+    # Validate text formatting params if provided
+    if any([bold is not None, italic is not None, underline is not None, font_size, font_family]):
+        is_valid, error_msg = validator.validate_text_formatting_params(bold, italic, underline, font_size, font_family)
+        if not is_valid:
+            return f"Error: {error_msg}"
+            
+        # For formatting, we need end_index
+        if end_index is None:
+            return "Error: 'end_index' is required when applying formatting."
+            
+        is_valid, error_msg = validator.validate_index_range(start_index, end_index)
+        if not is_valid:
+            return f"Error: {error_msg}"
 
     requests = []
+    operations = []
 
-    if end_index is not None and end_index > start_index:
-        # Special case: Cannot delete at index 0 (first section break)
-        # Instead, we insert new text at index 1 and then delete the old text
-        if start_index == 0:
-            # Insert new text at index 1
-            requests.append(create_insert_text_request(1, text))
-            # Then delete old text (adjusting for the inserted text)
-            adjusted_end = end_index + len(text)
-            requests.append(create_delete_range_request(1 + len(text), adjusted_end))
-            operation = f"Replaced text from index {start_index} to {end_index}"
+    # Handle text insertion/replacement
+    if text is not None:
+        if end_index is not None and end_index > start_index:
+            # Text replacement
+            if start_index == 0:
+                # Special case: Cannot delete at index 0 (first section break)
+                # Instead, we insert new text at index 1 and then delete the old text
+                requests.append(create_insert_text_request(1, text))
+                adjusted_end = end_index + len(text)
+                requests.append(create_delete_range_request(1 + len(text), adjusted_end))
+                operations.append(f"Replaced text from index {start_index} to {end_index}")
+            else:
+                # Normal replacement: delete old text, then insert new text
+                requests.extend([
+                    create_delete_range_request(start_index, end_index),
+                    create_insert_text_request(start_index, text)
+                ])
+                operations.append(f"Replaced text from index {start_index} to {end_index}")
         else:
-            # Normal replacement: delete old text, then insert new text
-            requests.extend([
-                create_delete_range_request(start_index, end_index),
-                create_insert_text_request(start_index, text)
-            ])
-            operation = f"Replaced text from index {start_index} to {end_index}"
-    else:
-        # Insert text at position
-        # If inserting at index 0, actually insert at index 1 to avoid the section break
-        actual_index = 1 if start_index == 0 else start_index
-        requests.append(create_insert_text_request(actual_index, text))
-        operation = f"Inserted text at index {start_index}"
+            # Text insertion
+            actual_index = 1 if start_index == 0 else start_index
+            requests.append(create_insert_text_request(actual_index, text))
+            operations.append(f"Inserted text at index {start_index}")
+
+    # Handle formatting
+    if any([bold is not None, italic is not None, underline is not None, font_size, font_family]):
+        # Adjust range for formatting based on text operations
+        format_start = start_index
+        format_end = end_index
+        
+        if text is not None:
+            if end_index is not None and end_index > start_index:
+                # Text was replaced - format the new text
+                format_end = start_index + len(text)
+            else:
+                # Text was inserted - format the inserted text  
+                actual_index = 1 if start_index == 0 else start_index
+                format_start = actual_index
+                format_end = actual_index + len(text)
+        
+        # Handle special case for formatting at index 0
+        if format_start == 0:
+            format_start = 1
+        if format_end is not None and format_end <= format_start:
+            format_end = format_start + 1
+            
+        requests.append(create_format_text_request(format_start, format_end, bold, italic, underline, font_size, font_family))
+        
+        format_details = []
+        if bold is not None: format_details.append(f"bold={bold}")
+        if italic is not None: format_details.append(f"italic={italic}")  
+        if underline is not None: format_details.append(f"underline={underline}")
+        if font_size: format_details.append(f"font_size={font_size}")
+        if font_family: format_details.append(f"font_family={font_family}")
+        
+        operations.append(f"Applied formatting ({', '.join(format_details)}) to range {format_start}-{format_end}")
 
     await asyncio.to_thread(
         service.documents().batchUpdate(
@@ -370,7 +439,9 @@ async def update_doc_text(
     )
 
     link = f"https://docs.google.com/document/d/{document_id}/edit"
-    return f"{operation} in document {document_id}. Text length: {len(text)} characters. Link: {link}"
+    operation_summary = "; ".join(operations)
+    text_info = f" Text length: {len(text)} characters." if text else ""
+    return f"{operation_summary} in document {document_id}.{text_info} Link: {link}"
 
 @server.tool()
 @handle_http_errors("find_and_replace_doc", service_type="docs")
@@ -417,96 +488,6 @@ async def find_and_replace_doc(
     link = f"https://docs.google.com/document/d/{document_id}/edit"
     return f"Replaced {replacements} occurrence(s) of '{find_text}' with '{replace_text}' in document {document_id}. Link: {link}"
 
-@server.tool()
-@handle_http_errors("format_doc_text", service_type="docs")
-@require_google_service("docs", "docs_write")
-async def format_doc_text(
-    service,
-    user_google_email: str,
-    document_id: str,
-    start_index: int,
-    end_index: int,
-    bold: bool = None,
-    italic: bool = None,
-    underline: bool = None,
-    font_size: int = None,
-    font_family: str = None,
-) -> str:
-    """
-    Applies text formatting to a specific range in a Google Doc.
-
-    Args:
-        user_google_email: User's Google email address
-        document_id: ID of the document to update
-        start_index: Start position of text to format (0-based)
-        end_index: End position of text to format
-        bold: Whether to make text bold (True/False/None to leave unchanged)
-        italic: Whether to make text italic (True/False/None to leave unchanged)
-        underline: Whether to underline text (True/False/None to leave unchanged)
-        font_size: Font size in points
-        font_family: Font family name (e.g., "Arial", "Times New Roman")
-
-    Returns:
-        str: Confirmation message with formatting details
-    """
-    logger.info(f"[format_doc_text] Doc={document_id}, range={start_index}-{end_index}")
-    
-    # Input validation
-    validator = ValidationManager()
-    
-    is_valid, error_msg = validator.validate_document_id(document_id)
-    if not is_valid:
-        return f"Error: {error_msg}"
-    
-    is_valid, error_msg = validator.validate_index_range(start_index, end_index)
-    if not is_valid:
-        return f"Error: {error_msg}"
-    
-    is_valid, error_msg = validator.validate_text_formatting_params(
-        bold, italic, underline, font_size, font_family
-    )
-    if not is_valid:
-        return f"Error: {error_msg}"
-    
-    # Handle the special case where we can't format the first section break
-    # If start_index is 0, bump it to 1 to avoid the section break
-    if start_index == 0:
-        logger.debug(f"Adjusting start_index from 0 to 1 to avoid first section break")
-        start_index = 1
-        # Also adjust end_index if it was also 0 (edge case)
-        if end_index == 0:
-            end_index = 1
-
-    # Use helper to create format request
-    format_request = create_format_text_request(
-        start_index, end_index, bold, italic, underline, font_size, font_family
-    )
-
-    requests = [format_request]
-
-    # Build format_changes list for the return message
-    format_changes = []
-    if bold is not None:
-        format_changes.append(f"bold: {bold}")
-    if italic is not None:
-        format_changes.append(f"italic: {italic}")
-    if underline is not None:
-        format_changes.append(f"underline: {underline}")
-    if font_size is not None:
-        format_changes.append(f"font size: {font_size}pt")
-    if font_family is not None:
-        format_changes.append(f"font family: {font_family}")
-
-    await asyncio.to_thread(
-        service.documents().batchUpdate(
-            documentId=document_id,
-            body={'requests': requests}
-        ).execute
-    )
-
-    changes_str = ', '.join(format_changes)
-    link = f"https://docs.google.com/document/d/{document_id}/edit"
-    return f"Applied formatting ({changes_str}) to text from index {start_index} to {end_index} in document {document_id}. Link: {link}"
 
 @server.tool()
 @handle_http_errors("insert_doc_elements", service_type="docs")
