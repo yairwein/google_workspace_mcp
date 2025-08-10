@@ -55,7 +55,7 @@ class TableOperationManager:
         Returns:
             Tuple of (success, message, metadata)
         """
-        logger.debug(f"Creating table at index {index}, dimensions: {len(table_data)}x{len(table_data[0]) if table_data else 0}")
+        logger.debug(f"Creating table at index {index}, dimensions: {len(table_data)}x{len(table_data[0]) if table_data and len(table_data) > 0 else 0}")
         
         # Validate input data
         is_valid, error_msg = validate_table_data(table_data)
