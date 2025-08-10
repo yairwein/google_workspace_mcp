@@ -1,0 +1,62 @@
+{
+  "mcpServers": {
+    "sequential-thinking": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ]
+    },
+    "serena": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/oraios/serena",
+        "serena-mcp-server"
+      ]
+    },
+    "Context7": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp"
+      ]
+    },
+    "fetch": {
+      "command": "uvx",
+      "args": [
+        "mcp-server-fetch"
+      ]
+    },
+    "claude-code": {
+      "command": "claude",
+      "args": [
+        "mcp",
+        "serve"
+      ],
+      "env": {}
+    },
+    "playwright": {
+      "command": "node",
+      "args": [
+        "/Users/robsherman/Servers/playwright-mcp/cli.js",
+        "--browser=chromium"
+      ]
+    },
+    "google-highway": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "/Users/robsherman/Servers/google_workspace_mcp",
+        "run",
+        "main.py",
+        "--single-user"
+      ],
+      "env": {
+        "MCP_SILENT_START": "1",
+        "WORKSPACE_MCP_PORT": "8001",
+        "GOOGLE_MCP_CREDENTIALS_DIR": "/Users/robsherman/.google_workspace_mcp/credentials_highway"
+      }
+    }
+  }
+}
