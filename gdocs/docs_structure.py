@@ -5,12 +5,12 @@ This module provides utilities for parsing and analyzing the structure
 of Google Docs documents, including finding tables, cells, and other elements.
 """
 import logging
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
 
-def parse_document_structure(doc_data: Dict[str, Any]) -> Dict[str, Any]:
+def parse_document_structure(doc_data: dict[str, Any]) -> dict[str, Any]:
     """
     Parse the full document structure into a navigable format.
     
@@ -54,7 +54,7 @@ def parse_document_structure(doc_data: Dict[str, Any]) -> Dict[str, Any]:
     return structure
 
 
-def _parse_element(element: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def _parse_element(element: dict[str, Any]) -> Optional[dict[str, Any]]:
     """
     Parse a single document element.
     
@@ -96,7 +96,7 @@ def _parse_element(element: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     return element_info
 
 
-def _parse_table_cells(table: Dict[str, Any]) -> List[List[Dict[str, Any]]]:
+def _parse_table_cells(table: dict[str, Any]) -> list[list[dict[str, Any]]]:
     """
     Parse table cells with their positions and content.
     
@@ -140,7 +140,7 @@ def _parse_table_cells(table: Dict[str, Any]) -> List[List[Dict[str, Any]]]:
     return cells
 
 
-def _extract_paragraph_text(paragraph: Dict[str, Any]) -> str:
+def _extract_paragraph_text(paragraph: dict[str, Any]) -> str:
     """Extract text from a paragraph element."""
     text_parts = []
     for element in paragraph.get('elements', []):
@@ -149,7 +149,7 @@ def _extract_paragraph_text(paragraph: Dict[str, Any]) -> str:
     return ''.join(text_parts)
 
 
-def _extract_cell_text(cell: Dict[str, Any]) -> str:
+def _extract_cell_text(cell: dict[str, Any]) -> str:
     """Extract text content from a table cell."""
     text_parts = []
     for element in cell.get('content', []):
@@ -158,7 +158,7 @@ def _extract_cell_text(cell: Dict[str, Any]) -> str:
     return ''.join(text_parts)
 
 
-def _parse_segment(segment_data: Dict[str, Any]) -> Dict[str, Any]:
+def _parse_segment(segment_data: dict[str, Any]) -> dict[str, Any]:
     """Parse a document segment (header/footer)."""
     return {
         'content': segment_data.get('content', []),
@@ -167,7 +167,7 @@ def _parse_segment(segment_data: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def find_tables(doc_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+def find_tables(doc_data: dict[str, Any]) -> list[dict[str, Any]]:
     """
     Find all tables in the document with their positions and dimensions.
     
@@ -193,7 +193,7 @@ def find_tables(doc_data: Dict[str, Any]) -> List[Dict[str, Any]]:
     return tables
 
 
-def get_table_cell_indices(doc_data: Dict[str, Any], table_index: int = 0) -> Optional[List[List[Tuple[int, int]]]]:
+def get_table_cell_indices(doc_data: dict[str, Any], table_index: int = 0) -> Optional[list[list[tuple[int, int]]]]:
     """
     Get content indices for all cells in a specific table.
     
@@ -245,7 +245,7 @@ def get_table_cell_indices(doc_data: Dict[str, Any], table_index: int = 0) -> Op
     return cell_indices
 
 
-def find_element_at_index(doc_data: Dict[str, Any], index: int) -> Optional[Dict[str, Any]]:
+def find_element_at_index(doc_data: dict[str, Any], index: int) -> Optional[dict[str, Any]]:
     """
     Find what element exists at a given index in the document.
     
@@ -280,7 +280,7 @@ def find_element_at_index(doc_data: Dict[str, Any], index: int) -> Optional[Dict
     return None
 
 
-def get_next_paragraph_index(doc_data: Dict[str, Any], after_index: int = 0) -> int:
+def get_next_paragraph_index(doc_data: dict[str, Any], after_index: int = 0) -> int:
     """
     Find the next safe position to insert content after a given index.
     
@@ -303,7 +303,7 @@ def get_next_paragraph_index(doc_data: Dict[str, Any], after_index: int = 0) -> 
     return structure['total_length'] - 1 if structure['total_length'] > 0 else 1
 
 
-def analyze_document_complexity(doc_data: Dict[str, Any]) -> Dict[str, Any]:
+def analyze_document_complexity(doc_data: dict[str, Any]) -> dict[str, Any]:
     """
     Analyze document complexity and provide statistics.
     

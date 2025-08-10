@@ -164,6 +164,25 @@ class ValidationManager:
         
         return True, ""
     
+    def validate_index(self, index: int, context: str = "Index") -> Tuple[bool, str]:
+        """
+        Validate a single document index.
+        
+        Args:
+            index: Index to validate
+            context: Context description for error messages
+            
+        Returns:
+            Tuple of (is_valid, error_message)
+        """
+        if not isinstance(index, int):
+            return False, f"{context} must be an integer, got {type(index).__name__}"
+        
+        if index < 0:
+            return False, f"{context} {index} is negative. You MUST call inspect_doc_structure first to get the proper insertion index."
+        
+        return True, ""
+    
     def validate_index_range(
         self,
         start_index: int,

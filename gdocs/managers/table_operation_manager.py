@@ -274,8 +274,6 @@ class TableOperationManager:
             if data_rows > table_rows or data_cols > table_cols:
                 return False, f"Data ({data_rows}x{data_cols}) exceeds table dimensions ({table_rows}x{table_cols})", {}
             
-            # TODO: Implement clear_existing logic if needed
-            
             # Populate cells
             population_count = await self._populate_existing_table_cells(
                 document_id, table_index, table_data

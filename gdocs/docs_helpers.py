@@ -5,7 +5,7 @@ This module provides utility functions for common Google Docs operations
 to simplify the implementation of document editing tools.
 """
 import logging
-from typing import List, Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +15,7 @@ def build_text_style(
     underline: bool = None,
     font_size: int = None,
     font_family: str = None
-) -> Tuple[Dict[str, Any], List[str]]:
+) -> tuple[Dict[str, Any], list[str]]:
     """
     Build text style object for Google Docs API requests.
     

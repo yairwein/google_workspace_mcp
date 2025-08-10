@@ -957,8 +957,9 @@ async def create_table_with_data(
     if not is_valid:
         return f"ERROR: {error_msg}"
     
-    if index < 0:
-        return f"ERROR: Index {index} is negative. You MUST call inspect_doc_structure first to get the proper insertion index."
+    is_valid, error_msg = validator.validate_index(index, "Index")
+    if not is_valid:
+        return f"ERROR: {error_msg}"
 
     # Use TableOperationManager to handle the complex logic
     table_manager = TableOperationManager(service)

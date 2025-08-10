@@ -6,7 +6,7 @@ in Google Docs, extracting complex logic from the main tools module.
 """
 import logging
 import asyncio
-from typing import Dict, Any, Optional, Tuple, List
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ class HeaderFooterManager:
         section_type: str,
         content: str,
         header_footer_type: str = "DEFAULT"
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """
         Updates header or footer content in a document.
         
@@ -85,7 +85,7 @@ class HeaderFooterManager:
             logger.error(f"Failed to update {section_type}: {str(e)}")
             return False, f"Failed to update {section_type}: {str(e)}"
     
-    async def _get_document(self, document_id: str) -> Dict[str, Any]:
+    async def _get_document(self, document_id: str) -> dict[str, Any]:
         """Get the full document data."""
         return await asyncio.to_thread(
             self.service.documents().get(documentId=document_id).execute
@@ -93,10 +93,10 @@ class HeaderFooterManager:
     
     async def _find_target_section(
         self,
-        doc: Dict[str, Any],
+        doc: dict[str, Any],
         section_type: str,
         header_footer_type: str
-    ) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    ) -> tuple[Optional[dict[str, Any]], Optional[str]]:
         """
         Find the target header or footer section.
         
@@ -113,8 +113,32 @@ class HeaderFooterManager:
         else:
             sections = doc.get('footers', {})
         
-        # For now, return the first available section
-        # TODO: Implement proper section type matching based on header_footer_type
+        # Try to match section based on header_footer_type
+        # Google Docs API typically uses section IDs that correspond to types
+        
+        # First, try to find an exact match based on common patterns
+        for section_id, section_data in sections.items():
+            # Check if section_data contains type information
+            if 'type' in section_data and section_data['type'] == header_footer_type:
+                return section_data, section_id
+        
+        # If no exact match, try pattern matching on section ID
+        # Google Docs often uses predictable section ID patterns
+        target_patterns = {
+            "DEFAULT": ["default", "kix"],  # DEFAULT headers often have these patterns
+            "FIRST_PAGE": ["first", "firstpage"],
+            "EVEN_PAGE": ["even", "evenpage"],
+            "FIRST_PAGE_ONLY": ["first", "firstpage"]  # Legacy support
+        }
+        
+        patterns = target_patterns.get(header_footer_type, [])
+        for pattern in patterns:
+            for section_id, section_data in sections.items():
+                if pattern.lower() in section_id.lower():
+                    return section_data, section_id
+        
+        # If still no match, return the first available section as fallback
+        # This maintains backward compatibility
         for section_id, section_data in sections.items():
             return section_data, section_id
             
@@ -123,7 +147,7 @@ class HeaderFooterManager:
     async def _replace_section_content(
         self,
         document_id: str,
-        section: Dict[str, Any],
+        section: dict[str, Any],
         new_content: str
     ) -> bool:
         """
@@ -185,7 +209,7 @@ class HeaderFooterManager:
             logger.error(f"Failed to replace section content: {str(e)}")
             return False
     
-    def _find_first_paragraph(self, content_elements: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    def _find_first_paragraph(self, content_elements: list[dict[str, Any]]) -> Optional[dict[str, Any]]:
         """Find the first paragraph element in content."""
         for element in content_elements:
             if 'paragraph' in element:
@@ -195,7 +219,7 @@ class HeaderFooterManager:
     async def get_header_footer_info(
         self,
         document_id: str
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Get information about all headers and footers in the document.
         
@@ -227,7 +251,7 @@ class HeaderFooterManager:
             logger.error(f"Failed to get header/footer info: {str(e)}")
             return {'error': str(e)}
     
-    def _extract_section_info(self, section_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _extract_section_info(self, section_data: dict[str, Any]) -> dict[str, Any]:
         """Extract useful information from a header/footer section."""
         content_elements = section_data.get('content', [])
         
@@ -251,23 +275,58 @@ class HeaderFooterManager:
         self,
         document_id: str,
         section_type: str,
-        content: str,
         header_footer_type: str = "DEFAULT"
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """
         Create a new header or footer section.
-        
-        Note: This is a placeholder for future implementation.
-        Google Docs API has limitations on programmatically creating headers/footers.
         
         Args:
             document_id: Document ID
             section_type: "header" or "footer"
-            content: Initial content
-            header_footer_type: Type of header/footer
+            header_footer_type: Type of header/footer ("DEFAULT", "FIRST_PAGE", or "EVEN_PAGE")
             
         Returns:
             Tuple of (success, message)
         """
-        # TODO: Implement when Google Docs API supports programmatic header/footer creation
-        return False, f"Creating new {section_type} sections is not currently supported by Google Docs API. Please create the {section_type} manually in Google Docs first."
+        if section_type not in ["header", "footer"]:
+            return False, "section_type must be 'header' or 'footer'"
+        
+        # Map our type names to API type names
+        type_mapping = {
+            "DEFAULT": "DEFAULT",
+            "FIRST_PAGE": "FIRST_PAGE",
+            "EVEN_PAGE": "EVEN_PAGE",
+            "FIRST_PAGE_ONLY": "FIRST_PAGE"  # Support legacy name
+        }
+        
+        api_type = type_mapping.get(header_footer_type, header_footer_type)
+        if api_type not in ["DEFAULT", "FIRST_PAGE", "EVEN_PAGE"]:
+            return False, "header_footer_type must be 'DEFAULT', 'FIRST_PAGE', or 'EVEN_PAGE'"
+        
+        try:
+            # Build the request
+            request = {
+                'type': api_type
+            }
+            
+            # Create the appropriate request type
+            if section_type == "header":
+                batch_request = {'createHeader': request}
+            else:
+                batch_request = {'createFooter': request}
+            
+            # Execute the request
+            await asyncio.to_thread(
+                self.service.documents().batchUpdate(
+                    documentId=document_id,
+                    body={'requests': [batch_request]}
+                ).execute
+            )
+            
+            return True, f"Successfully created {section_type} with type {api_type}"
+            
+        except Exception as e:
+            error_msg = str(e)
+            if "already exists" in error_msg.lower():
+                return False, f"A {section_type} of type {api_type} already exists in the document"
+            return False, f"Failed to create {section_type}: {error_msg}"

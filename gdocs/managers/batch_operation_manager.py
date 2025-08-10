@@ -6,7 +6,7 @@ extracting complex validation and request building logic.
 """
 import logging
 import asyncio
-from typing import List, Dict, Any, Tuple
+from typing import Any, Union
 
 from gdocs.docs_helpers import (
     create_insert_text_request,
@@ -43,8 +43,8 @@ class BatchOperationManager:
     async def execute_batch_operations(
         self,
         document_id: str,
-        operations: List[Dict[str, Any]]
-    ) -> Tuple[bool, str, Dict[str, Any]]:
+        operations: list[dict[str, Any]]
+    ) -> tuple[bool, str, dict[str, Any]]:
         """
         Execute multiple document operations in a single atomic batch.
         
@@ -91,8 +91,8 @@ class BatchOperationManager:
     
     async def _validate_and_build_requests(
         self,
-        operations: List[Dict[str, Any]]
-    ) -> Tuple[List[Dict[str, Any]], List[str]]:
+        operations: list[dict[str, Any]]
+    ) -> tuple[list[dict[str, Any]], list[str]]:
         """
         Validate operations and build API requests.
         
@@ -115,11 +115,18 @@ class BatchOperationManager:
             
             try:
                 # Build request based on operation type
-                request, description = self._build_operation_request(op, op_type)
+                result = self._build_operation_request(op, op_type)
                 
-                if request:
-                    requests.append(request)
-                    operation_descriptions.append(description)
+                # Handle both single request and list of requests
+                if isinstance(result[0], list):
+                    # Multiple requests (e.g., replace_text)
+                    for req in result[0]:
+                        requests.append(req)
+                    operation_descriptions.append(result[1])
+                elif result[0]:
+                    # Single request
+                    requests.append(result[0])
+                    operation_descriptions.append(result[1])
                     
             except KeyError as e:
                 raise ValueError(f"Operation {i+1} ({op_type}) missing required field: {e}")
@@ -130,9 +137,9 @@ class BatchOperationManager:
     
     def _build_operation_request(
         self,
-        op: Dict[str, Any],
+        op: dict[str, Any],
         op_type: str
-    ) -> Tuple[Dict[str, Any], str]:
+    ) -> Tuple[Union[Dict[str, Any], List[Dict[str, Any]]], str]:
         """
         Build a single operation request.
         
@@ -152,12 +159,12 @@ class BatchOperationManager:
             description = f"delete text {op['start_index']}-{op['end_index']}"
             
         elif op_type == 'replace_text':
-            # Replace is delete + insert
+            # Replace is delete + insert (must be done in this order)
             delete_request = create_delete_range_request(op['start_index'], op['end_index'])
             insert_request = create_insert_text_request(op['start_index'], op['text'])
-            # Return first request, but we'll need to handle multiple requests
-            request = delete_request  # This is a simplification
-            description = f"replace text {op['start_index']}-{op['end_index']}"
+            # Return both requests as a list
+            request = [delete_request, insert_request]
+            description = f"replace text {op['start_index']}-{op['end_index']} with '{op['text'][:20]}{'...' if len(op['text']) > 20 else ''}'"
             
         elif op_type == 'format_text':
             request = create_format_text_request(
@@ -207,8 +214,8 @@ class BatchOperationManager:
     async def _execute_batch_requests(
         self,
         document_id: str,
-        requests: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+        requests: list[dict[str, Any]]
+    ) -> dict[str, Any]:
         """
         Execute the batch requests against the Google Docs API.
         
@@ -226,7 +233,7 @@ class BatchOperationManager:
             ).execute
         )
     
-    def _build_operation_summary(self, operation_descriptions: List[str]) -> str:
+    def _build_operation_summary(self, operation_descriptions: list[str]) -> str:
         """
         Build a concise summary of operations performed.
         
@@ -248,7 +255,7 @@ class BatchOperationManager:
             
         return summary
     
-    def get_supported_operations(self) -> Dict[str, Any]:
+    def get_supported_operations(self) -> dict[str, Any]:
         """
         Get information about supported batch operations.
         
