@@ -59,7 +59,7 @@ A production-ready MCP server that integrates all major Google Workspace service
 - **📅 Google Calendar**: Full calendar management with event CRUD operations
 - **📁 Google Drive**: File operations with native Microsoft Office format support (.docx, .xlsx)
 - **📧 Gmail**: Complete email management with search, send, and draft capabilities
-- **📄 Google Docs**: Document operations including content extraction, creation, and comment management
+- **📄 Google Docs**: Complete document management including content extraction, creation, full editing capabilities, and comment management
 - **📊 Google Sheets**: Comprehensive spreadsheet management with flexible cell operations and comment management
 - **🖼️ Google Slides**: Presentation management with slide creation, updates, content manipulation, and comment management
 - **📝 Google Forms**: Form creation, retrieval, publish settings, and response management
@@ -499,6 +499,13 @@ When calling a tool:
 | `get_doc_content` | Extract document text |
 | `list_docs_in_folder` | List docs in folder |
 | `create_doc` | Create new documents |
+| `update_doc_text` | Insert or replace text at specific positions |
+| `find_and_replace_doc` | Find and replace text throughout document |
+| `format_doc_text` | Apply text formatting (bold, italic, underline, fonts) |
+| `insert_doc_elements` | Add tables, lists, or page breaks |
+| `insert_doc_image` | Insert images from Drive or URLs |
+| `update_doc_headers_footers` | Modify document headers and footers |
+| `batch_update_doc` | Execute multiple document operations atomically |
 | `read_doc_comments` | Read all comments and replies |
 | `create_doc_comment` | Create new comments |
 | `reply_to_comment` | Reply to existing comments |

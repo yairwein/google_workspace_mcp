@@ -2,6 +2,8 @@
 __pycache__/
 *.py[cod]
 *.so
+.mcp.json
+claude.md
 
 # ---- Packaging ---------------------------------------------------------
 *.egg-info/
@@ -23,3 +25,7 @@ client_secret.json
 
 # ---- Logs --------------------------------------------------------------
 mcp_server_debug.log
+
+# ---- Local development files -------------------------------------------
+/.credentials
+/.claude
