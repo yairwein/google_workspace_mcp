@@ -55,8 +55,7 @@ class TableOperationManager:
         Returns:
             Tuple of (success, message, metadata)
         """
-        logger.info(f"Creating and populating table at index {index}")
-        logger.info(f"Table data dimensions: {len(table_data)}x{len(table_data[0]) if table_data else 0}")
+        logger.debug(f"Creating table at index {index}, dimensions: {len(table_data)}x{len(table_data[0]) if table_data else 0}")
         
         # Validate input data
         is_valid, error_msg = validate_table_data(table_data)
@@ -104,7 +103,7 @@ class TableOperationManager:
         cols: int
     ) -> None:
         """Create an empty table at the specified index."""
-        logger.info(f"Creating {rows}x{cols} table at index {index}")
+        logger.debug(f"Creating {rows}x{cols} table at index {index}")
         
         await asyncio.to_thread(
             self.service.documents().batchUpdate(
@@ -135,7 +134,7 @@ class TableOperationManager:
         population_count = 0
         
         for row_idx, row_data in enumerate(table_data):
-            logger.info(f"Processing row {row_idx}: {len(row_data)} cells")
+            logger.debug(f"Processing row {row_idx}: {len(row_data)} cells")
             
             for col_idx, cell_text in enumerate(row_data):
                 if not cell_text:  # Skip empty cells
@@ -149,7 +148,7 @@ class TableOperationManager:
                     
                     if success:
                         population_count += 1
-                        logger.info(f"Successfully populated cell ({row_idx},{col_idx}) with '{cell_text}'")
+                        logger.debug(f"Populated cell ({row_idx},{col_idx})")
                     else:
                         logger.warning(f"Failed to populate cell ({row_idx},{col_idx})")
                         

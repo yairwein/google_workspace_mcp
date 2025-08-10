@@ -339,15 +339,27 @@ async def update_doc_text(
     requests = []
 
     if end_index is not None and end_index > start_index:
-        # Replace text: delete old text, then insert new text
-        requests.extend([
-            create_delete_range_request(start_index, end_index),
-            create_insert_text_request(start_index, text)
-        ])
-        operation = f"Replaced text from index {start_index} to {end_index}"
+        # Special case: Cannot delete at index 0 (first section break)
+        # Instead, we insert new text at index 1 and then delete the old text
+        if start_index == 0:
+            # Insert new text at index 1
+            requests.append(create_insert_text_request(1, text))
+            # Then delete old text (adjusting for the inserted text)
+            adjusted_end = end_index + len(text)
+            requests.append(create_delete_range_request(1 + len(text), adjusted_end))
+            operation = f"Replaced text from index {start_index} to {end_index}"
+        else:
+            # Normal replacement: delete old text, then insert new text
+            requests.extend([
+                create_delete_range_request(start_index, end_index),
+                create_insert_text_request(start_index, text)
+            ])
+            operation = f"Replaced text from index {start_index} to {end_index}"
     else:
         # Insert text at position
-        requests.append(create_insert_text_request(start_index, text))
+        # If inserting at index 0, actually insert at index 1 to avoid the section break
+        actual_index = 1 if start_index == 0 else start_index
+        requests.append(create_insert_text_request(actual_index, text))
         operation = f"Inserted text at index {start_index}"
 
     await asyncio.to_thread(
@@ -455,6 +467,15 @@ async def format_doc_text(
     )
     if not is_valid:
         return f"Error: {error_msg}"
+    
+    # Handle the special case where we can't format the first section break
+    # If start_index is 0, bump it to 1 to avoid the section break
+    if start_index == 0:
+        logger.debug(f"Adjusting start_index from 0 to 1 to avoid first section break")
+        start_index = 1
+        # Also adjust end_index if it was also 0 (edge case)
+        if end_index == 0:
+            end_index = 1
 
     # Use helper to create format request
     format_request = create_format_text_request(
@@ -518,6 +539,12 @@ async def insert_doc_elements(
         str: Confirmation message with insertion details
     """
     logger.info(f"[insert_doc_elements] Doc={document_id}, type={element_type}, index={index}")
+    
+    # Handle the special case where we can't insert at the first section break
+    # If index is 0, bump it to 1 to avoid the section break
+    if index == 0:
+        logger.debug(f"Adjusting index from 0 to 1 to avoid first section break")
+        index = 1
 
     requests = []
 
@@ -590,6 +617,12 @@ async def insert_doc_image(
         str: Confirmation message with insertion details
     """
     logger.info(f"[insert_doc_image] Doc={document_id}, source={image_source}, index={index}")
+    
+    # Handle the special case where we can't insert at the first section break
+    # If index is 0, bump it to 1 to avoid the section break
+    if index == 0:
+        logger.debug(f"Adjusting index from 0 to 1 to avoid first section break")
+        index = 1
 
     # Determine if source is a Drive file ID or URL
     is_drive_file = not (image_source.startswith('http://') or image_source.startswith('https://'))
@@ -715,7 +748,7 @@ async def batch_update_doc(
     Returns:
         str: Confirmation message with batch operation results
     """
-    logger.info(f"[batch_update_doc] Doc={document_id}, operations={len(operations)}")
+    logger.debug(f"[batch_update_doc] Doc={document_id}, operations={len(operations)}")
     
     # Input validation
     validator = ValidationManager()
@@ -784,7 +817,7 @@ async def inspect_doc_structure(
     Returns:
         str: JSON string containing document structure and safe insertion indices
     """
-    logger.info(f"[inspect_doc_structure] Doc={document_id}, detailed={detailed}")
+    logger.debug(f"[inspect_doc_structure] Doc={document_id}, detailed={detailed}")
 
     # Get the document
     doc = await asyncio.to_thread(
@@ -911,7 +944,7 @@ async def create_table_with_data(
     Returns:
         str: Confirmation with table details and link
     """
-    logger.info(f"[create_table_with_data] Doc={document_id}, index={index}")
+    logger.debug(f"[create_table_with_data] Doc={document_id}, index={index}")
     
     # Input validation
     validator = ValidationManager()
@@ -930,9 +963,17 @@ async def create_table_with_data(
     # Use TableOperationManager to handle the complex logic
     table_manager = TableOperationManager(service)
     
+    # Try to create the table, and if it fails due to index being at document end, retry with index-1
     success, message, metadata = await table_manager.create_and_populate_table(
         document_id, table_data, index, bold_headers
     )
+    
+    # If it failed due to index being at or beyond document end, retry with adjusted index
+    if not success and "must be less than the end index" in message:
+        logger.debug(f"Index {index} is at document boundary, retrying with index {index - 1}")
+        success, message, metadata = await table_manager.create_and_populate_table(
+            document_id, table_data, index - 1, bold_headers
+        )
     
     if success:
         link = f"https://docs.google.com/document/d/{document_id}/edit"
@@ -991,7 +1032,7 @@ async def debug_table_structure(
     Returns:
         str: Detailed JSON structure showing table layout, cell positions, and current content
     """
-    logger.info(f"[debug_table_structure] Doc={document_id}, table_index={table_index}")
+    logger.debug(f"[debug_table_structure] Doc={document_id}, table_index={table_index}")
 
     # Get the document
     doc = await asyncio.to_thread(

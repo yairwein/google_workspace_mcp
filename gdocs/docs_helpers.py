@@ -49,8 +49,8 @@ def build_text_style(
         fields.append('fontSize')
     
     if font_family is not None:
-        text_style['fontFamily'] = font_family
-        fields.append('fontFamily')
+        text_style['weightedFontFamily'] = {'fontFamily': font_family}
+        fields.append('weightedFontFamily')
     
     return text_style, fields
 
