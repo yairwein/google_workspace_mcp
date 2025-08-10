@@ -543,7 +543,7 @@ async def insert_doc_elements(
                         'startIndex': index,
                         'endIndex': index + len(text)
                     },
-                    'bulletPreset': f'BULLET_DISC_CIRCLE_SQUARE' if list_type == "UNORDERED" else 'NUMBERED_DECIMAL_ALPHA_ROMAN'
+                    'bulletPreset': 'BULLET_DISC_CIRCLE_SQUARE' if list_type == "UNORDERED" else 'NUMBERED_DECIMAL_ALPHA_ROMAN'
                 }
             }
         ])
