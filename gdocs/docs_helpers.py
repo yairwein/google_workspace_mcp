@@ -5,7 +5,7 @@ This module provides utility functions for common Google Docs operations
 to simplify the implementation of document editing tools.
 """
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 

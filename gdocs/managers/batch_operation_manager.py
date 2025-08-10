@@ -6,7 +6,7 @@ extracting complex validation and request building logic.
 """
 import logging
 import asyncio
-from typing import Any, Union
+from typing import Any, Union, Dict, List, Tuple
 
 from gdocs.docs_helpers import (
     create_insert_text_request,
