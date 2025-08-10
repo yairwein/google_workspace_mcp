@@ -853,23 +853,23 @@ async def inspect_doc_structure(
     """
     Essential tool for finding safe insertion points and understanding document structure.
     
-    🎯 USE THIS FOR:
+    USE THIS FOR:
     - Finding the correct index for table insertion
     - Understanding document layout before making changes
     - Locating existing tables and their positions
     - Getting document statistics and complexity info
     
-    🔥 CRITICAL FOR TABLE OPERATIONS:
+    CRITICAL FOR TABLE OPERATIONS:
     ALWAYS call this BEFORE creating tables to get a safe insertion index.
     Look for "total_length" in the output - use values less than this for insertion.
     
-    📊 WHAT THE OUTPUT SHOWS:
+    WHAT THE OUTPUT SHOWS:
     - total_elements: Number of document elements
     - total_length: Maximum safe index for insertion
     - tables: Number of existing tables
     - table_details: Position and dimensions of each table
     
-    💡 WORKFLOW:
+    WORKFLOW:
     Step 1: Call this function
     Step 2: Note the "total_length" value
     Step 3: Use an index < total_length for table insertion
@@ -1067,7 +1067,7 @@ async def create_table_with_data(
     # Find the table we just created
     tables = find_tables(doc)
     if not tables:
-        return f"❌ ERROR: Could not find table after creation in document {document_id}"
+        return f"ERROR: Could not find table after creation in document {document_id}"
     
     # Use the last table (newly created one)
     table_info = tables[-1]
@@ -1167,20 +1167,20 @@ async def create_empty_table(
     """
     Creates an empty table with specified dimensions - use when you need precise control.
     
-    🎯 WHEN TO USE THIS:
+    WHEN TO USE THIS:
     - You want to create table first, then populate later
     - You need to create multiple tables before populating any
     - You want to manually control each step of table creation
     
-    🔥 RECOMMENDED WORKFLOW:
+    RECOMMENDED WORKFLOW:
     Step 1: Call inspect_doc_structure to get safe insertion index
     Step 2: Call this function to create empty table
     Step 3: Call debug_table_structure to verify table was created correctly
     Step 4: Call populate_existing_table to fill with data
     
-    💡 ALTERNATIVE: Use create_table_with_data to do steps 2-4 in one operation
+    ALTERNATIVE: Use create_table_with_data to do steps 2-4 in one operation
     
-    ✅ VALIDATION RULES:
+    VALIDATION RULES:
     - rows: 1-20 (Google Docs limits)
     - columns: 1-10 (Google Docs limits)
     - index: Must be valid insertion point (get from inspect_doc_structure)
@@ -1199,9 +1199,9 @@ async def create_empty_table(
     
     # Validation
     if rows < 1 or rows > 20:
-        return f"❌ ERROR: Rows must be between 1-20, got {rows}"
+        return f"ERROR: Rows must be between 1-20, got {rows}"
     if columns < 1 or columns > 10:
-        return f"❌ ERROR: Columns must be between 1-10, got {columns}"
+        return f"ERROR: Columns must be between 1-10, got {columns}"
     
     # Create table
     result = await asyncio.to_thread(
@@ -1212,7 +1212,7 @@ async def create_empty_table(
     )
     
     link = f"https://docs.google.com/document/d/{document_id}/edit"
-    return f"✅ SUCCESS: Created empty {rows}x{columns} table at index {index}. Link: {link}"
+    return f"SUCCESS: Created empty {rows}x{columns} table at index {index}. Link: {link}"
 
 @server.tool()
 @handle_http_errors("populate_existing_table", service_type="docs")
@@ -1228,7 +1228,7 @@ async def populate_existing_table(
     """
     Populates an existing empty table with data using individual cell updates.
     
-    🔥 USAGE WORKFLOW - DO THIS STEP BY STEP:
+    USAGE WORKFLOW - DO THIS STEP BY STEP:
     
     Step 1: Ensure table already exists in document (use create_empty_table first if needed)
     Step 2: ALWAYS call debug_table_structure to verify table layout and dimensions
@@ -1236,14 +1236,14 @@ async def populate_existing_table(
     Step 4: Call this function
     Step 5: If issues occur, call debug_table_structure again to diagnose
     
-    ⚠️  MANDATORY DATA FORMAT:
+    MANDATORY DATA FORMAT:
     table_data = [
         ["Col1", "Col2", "Col3"],       # Row 0 - must match table width
         ["Val1", "Val2", "Val3"],       # Row 1
         ["Val4", "Val5", "Val6"]        # Row 2 - must match table height
     ]
     
-    ✅ REQUIREMENTS CHECKLIST:
+    REQUIREMENTS CHECKLIST:
     □ Table already exists in document
     □ Used debug_table_structure to check table dimensions  
     □ Data is 2D list of strings only
@@ -1251,12 +1251,12 @@ async def populate_existing_table(
     □ All data items are strings (use "" for empty cells)
     □ Verified table_index is correct (0 = first table)
     
-    🎯 WHEN TO USE THIS vs create_table_with_data:
+    WHEN TO USE THIS vs create_table_with_data:
     - Use create_table_with_data: When you need to create a NEW table
     - Use populate_existing_table: When table already exists and is empty
     - Use debug_table_structure: ALWAYS use this first to understand table layout
     
-    🚨 TROUBLESHOOTING:
+    TROUBLESHOOTING:
     - Data in wrong cells? → Check debug_table_structure output
     - "Table not found" error? → Verify table_index, use inspect_doc_structure
     - "Dimensions mismatch" error? → Your data array is wrong size for table
@@ -1276,7 +1276,7 @@ async def populate_existing_table(
     # Strict validation with clear error messages
     is_valid, error_msg = validate_table_data(table_data)
     if not is_valid:
-        return f"❌ ERROR: {error_msg}\n\nRequired format: [['col1', 'col2'], ['row2col1', 'row2col2']]"
+        return f"ERROR: {error_msg}\n\nRequired format: [['col1', 'col2'], ['row2col1', 'row2col2']]"
     
     # Get document and find the specified table
     doc = await asyncio.to_thread(
@@ -1285,7 +1285,7 @@ async def populate_existing_table(
     
     tables = find_tables(doc)
     if table_index >= len(tables):
-        return f"❌ ERROR: Table index {table_index} not found. Document has {len(tables)} table(s). Use debug_table_structure to see available tables."
+        return f"ERROR: Table index {table_index} not found. Document has {len(tables)} table(s). Use debug_table_structure to see available tables."
     
     table_info = tables[table_index]
     cells = table_info.get('cells', [])
@@ -1297,10 +1297,10 @@ async def populate_existing_table(
     data_cols = len(table_data[0])
     
     if data_rows > table_rows:
-        return f"❌ ERROR: Data has {data_rows} rows but table only has {table_rows} rows."
+        return f"ERROR: Data has {data_rows} rows but table only has {table_rows} rows."
     
     if data_cols > table_cols:
-        return f"❌ ERROR: Data has {data_cols} columns but table only has {table_cols} columns."
+        return f"ERROR: Data has {data_cols} columns but table only has {table_cols} columns."
     
     # Populate each cell individually using the proven working method
     population_count = 0
@@ -1344,7 +1344,7 @@ async def populate_existing_table(
                         )
     
     link = f"https://docs.google.com/document/d/{document_id}/edit"
-    return f"✅ SUCCESS: Populated {population_count} cells in table {table_index} with {data_rows}x{data_cols} data. Bold headers: {bold_headers}. Link: {link}"
+    return f"SUCCESS: Populated {population_count} cells in table {table_index} with {data_rows}x{data_cols} data. Bold headers: {bold_headers}. Link: {link}"
 
 @server.tool()
 @handle_http_errors("debug_table_structure", is_read_only=True, service_type="docs")
@@ -1358,27 +1358,27 @@ async def debug_table_structure(
     """
     ESSENTIAL DEBUGGING TOOL - Use this whenever tables don't work as expected.
     
-    🚨 USE THIS IMMEDIATELY WHEN:
+    USE THIS IMMEDIATELY WHEN:
     - Table population put data in wrong cells
     - You get "table not found" errors  
     - Data appears concatenated in first cell
     - Need to understand existing table structure
     - Planning to use populate_existing_table
     
-    📊 WHAT THIS SHOWS YOU:
+    WHAT THIS SHOWS YOU:
     - Exact table dimensions (rows × columns)
     - Each cell's position coordinates (row,col)
     - Current content in each cell
     - Insertion indices for each cell
     - Table boundaries and ranges
     
-    🔍 HOW TO READ THE OUTPUT:
+    HOW TO READ THE OUTPUT:
     - "dimensions": "2x3" = 2 rows, 3 columns
     - "position": "(0,0)" = first row, first column
     - "current_content": What's actually in each cell right now
     - "insertion_index": Where new text would be inserted in that cell
     
-    💡 WORKFLOW INTEGRATION:
+    WORKFLOW INTEGRATION:
     1. After creating table → Use this to verify structure
     2. Before populating → Use this to plan your data format
     3. After population fails → Use this to see what went wrong

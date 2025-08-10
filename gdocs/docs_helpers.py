@@ -5,7 +5,7 @@ This module provides utility functions for common Google Docs operations
 to simplify the implementation of document editing tools.
 """
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +15,7 @@ def build_text_style(
     underline: bool = None,
     font_size: int = None,
     font_family: str = None
-) -> tuple[Dict[str, Any], List[str]]:
+) -> Tuple[Dict[str, Any], List[str]]:
     """
     Build text style object for Google Docs API requests.
     
@@ -263,7 +263,7 @@ def create_bullet_list_request(
         }
     }
 
-def validate_operation(operation: Dict[str, Any]) -> tuple[bool, str]:
+def validate_operation(operation: Dict[str, Any]) -> Tuple[bool, str]:
     """
     Validate a batch operation dictionary.
     
@@ -289,7 +289,7 @@ def validate_operation(operation: Dict[str, Any]) -> tuple[bool, str]:
     }
     
     if op_type not in required_fields:
-        return False, f"Unsupported operation type: {op_type}"
+        return False, f"Unsupported operation type: {op_type or 'None'}"
     
     for field in required_fields[op_type]:
         if field not in operation:
