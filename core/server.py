@@ -190,6 +190,19 @@ async def oauth2_callback(request: Request) -> HTMLResponse:
 # --- Tools ---
 @server.tool()
 async def start_google_auth(service_name: str, user_google_email: str = USER_GOOGLE_EMAIL) -> str:
+    """
+    Manually initiate Google OAuth authentication flow.
+    
+    NOTE: This tool should typically NOT be called directly. The authentication system 
+    automatically handles credential checks and prompts for authentication when needed.
+    Only use this tool if:
+    1. You need to re-authenticate with different credentials
+    2. You want to proactively authenticate before using other tools
+    3. The automatic authentication flow failed and you need to retry
+    
+    In most cases, simply try calling the Google Workspace tool you need - it will 
+    automatically handle authentication if required.
+    """
     if not user_google_email:
         raise ValueError("user_google_email must be provided.")
 
