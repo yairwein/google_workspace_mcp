@@ -17,6 +17,7 @@ from fastapi import Body
 from auth.service_decorator import require_google_service
 from core.utils import handle_http_errors
 from core.server import server
+from core.schema_modifier import inject_user_email
 from auth.scopes import (
     GMAIL_SEND_SCOPE,
     GMAIL_COMPOSE_SCOPE,
@@ -218,6 +219,7 @@ def _format_gmail_results_plain(messages: list, query: str) -> str:
 
 
 @server.tool()
+@inject_user_email
 @handle_http_errors("search_gmail_messages", is_read_only=True, service_type="gmail")
 @require_google_service("gmail", "gmail_read")
 async def search_gmail_messages(
