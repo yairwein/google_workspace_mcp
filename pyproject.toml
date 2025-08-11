@@ -67,5 +67,5 @@ dev = [
 ]
 
 [tool.setuptools]
-packages = [ "auth", "gcalendar", "core", "gdocs", "gdrive", "gmail", "gchat", "gsheets", "gforms", "gslides", "gtasks", "gsearch"]
+packages = [ "auth", "gcalendar", "core", "gdocs", "gdocs.managers", "gdrive", "gmail", "gchat", "gsheets", "gforms", "gslides", "gtasks", "gsearch"]
 py-modules = [ "main"]
