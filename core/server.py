@@ -1,5 +1,4 @@
 import logging
-import os
 from typing import Optional, Union
 from importlib import metadata
 
