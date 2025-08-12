@@ -13,7 +13,7 @@
 **The most feature-complete Google Workspace MCP server**, now with Remote OAuth2.1 multi-user support and 1-click Claude installation.
 
 
-###### Support for all free Google accounts (Gmail, Docs, Drive etc) & Google Workspace plans (Starter, Standard, Plus, Enterprise, Non Profit etc) with expanded app options like Chat & Spaces. <br/> Interested in a private cloud instance? [Get in touch](https://workspacemcp.com/workspace-mcp-cloud)!
+###### Support for all free Google accounts (Gmail, Docs, Drive etc) & Google Workspace plans (Starter, Standard, Plus, Enterprise, Non Profit) with expanded app options like Chat & Spaces. <br/> Interested in a private cloud instance? [Get in touch](https://workspacemcp.com/workspace-mcp-cloud)!
 
 
 </div>
