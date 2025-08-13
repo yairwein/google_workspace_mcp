@@ -1,11 +1,16 @@
 import inspect
 import logging
 from functools import wraps
-from typing import Dict, List, Optional, Any, Callable, Union
+from typing import Dict, List, Optional, Any, Callable, Union, Tuple
 from datetime import datetime, timedelta
 
 from google.auth.exceptions import RefreshError
+from googleapiclient.discovery import build
+from fastmcp.server.dependencies import get_context
 from auth.google_auth import get_authenticated_google_service, GoogleAuthenticationError
+from auth.oauth21_session_store import get_oauth21_session_store
+from auth.oauth_config import is_oauth21_enabled, get_oauth_config
+from core.context import set_fastmcp_session_id
 from auth.scopes import (
     GMAIL_READONLY_SCOPE, GMAIL_SEND_SCOPE, GMAIL_COMPOSE_SCOPE, GMAIL_MODIFY_SCOPE, GMAIL_LABELS_SCOPE,
     DRIVE_READONLY_SCOPE, DRIVE_FILE_SCOPE,
@@ -23,6 +28,182 @@ from auth.scopes import (
 OAUTH21_INTEGRATION_AVAILABLE = True
 
 
+# Authentication helper functions
+def _get_auth_context(tool_name: str) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+    """
+    Get authentication context from FastMCP.
+    
+    Returns:
+        Tuple of (authenticated_user, auth_method, mcp_session_id)
+    """
+    try:
+        ctx = get_context()
+        if not ctx:
+            return None, None, None
+            
+        authenticated_user = ctx.get_state("authenticated_user_email")
+        auth_method = ctx.get_state("authenticated_via")
+        mcp_session_id = ctx.session_id if hasattr(ctx, 'session_id') else None
+        
+        if mcp_session_id:
+            set_fastmcp_session_id(mcp_session_id)
+            
+        logger.debug(f"[{tool_name}] Auth from middleware: {authenticated_user} via {auth_method}")
+        return authenticated_user, auth_method, mcp_session_id
+        
+    except Exception as e:
+        logger.debug(f"[{tool_name}] Could not get FastMCP context: {e}")
+        return None, None, None
+
+
+def _detect_oauth_version(authenticated_user: Optional[str], mcp_session_id: Optional[str], tool_name: str) -> bool:
+    """
+    Detect whether to use OAuth 2.1 based on configuration and context.
+    
+    Returns:
+        True if OAuth 2.1 should be used, False otherwise
+    """
+    if not is_oauth21_enabled():
+        return False
+        
+    # When OAuth 2.1 is enabled globally, ALWAYS use OAuth 2.1 for authenticated users
+    if authenticated_user:
+        logger.info(f"[{tool_name}] OAuth 2.1 mode: Using OAuth 2.1 for authenticated user '{authenticated_user}'")
+        return True
+        
+    # Only use version detection for unauthenticated requests
+    config = get_oauth_config()
+    request_params = {}
+    if mcp_session_id:
+        request_params["session_id"] = mcp_session_id
+        
+    oauth_version = config.detect_oauth_version(request_params)
+    use_oauth21 = (oauth_version == "oauth21")
+    logger.info(f"[{tool_name}] OAuth version detected: {oauth_version}, will use OAuth 2.1: {use_oauth21}")
+    return use_oauth21
+
+
+def _override_user_email_for_oauth21(
+    use_oauth21: bool,
+    authenticated_user: Optional[str],
+    bound_args: inspect.BoundArguments,
+    args: tuple,
+    kwargs: dict,
+    wrapper_sig: inspect.Signature,
+    tool_name: str
+) -> Tuple[str, tuple]:
+    """
+    Override user_google_email with authenticated user when using OAuth 2.1.
+    
+    Returns:
+        Tuple of (updated_user_email, updated_args)
+    """
+    if not (use_oauth21 and authenticated_user):
+        return bound_args.arguments.get('user_google_email'), args
+        
+    current_email = bound_args.arguments.get('user_google_email')
+    if current_email == authenticated_user:
+        return current_email, args
+        
+    logger.info(f"[{tool_name}] OAuth 2.1: Overriding user_google_email from '{current_email}' to authenticated user '{authenticated_user}'")
+    
+    # Update in bound_args
+    bound_args.arguments['user_google_email'] = authenticated_user
+    
+    # Update in kwargs if present
+    if 'user_google_email' in kwargs:
+        kwargs['user_google_email'] = authenticated_user
+        
+    # Update in args if user_google_email is passed positionally
+    wrapper_params = list(wrapper_sig.parameters.keys())
+    if 'user_google_email' in wrapper_params:
+        user_email_index = wrapper_params.index('user_google_email')
+        if user_email_index < len(args):
+            args_list = list(args)
+            args_list[user_email_index] = authenticated_user
+            args = tuple(args_list)
+            
+    return authenticated_user, args
+
+
+def _override_user_email_for_multiple_services(
+    use_oauth21: bool,
+    authenticated_user: Optional[str],
+    user_google_email: str,
+    args: tuple,
+    kwargs: dict,
+    param_names: List[str],
+    tool_name: str,
+    service_type: str
+) -> Tuple[str, tuple]:
+    """
+    Override user_google_email for multiple services decorator.
+    
+    Returns:
+        Tuple of (updated_user_email, updated_args)
+    """
+    if not (use_oauth21 and authenticated_user and user_google_email != authenticated_user):
+        return user_google_email, args
+        
+    logger.info(f"[{tool_name}] OAuth 2.1: Overriding user_google_email from '{user_google_email}' to authenticated user '{authenticated_user}' for service '{service_type}'")
+    
+    # Update in kwargs if present
+    if 'user_google_email' in kwargs:
+        kwargs['user_google_email'] = authenticated_user
+        
+    # Update in args if user_google_email is passed positionally
+    try:
+        user_email_index = param_names.index('user_google_email')
+        if user_email_index < len(args):
+            args_list = list(args)
+            args_list[user_email_index] = authenticated_user
+            args = tuple(args_list)
+    except ValueError:
+        pass  # user_google_email not in positional parameters
+        
+    return authenticated_user, args
+
+
+async def _authenticate_service(
+    use_oauth21: bool,
+    service_name: str,
+    service_version: str,
+    tool_name: str,
+    user_google_email: str,
+    resolved_scopes: List[str],
+    mcp_session_id: Optional[str],
+    authenticated_user: Optional[str]
+) -> Tuple[Any, str]:
+    """
+    Authenticate and get Google service using appropriate OAuth version.
+    
+    Returns:
+        Tuple of (service, actual_user_email)
+    """
+    if use_oauth21:
+        logger.debug(f"[{tool_name}] Using OAuth 2.1 flow")
+        return await get_authenticated_google_service_oauth21(
+            service_name=service_name,
+            version=service_version,
+            tool_name=tool_name,
+            user_google_email=user_google_email,
+            required_scopes=resolved_scopes,
+            session_id=mcp_session_id,
+            auth_token_email=authenticated_user,
+            allow_recent_auth=False,
+        )
+    else:
+        logger.debug(f"[{tool_name}] Using legacy OAuth 2.0 flow")
+        return await get_authenticated_google_service(
+            service_name=service_name,
+            version=service_version,
+            tool_name=tool_name,
+            user_google_email=user_google_email,
+            required_scopes=resolved_scopes,
+            session_id=mcp_session_id,
+        )
+
+
 # REMOVED: _extract_and_verify_bearer_token function. This functionality is now handled by AuthInfoMiddleware.
 async def get_authenticated_google_service_oauth21(
     service_name: str,
@@ -37,9 +218,6 @@ async def get_authenticated_google_service_oauth21(
     """
     OAuth 2.1 authentication using the session store with security validation.
     """
-    from auth.oauth21_session_store import get_oauth21_session_store
-    from googleapiclient.discovery import build
-
     store = get_oauth21_session_store()
 
     # Use the new validation method to ensure session can only access its own credentials
@@ -51,7 +229,6 @@ async def get_authenticated_google_service_oauth21(
     )
 
     if not credentials:
-        from auth.google_auth import GoogleAuthenticationError
         raise GoogleAuthenticationError(
             f"Access denied: Cannot retrieve credentials for {user_google_email}. "
             f"You can only access credentials for your authenticated account."
@@ -59,7 +236,6 @@ async def get_authenticated_google_service_oauth21(
 
     # Check scopes
     if not all(scope in credentials.scopes for scope in required_scopes):
-        from auth.google_auth import GoogleAuthenticationError
         raise GoogleAuthenticationError(f"OAuth 2.1 credentials lack required scopes. Need: {required_scopes}, Have: {credentials.scopes}")
 
     # Build service
@@ -306,99 +482,25 @@ def require_google_service(
                 try:
                     tool_name = func.__name__
 
-                    # SIMPLIFIED: Just get the authenticated user from the context
-                    # The AuthInfoMiddleware has already done all the authentication checks
-                    authenticated_user = None
-                    auth_method = None
-                    mcp_session_id = None
-
-                    try:
-                        from fastmcp.server.dependencies import get_context
-                        ctx = get_context()
-                        if ctx:
-                            # Get the authenticated user email set by AuthInfoMiddleware
-                            authenticated_user = ctx.get_state("authenticated_user_email")
-                            auth_method = ctx.get_state("authenticated_via")
-
-                            # Get session ID for logging
-                            if hasattr(ctx, 'session_id'):
-                                mcp_session_id = ctx.session_id
-                                # Set FastMCP session ID in context variable for propagation
-                                from core.context import set_fastmcp_session_id
-                                set_fastmcp_session_id(mcp_session_id)
-
-                            logger.debug(f"[{tool_name}] Auth from middleware: {authenticated_user} via {auth_method}")
-                    except Exception as e:
-                        logger.debug(f"[{tool_name}] Could not get FastMCP context: {e}")
+                    # Get authentication context
+                    authenticated_user, auth_method, mcp_session_id = _get_auth_context(tool_name)
 
                     # Log authentication status
                     logger.debug(f"[{tool_name}] Auth: {authenticated_user or 'none'} via {auth_method or 'none'} (session: {mcp_session_id[:8] if mcp_session_id else 'none'})")
 
-                    from auth.oauth_config import is_oauth21_enabled, get_oauth_config
-
-                    use_oauth21 = False
-
-                    if is_oauth21_enabled():
-                        # When OAuth 2.1 is enabled globally, ALWAYS use OAuth 2.1 for authenticated users.
-                        if authenticated_user:
-                            use_oauth21 = True
-                            logger.info(f"[{tool_name}] OAuth 2.1 mode: Using OAuth 2.1 for authenticated user '{authenticated_user}'")
-                        else:
-                            # Only use version detection for unauthenticated requests
-                            config = get_oauth_config()
-                            request_params = {}
-                            if mcp_session_id:
-                                request_params["session_id"] = mcp_session_id
-
-                            oauth_version = config.detect_oauth_version(request_params)
-                            use_oauth21 = (oauth_version == "oauth21")
-                            logger.info(f"[{tool_name}] OAuth version detected: {oauth_version}, will use OAuth 2.1: {use_oauth21}")
+                    # Detect OAuth version
+                    use_oauth21 = _detect_oauth_version(authenticated_user, mcp_session_id, tool_name)
 
                     # Override user_google_email with authenticated user when using OAuth 2.1
-                    if use_oauth21 and authenticated_user:
-                        if bound_args.arguments.get('user_google_email') != authenticated_user:
-                            original_email = bound_args.arguments.get('user_google_email')
-                            logger.info(f"[{tool_name}] OAuth 2.1: Overriding user_google_email from '{original_email}' to authenticated user '{authenticated_user}'")
-                            bound_args.arguments['user_google_email'] = authenticated_user
-                            user_google_email = authenticated_user
+                    user_google_email, args = _override_user_email_for_oauth21(
+                        use_oauth21, authenticated_user, bound_args, args, kwargs, wrapper_sig, tool_name
+                    )
 
-                            # Update in kwargs if the parameter exists there
-                            if 'user_google_email' in kwargs:
-                                kwargs['user_google_email'] = authenticated_user
-
-                            # Update in args if user_google_email is passed positionally
-                            wrapper_params = list(wrapper_sig.parameters.keys())
-                            if 'user_google_email' in wrapper_params:
-                                user_email_index = wrapper_params.index('user_google_email')
-                                if user_email_index < len(args):
-                                    args_list = list(args)
-                                    args_list[user_email_index] = authenticated_user
-                                    args = tuple(args_list)
-
-                    if use_oauth21:
-                        logger.debug(f"[{tool_name}] Using OAuth 2.1 flow")
-                        # The downstream get_authenticated_google_service_oauth21 will handle token validation
-                        service, actual_user_email = await get_authenticated_google_service_oauth21(
-                            service_name=service_name,
-                            version=service_version,
-                            tool_name=tool_name,
-                            user_google_email=user_google_email,
-                            required_scopes=resolved_scopes,
-                            session_id=mcp_session_id,
-                            auth_token_email=authenticated_user,
-                            allow_recent_auth=False,
-                        )
-                    else:
-                        # Use legacy OAuth 2.0 authentication
-                        logger.debug(f"[{tool_name}] Using legacy OAuth 2.0 flow")
-                        service, actual_user_email = await get_authenticated_google_service(
-                            service_name=service_name,
-                            version=service_version,
-                            tool_name=tool_name,
-                            user_google_email=user_google_email,
-                            required_scopes=resolved_scopes,
-                            session_id=mcp_session_id,
-                        )
+                    # Authenticate service
+                    service, actual_user_email = await _authenticate_service(
+                        use_oauth21, service_name, service_version, tool_name,
+                        user_google_email, resolved_scopes, mcp_session_id, authenticated_user
+                    )
 
                     if cache_enabled:
                         cache_key = _get_cache_key(user_google_email, service_name, service_version, resolved_scopes)
@@ -483,74 +585,23 @@ def require_multiple_services(service_configs: List[Dict[str, Any]]):
                 try:
                     tool_name = func.__name__
 
-                    authenticated_user = None
-                    mcp_session_id = None
+                    # Get authentication context
+                    authenticated_user, _, mcp_session_id = _get_auth_context(tool_name)
 
-                    try:
-                        from fastmcp.server.dependencies import get_context
-                        ctx = get_context()
-                        if ctx:
-                            authenticated_user = ctx.get_state("authenticated_user_email")
-                            if hasattr(ctx, 'session_id'):
-                                mcp_session_id = ctx.session_id
-                    except Exception as e:
-                        logger.debug(f"[{tool_name}] Could not get FastMCP context: {e}")
-
-                    from auth.oauth_config import is_oauth21_enabled
-
-                    use_oauth21 = False
-                    if is_oauth21_enabled():
-                        # When OAuth 2.1 is enabled globally, ALWAYS use OAuth 2.1 for authenticated users
-                        if authenticated_user:
-                            use_oauth21 = True
-                        else:
-                            # Only use version detection for unauthenticated requests (rare case)
-                            use_oauth21 = False
+                    # Detect OAuth version (simplified for multiple services)
+                    use_oauth21 = is_oauth21_enabled() and authenticated_user is not None
 
                     # Override user_google_email with authenticated user when using OAuth 2.1
-                    if use_oauth21 and authenticated_user:
-                        if user_google_email != authenticated_user:
-                            logger.info(f"[{tool_name}] OAuth 2.1: Overriding user_google_email from '{user_google_email}' to authenticated user '{authenticated_user}' for service '{service_type}'")
-                            user_google_email = authenticated_user
+                    user_google_email, args = _override_user_email_for_multiple_services(
+                        use_oauth21, authenticated_user, user_google_email, args, kwargs, 
+                        param_names, tool_name, service_type
+                    )
 
-                            # Update in kwargs if present
-                            if 'user_google_email' in kwargs:
-                                kwargs['user_google_email'] = authenticated_user
-
-                            # Update in args if user_google_email is passed positionally
-                            try:
-                                user_email_index = param_names.index('user_google_email')
-                                if user_email_index < len(args):
-                                    # Convert args to list, update, convert back to tuple
-                                    args_list = list(args)
-                                    args_list[user_email_index] = authenticated_user
-                                    args = tuple(args_list)
-                            except ValueError:
-                                pass  # user_google_email not in positional parameters
-
-                    if use_oauth21:
-                        logger.debug(f"[{tool_name}] Attempting OAuth 2.1 authentication flow for {service_type}.")
-                        service, _ = await get_authenticated_google_service_oauth21(
-                            service_name=service_name,
-                            version=service_version,
-                            tool_name=tool_name,
-                            user_google_email=user_google_email,
-                            required_scopes=resolved_scopes,
-                            session_id=mcp_session_id,
-                            auth_token_email=authenticated_user,
-                            allow_recent_auth=False,
-                        )
-                    else:
-                        # If OAuth 2.1 is not enabled, always use the legacy authentication method.
-                        logger.debug(f"[{tool_name}] Using legacy authentication flow for {service_type} (OAuth 2.1 disabled).")
-                        service, _ = await get_authenticated_google_service(
-                            service_name=service_name,
-                            version=service_version,
-                            tool_name=tool_name,
-                            user_google_email=user_google_email,
-                            required_scopes=resolved_scopes,
-                            session_id=mcp_session_id,
-                        )
+                    # Authenticate service
+                    service, _ = await _authenticate_service(
+                        use_oauth21, service_name, service_version, tool_name,
+                        user_google_email, resolved_scopes, mcp_session_id, authenticated_user
+                    )
 
                     # Inject service with specified parameter name
                     kwargs[param_name] = service

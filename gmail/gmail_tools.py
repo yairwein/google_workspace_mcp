@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 
 GMAIL_BATCH_SIZE = 25
 GMAIL_REQUEST_DELAY = 0.1
+HTML_BODY_TRUNCATE_LIMIT = 20000
 
 
 def _extract_message_body(payload):
@@ -360,8 +361,8 @@ async def get_gmail_message_content(
         body_data = text_body
     elif html_body.strip():
         # Truncate very large HTML to keep responses manageable
-        if len(html_body) > 20000:
-            html_body = html_body[:20000] + "\n\n[HTML content truncated...]"
+        if len(html_body) > HTML_BODY_TRUNCATE_LIMIT:
+            html_body = html_body[:HTML_BODY_TRUNCATE_LIMIT] + "\n\n[HTML content truncated...]"
         body_data = f"[HTML Content Converted]\n{html_body}"
     else:
         body_data = "[No readable content found]"
@@ -537,8 +538,8 @@ async def get_gmail_messages_content_batch(
                         body_data = text_body
                     elif html_body.strip():
                         # Truncate very large HTML to keep batch responses manageable
-                        if len(html_body) > 15000:
-                            html_body = html_body[:15000] + "\n\n[HTML content truncated...]"
+                        if len(html_body) > HTML_BODY_TRUNCATE_LIMIT:
+                            html_body = html_body[:HTML_BODY_TRUNCATE_LIMIT] + "\n\n[HTML content truncated...]"
                         body_data = f"[HTML Content Converted]\n{html_body}"
                     else:
                         body_data = "[No readable content found]"
@@ -782,8 +783,8 @@ def _format_thread_content(thread_data: dict, thread_id: str) -> str:
             body_data = text_body
         elif html_body.strip():
             # Truncate very large HTML to keep batch responses manageable
-            if len(html_body) > 15000:
-                html_body = html_body[:15000] + "\n\n[HTML content truncated...]"
+            if len(html_body) > HTML_BODY_TRUNCATE_LIMIT:
+                html_body = html_body[:HTML_BODY_TRUNCATE_LIMIT] + "\n\n[HTML content truncated...]"
             body_data = f"[HTML Content Converted]\n{html_body}"
         else:
             body_data = "[No readable content found]"
