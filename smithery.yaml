@@ -1,4 +1,6 @@
+runtime: "container"
 startCommand:
+  type: "http"
   configSchema:
     type: object
     required:
@@ -91,17 +93,3 @@ startCommand:
         }
       };
     }
-  exampleConfig:
-    googleOauthClientId: "your-client-id.apps.googleusercontent.com"
-    googleOauthClientSecret: "your-client-secret"
-    userGoogleEmail: ""
-    googleOauthRedirectUri: ""
-    googleClientSecretPath: ""
-    workspaceMcpBaseUri: "http://localhost"
-    workspaceMcpPort: 8000
-    mcpSingleUserMode: false
-    mcpEnableOauth21: false
-    oauthlibInsecureTransport: false
-    googlePseApiKey: ""
-    googlePseEngineId: ""
-    tools: ""
