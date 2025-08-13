@@ -13,6 +13,7 @@ from typing import Optional, List, Dict, Literal
 from email.mime.text import MIMEText
 
 from fastapi import Body
+from pydantic import Field
 
 from auth.service_decorator import require_google_service
 from core.utils import handle_http_errors
@@ -1080,8 +1081,8 @@ async def modify_gmail_message_labels(
     service,
     user_google_email: str,
     message_id: str,
-    add_label_ids: Optional[List[str]] = None,
-    remove_label_ids: Optional[List[str]] = None,
+    add_label_ids: List[str] = Field(default=[], description="Label IDs to add to the message."),
+    remove_label_ids: List[str] = Field(default=[], description="Label IDs to remove from the message."),
 ) -> str:
     """
     Adds or removes labels from a Gmail message.
@@ -1132,8 +1133,8 @@ async def batch_modify_gmail_message_labels(
     service,
     user_google_email: str,
     message_ids: List[str],
-    add_label_ids: Optional[List[str]] = None,
-    remove_label_ids: Optional[List[str]] = None,
+    add_label_ids: List[str] = Field(default=[], description="Label IDs to add to messages."),
+    remove_label_ids: List[str] = Field(default=[], description="Label IDs to remove from messages."),
 ) -> str:
     """
     Adds or removes labels from multiple Gmail messages in a single batch request.
