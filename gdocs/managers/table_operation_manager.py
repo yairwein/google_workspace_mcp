@@ -6,7 +6,7 @@ multiple Google Docs API calls for complex table manipulations.
 """
 import logging
 import asyncio
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Tuple
 
 from gdocs.docs_helpers import create_insert_table_request
 from gdocs.docs_structure import find_tables
@@ -74,9 +74,6 @@ class TableOperationManager:
             if not fresh_tables:
                 return False, "Could not find table after creation", {}
                 
-            # Use the last table (newly created one)
-            table_info = fresh_tables[-1]
-            
             # Step 3: Populate each cell with proper index refreshing
             population_count = await self._populate_table_cells(
                 document_id, table_data, bold_headers

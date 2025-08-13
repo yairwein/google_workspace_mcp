@@ -152,7 +152,6 @@ Claude Desktop stores these securely in the OS keychain; set them once in the ex
      ```bash
      export GOOGLE_OAUTH_CLIENT_ID="your-client-id.apps.googleusercontent.com"
      export GOOGLE_OAUTH_CLIENT_SECRET="your-client-secret"
-     export GOOGLE_OAUTH_REDIRECT_URI="http://localhost:8000/oauth2callback"  # Optional - see Reverse Proxy Setup below
      ```
 
      **Option B: File-based (Traditional)**
@@ -305,19 +304,8 @@ The server supports two transport modes:
 
 #### Stdio Mode (Default - Recommended for Claude Desktop)
 
-**Guided Setup (Recommended if not using DXT)**
-
-```bash
-python install_claude.py
-```
-
-This script automatically:
-- Prompts you for your Google OAuth credentials (Client ID and Secret)
-- Creates the Claude Desktop config file in the correct location
-- Sets up all necessary environment variables
-- No manual file editing required!
-
-After running the script, just restart Claude Desktop and you're ready to go.
+In general, you should use the one-click DXT installer package for Claude Desktop.
+If you are unable to for some reason, you can configure it manually via `claude_desktop_config.json`
 
 **Manual Claude Configuration (Alternative)**
 1. Open Claude Desktop Settings → Developer → Edit Config
@@ -690,6 +678,7 @@ MIT License - see `LICENSE` file for details.
 
 Validations:
 [![MCP Badge](https://lobehub.com/badge/mcp/taylorwilsdon-google_workspace_mcp)](https://lobehub.com/mcp/taylorwilsdon-google_workspace_mcp)
+
 [![Verified on MseeP](https://mseep.ai/badge.svg)](https://mseep.ai/app/eebbc4a6-0f8c-41b2-ace8-038e5516dba0)
 
 
