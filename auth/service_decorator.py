@@ -335,34 +335,49 @@ def require_google_service(
                     logger.debug(f"[{tool_name}] Auth: {authenticated_user or 'none'} via {auth_method or 'none'} (session: {mcp_session_id[:8] if mcp_session_id else 'none'})")
 
                     from auth.oauth_config import is_oauth21_enabled, get_oauth_config
-                    
-                    # Smart OAuth version detection and fallback
+
                     use_oauth21 = False
-                    oauth_version = "oauth20"  # Default
-                    
+
                     if is_oauth21_enabled():
-                        # OAuth 2.1 is enabled globally, check client capabilities
-                        # Try to detect from context if this is an OAuth 2.1 capable client
-                        config = get_oauth_config()
-                        
-                        # Build request params from context for version detection
-                        request_params = {}
+                        # When OAuth 2.1 is enabled globally, ALWAYS use OAuth 2.1 for authenticated users.
                         if authenticated_user:
-                            request_params["authenticated_user"] = authenticated_user
-                        if mcp_session_id:
-                            request_params["session_id"] = mcp_session_id
-                        
-                        # Detect OAuth version based on client capabilities
-                        oauth_version = config.detect_oauth_version(request_params)
-                        use_oauth21 = (oauth_version == "oauth21")
-                        
-                        logger.debug(f"[{tool_name}] OAuth version detected: {oauth_version}, will use OAuth 2.1: {use_oauth21}")
+                            use_oauth21 = True
+                            logger.info(f"[{tool_name}] OAuth 2.1 mode: Using OAuth 2.1 for authenticated user '{authenticated_user}'")
+                        else:
+                            # Only use version detection for unauthenticated requests
+                            config = get_oauth_config()
+                            request_params = {}
+                            if mcp_session_id:
+                                request_params["session_id"] = mcp_session_id
+
+                            oauth_version = config.detect_oauth_version(request_params)
+                            use_oauth21 = (oauth_version == "oauth21")
+                            logger.info(f"[{tool_name}] OAuth version detected: {oauth_version}, will use OAuth 2.1: {use_oauth21}")
+
+                    # Override user_google_email with authenticated user when using OAuth 2.1
+                    if use_oauth21 and authenticated_user:
+                        if bound_args.arguments.get('user_google_email') != authenticated_user:
+                            original_email = bound_args.arguments.get('user_google_email')
+                            logger.info(f"[{tool_name}] OAuth 2.1: Overriding user_google_email from '{original_email}' to authenticated user '{authenticated_user}'")
+                            bound_args.arguments['user_google_email'] = authenticated_user
+                            user_google_email = authenticated_user
+
+                            # Update in kwargs if the parameter exists there
+                            if 'user_google_email' in kwargs:
+                                kwargs['user_google_email'] = authenticated_user
+
+                            # Update in args if user_google_email is passed positionally
+                            wrapper_params = list(wrapper_sig.parameters.keys())
+                            if 'user_google_email' in wrapper_params:
+                                user_email_index = wrapper_params.index('user_google_email')
+                                if user_email_index < len(args):
+                                    args_list = list(args)
+                                    args_list[user_email_index] = authenticated_user
+                                    args = tuple(args_list)
 
                     if use_oauth21:
                         logger.debug(f"[{tool_name}] Using OAuth 2.1 flow")
-                        # The downstream get_authenticated_google_service_oauth21 will handle
-                        # whether the user's token is valid for the requested resource.
-                        # This decorator should not block the call here.
+                        # The downstream get_authenticated_google_service_oauth21 will handle token validation
                         service, actual_user_email = await get_authenticated_google_service_oauth21(
                             service_name=service_name,
                             version=service_version,
@@ -397,7 +412,6 @@ def require_google_service(
                     # Re-raise the original error without wrapping it
                     raise
 
-            # --- Call the original function with the service object injected ---
             try:
                 # Prepend the fetched service object to the original arguments
                 return await func(service, *args, **kwargs)
@@ -469,7 +483,6 @@ def require_multiple_services(service_configs: List[Dict[str, Any]]):
                 try:
                     tool_name = func.__name__
 
-                    # SIMPLIFIED: Get authentication state from context (set by AuthInfoMiddleware)
                     authenticated_user = None
                     mcp_session_id = None
 
@@ -483,10 +496,39 @@ def require_multiple_services(service_configs: List[Dict[str, Any]]):
                     except Exception as e:
                         logger.debug(f"[{tool_name}] Could not get FastMCP context: {e}")
 
-                    # Use the same logic as single service decorator
                     from auth.oauth_config import is_oauth21_enabled
 
+                    use_oauth21 = False
                     if is_oauth21_enabled():
+                        # When OAuth 2.1 is enabled globally, ALWAYS use OAuth 2.1 for authenticated users
+                        if authenticated_user:
+                            use_oauth21 = True
+                        else:
+                            # Only use version detection for unauthenticated requests (rare case)
+                            use_oauth21 = False
+
+                    # Override user_google_email with authenticated user when using OAuth 2.1
+                    if use_oauth21 and authenticated_user:
+                        if user_google_email != authenticated_user:
+                            logger.info(f"[{tool_name}] OAuth 2.1: Overriding user_google_email from '{user_google_email}' to authenticated user '{authenticated_user}' for service '{service_type}'")
+                            user_google_email = authenticated_user
+
+                            # Update in kwargs if present
+                            if 'user_google_email' in kwargs:
+                                kwargs['user_google_email'] = authenticated_user
+
+                            # Update in args if user_google_email is passed positionally
+                            try:
+                                user_email_index = param_names.index('user_google_email')
+                                if user_email_index < len(args):
+                                    # Convert args to list, update, convert back to tuple
+                                    args_list = list(args)
+                                    args_list[user_email_index] = authenticated_user
+                                    args = tuple(args_list)
+                            except ValueError:
+                                pass  # user_google_email not in positional parameters
+
+                    if use_oauth21:
                         logger.debug(f"[{tool_name}] Attempting OAuth 2.1 authentication flow for {service_type}.")
                         service, _ = await get_authenticated_google_service_oauth21(
                             service_name=service_name,

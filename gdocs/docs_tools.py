@@ -416,11 +416,16 @@ async def modify_doc_text(
         requests.append(create_format_text_request(format_start, format_end, bold, italic, underline, font_size, font_family))
         
         format_details = []
-        if bold is not None: format_details.append(f"bold={bold}")
-        if italic is not None: format_details.append(f"italic={italic}")  
-        if underline is not None: format_details.append(f"underline={underline}")
-        if font_size: format_details.append(f"font_size={font_size}")
-        if font_family: format_details.append(f"font_family={font_family}")
+        if bold is not None:
+            format_details.append(f"bold={bold}")
+        if italic is not None:
+            format_details.append(f"italic={italic}")  
+        if underline is not None:
+            format_details.append(f"underline={underline}")
+        if font_size:
+            format_details.append(f"font_size={font_size}")
+        if font_family:
+            format_details.append(f"font_family={font_family}")
         
         operations.append(f"Applied formatting ({', '.join(format_details)}) to range {format_start}-{format_end}")
 
@@ -954,7 +959,6 @@ async def create_table_with_data(
         link = f"https://docs.google.com/document/d/{document_id}/edit"
         rows = metadata.get('rows', 0)
         columns = metadata.get('columns', 0)
-        populated_cells = metadata.get('populated_cells', 0)
         
         return f"SUCCESS: {message}. Table: {rows}x{columns}, Index: {index}. Link: {link}"
     else:

@@ -74,9 +74,6 @@ class TableOperationManager:
             if not fresh_tables:
                 return False, "Could not find table after creation", {}
                 
-            # Use the last table (newly created one)
-            table_info = fresh_tables[-1]
-            
             # Step 3: Populate each cell with proper index refreshing
             population_count = await self._populate_table_cells(
                 document_id, table_data, bold_headers
