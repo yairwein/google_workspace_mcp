@@ -13,6 +13,7 @@ from typing import Optional, List, Dict, Literal
 from email.mime.text import MIMEText
 
 from fastapi import Body
+from pydantic import Field
 
 from auth.service_decorator import require_google_service
 from core.utils import handle_http_errors
@@ -28,6 +29,7 @@ logger = logging.getLogger(__name__)
 
 GMAIL_BATCH_SIZE = 25
 GMAIL_REQUEST_DELAY = 0.1
+HTML_BODY_TRUNCATE_LIMIT = 20000
 
 
 def _extract_message_body(payload):
@@ -95,6 +97,28 @@ def _extract_message_bodies(payload):
         "text": text_body,
         "html": html_body
     }
+
+
+def _format_body_content(text_body: str, html_body: str) -> str:
+    """
+    Helper function to format message body content with HTML fallback and truncation.
+    
+    Args:
+        text_body: Plain text body content
+        html_body: HTML body content
+        
+    Returns:
+        Formatted body content string
+    """
+    if text_body.strip():
+        return text_body
+    elif html_body.strip():
+        # Truncate very large HTML to keep responses manageable
+        if len(html_body) > HTML_BODY_TRUNCATE_LIMIT:
+            html_body = html_body[:HTML_BODY_TRUNCATE_LIMIT] + "\n\n[HTML content truncated...]"
+        return f"[HTML Content Converted]\n{html_body}"
+    else:
+        return "[No readable content found]"
 
 
 def _extract_headers(payload: dict, header_names: List[str]) -> Dict[str, str]:
@@ -355,15 +379,7 @@ async def get_gmail_message_content(
     html_body = bodies.get("html", "")
     
     # Format body content with HTML fallback
-    if text_body.strip():
-        body_data = text_body
-    elif html_body.strip():
-        # Truncate very large HTML to keep responses manageable
-        if len(html_body) > 20000:
-            html_body = html_body[:20000] + "\n\n[HTML content truncated...]"
-        body_data = f"[HTML Content Converted]\n{html_body}"
-    else:
-        body_data = "[No readable content found]"
+    body_data = _format_body_content(text_body, html_body)
 
     content_text = "\n".join(
         [
@@ -532,15 +548,7 @@ async def get_gmail_messages_content_batch(
                     html_body = bodies.get("html", "")
                     
                     # Format body content with HTML fallback
-                    if text_body.strip():
-                        body_data = text_body
-                    elif html_body.strip():
-                        # Truncate very large HTML to keep batch responses manageable
-                        if len(html_body) > 15000:
-                            html_body = html_body[:15000] + "\n\n[HTML content truncated...]"
-                        body_data = f"[HTML Content Converted]\n{html_body}"
-                    else:
-                        body_data = "[No readable content found]"
+                    body_data = _format_body_content(text_body, html_body)
 
                     output_messages.append(
                         f"Message ID: {mid}\n"
@@ -777,15 +785,7 @@ def _format_thread_content(thread_data: dict, thread_id: str) -> str:
         html_body = bodies.get("html", "")
         
         # Format body content with HTML fallback
-        if text_body.strip():
-            body_data = text_body
-        elif html_body.strip():
-            # Truncate very large HTML to keep batch responses manageable
-            if len(html_body) > 15000:
-                html_body = html_body[:15000] + "\n\n[HTML content truncated...]"
-            body_data = f"[HTML Content Converted]\n{html_body}"
-        else:
-            body_data = "[No readable content found]"
+        body_data = _format_body_content(text_body, html_body)
 
         # Add message to content
         content_lines.extend(
@@ -1080,8 +1080,8 @@ async def modify_gmail_message_labels(
     service,
     user_google_email: str,
     message_id: str,
-    add_label_ids: Optional[List[str]] = None,
-    remove_label_ids: Optional[List[str]] = None,
+    add_label_ids: List[str] = Field(default=[], description="Label IDs to add to the message."),
+    remove_label_ids: List[str] = Field(default=[], description="Label IDs to remove from the message."),
 ) -> str:
     """
     Adds or removes labels from a Gmail message.
@@ -1132,8 +1132,8 @@ async def batch_modify_gmail_message_labels(
     service,
     user_google_email: str,
     message_ids: List[str],
-    add_label_ids: Optional[List[str]] = None,
-    remove_label_ids: Optional[List[str]] = None,
+    add_label_ids: List[str] = Field(default=[], description="Label IDs to add to messages."),
+    remove_label_ids: List[str] = Field(default=[], description="Label IDs to remove from messages."),
 ) -> str:
     """
     Adds or removes labels from multiple Gmail messages in a single batch request.
@@ -1173,3 +1173,4 @@ async def batch_modify_gmail_message_labels(
         actions.append(f"Removed labels: {', '.join(remove_label_ids)}")
 
     return f"Labels updated for {len(message_ids)} messages: {'; '.join(actions)}"
+
