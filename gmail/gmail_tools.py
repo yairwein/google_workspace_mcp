@@ -33,6 +33,7 @@ GMAIL_REQUEST_DELAY = 0.1
 def _extract_message_body(payload):
     """
     Helper function to extract plain text body from a Gmail message payload.
+    (Maintained for backward compatibility)
 
     Args:
         payload (dict): The message payload from Gmail API
@@ -40,29 +41,60 @@ def _extract_message_body(payload):
     Returns:
         str: The plain text body content, or empty string if not found
     """
-    body_data = ""
+    bodies = _extract_message_bodies(payload)
+    return bodies.get("text", "")
+
+
+def _extract_message_bodies(payload):
+    """
+    Helper function to extract both plain text and HTML bodies from a Gmail message payload.
+
+    Args:
+        payload (dict): The message payload from Gmail API
+
+    Returns:
+        dict: Dictionary with 'text' and 'html' keys containing body content
+    """
+    text_body = ""
+    html_body = ""
     parts = [payload] if "parts" not in payload else payload.get("parts", [])
 
     part_queue = list(parts)  # Use a queue for BFS traversal of parts
     while part_queue:
         part = part_queue.pop(0)
-        if part.get("mimeType") == "text/plain" and part.get("body", {}).get("data"):
-            data = base64.urlsafe_b64decode(part["body"]["data"])
-            body_data = data.decode("utf-8", errors="ignore")
-            break  # Found plain text body
-        elif part.get("mimeType", "").startswith("multipart/") and "parts" in part:
-            part_queue.extend(part.get("parts", []))  # Add sub-parts to the queue
+        mime_type = part.get("mimeType", "")
+        body_data = part.get("body", {}).get("data")
+        
+        if body_data:
+            try:
+                decoded_data = base64.urlsafe_b64decode(body_data).decode("utf-8", errors="ignore")
+                if mime_type == "text/plain" and not text_body:
+                    text_body = decoded_data
+                elif mime_type == "text/html" and not html_body:
+                    html_body = decoded_data
+            except Exception as e:
+                logger.warning(f"Failed to decode body part: {e}")
+                
+        # Add sub-parts to queue for multipart messages
+        if mime_type.startswith("multipart/") and "parts" in part:
+            part_queue.extend(part.get("parts", []))
 
-    # If no plain text found, check the main payload body if it exists
-    if (
-        not body_data
-        and payload.get("mimeType") == "text/plain"
-        and payload.get("body", {}).get("data")
-    ):
-        data = base64.urlsafe_b64decode(payload["body"]["data"])
-        body_data = data.decode("utf-8", errors="ignore")
+    # Check the main payload if it has body data directly
+    if payload.get("body", {}).get("data"):
+        try:
+            decoded_data = base64.urlsafe_b64decode(payload["body"]["data"]).decode("utf-8", errors="ignore")
+            mime_type = payload.get("mimeType", "")
+            if mime_type == "text/plain" and not text_body:
+                text_body = decoded_data
+            elif mime_type == "text/html" and not html_body:
+                html_body = decoded_data
+        except Exception as e:
+            logger.warning(f"Failed to decode main payload body: {e}")
 
-    return body_data
+    return {
+        "text": text_body,
+        "html": html_body
+    }
 
 
 def _extract_headers(payload: dict, header_names: List[str]) -> Dict[str, str]:
@@ -316,9 +348,22 @@ async def get_gmail_message_content(
         .execute
     )
 
-    # Extract the plain text body using helper function
+    # Extract both text and HTML bodies using enhanced helper function
     payload = message_full.get("payload", {})
-    body_data = _extract_message_body(payload)
+    bodies = _extract_message_bodies(payload)
+    text_body = bodies.get("text", "")
+    html_body = bodies.get("html", "")
+    
+    # Format body content with HTML fallback
+    if text_body.strip():
+        body_data = text_body
+    elif html_body.strip():
+        # Truncate very large HTML to keep responses manageable
+        if len(html_body) > 20000:
+            html_body = html_body[:20000] + "\n\n[HTML content truncated...]"
+        body_data = f"[HTML Content Converted]\n{html_body}"
+    else:
+        body_data = "[No readable content found]"
 
     content_text = "\n".join(
         [
@@ -480,14 +525,29 @@ async def get_gmail_messages_content_batch(
                     headers = _extract_headers(payload, ["Subject", "From"])
                     subject = headers.get("Subject", "(no subject)")
                     sender = headers.get("From", "(unknown sender)")
-                    body = _extract_message_body(payload)
+                    
+                    # Extract both text and HTML bodies using enhanced helper function
+                    bodies = _extract_message_bodies(payload)
+                    text_body = bodies.get("text", "")
+                    html_body = bodies.get("html", "")
+                    
+                    # Format body content with HTML fallback
+                    if text_body.strip():
+                        body_data = text_body
+                    elif html_body.strip():
+                        # Truncate very large HTML to keep batch responses manageable
+                        if len(html_body) > 15000:
+                            html_body = html_body[:15000] + "\n\n[HTML content truncated...]"
+                        body_data = f"[HTML Content Converted]\n{html_body}"
+                    else:
+                        body_data = "[No readable content found]"
 
                     output_messages.append(
                         f"Message ID: {mid}\n"
                         f"Subject: {subject}\n"
                         f"From: {sender}\n"
                         f"Web Link: {_generate_gmail_web_url(mid)}\n"
-                        f"\n{body or '[No text/plain body found]'}\n"
+                        f"\n{body_data}\n"
                     )
 
     # Combine all messages with separators
@@ -710,9 +770,22 @@ def _format_thread_content(thread_data: dict, thread_id: str) -> str:
         date = headers.get("Date", "(unknown date)")
         subject = headers.get("Subject", "(no subject)")
 
-        # Extract message body
+        # Extract both text and HTML bodies
         payload = message.get("payload", {})
-        body_data = _extract_message_body(payload)
+        bodies = _extract_message_bodies(payload)
+        text_body = bodies.get("text", "")
+        html_body = bodies.get("html", "")
+        
+        # Format body content with HTML fallback
+        if text_body.strip():
+            body_data = text_body
+        elif html_body.strip():
+            # Truncate very large HTML to keep batch responses manageable
+            if len(html_body) > 15000:
+                html_body = html_body[:15000] + "\n\n[HTML content truncated...]"
+            body_data = f"[HTML Content Converted]\n{html_body}"
+        else:
+            body_data = "[No readable content found]"
 
         # Add message to content
         content_lines.extend(
@@ -730,7 +803,7 @@ def _format_thread_content(thread_data: dict, thread_id: str) -> str:
         content_lines.extend(
             [
                 "",
-                body_data or "[No text/plain body found]",
+                body_data,
                 "",
             ]
         )
