@@ -58,7 +58,7 @@ startCommand:
   commandFunction:
     |-
     (config) => {
-      const args = ['run', 'main.py'];
+      const args = ['run', 'main.py', '--transport', 'streamable-http'];
       
       // Add single-user flag if enabled
       if (config.mcpSingleUserMode) {
