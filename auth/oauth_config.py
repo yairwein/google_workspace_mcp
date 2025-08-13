@@ -212,7 +212,7 @@ class OAuthConfig:
                 store = get_oauth21_session_store()
                 if store.has_session(authenticated_user):
                     return "oauth21"
-            except Exception:
+            except (ImportError, AttributeError, RuntimeError):
                 pass  # Fall back to OAuth 2.0 if session check fails
 
         # For public clients in OAuth 2.1 mode, we require PKCE

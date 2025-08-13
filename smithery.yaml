@@ -1,49 +1,65 @@
-# Smithery configuration file: https://smithery.ai/docs/config#smitheryyaml
+version: 1
 
-build:
-  dockerBuildPath: .
+start:
+  command: ["uv", "run", "main.py", "--transport", "streamable-http"]
+  port: 8000
 
-startCommand:
-  type: stdio
-  configSchema:
-    type: object
-    required:
-      - googleOauthClientId
-      - googleOauthClientSecret
-    properties:
-      googleOauthClientId:
-        type: string
-        description: "(required) - Your Google OAuth 2.0 Client ID from Google Cloud Console"
-      googleOauthClientSecret:
-        type: string
-        description: "(required) - Your Google OAuth 2.0 Client Secret from Google Cloud Console"
-      googleOauthRedirectUri:
-        type: string
-        description: "(optional) - OAuth redirect URI - Default: http://localhost:8000/oauth2callback"
-      googleClientSecretPath:
-        type: string
-        description: "(optional) - Path to client_secret.json file (alternative to environment variables)"
-      workspaceMcpBaseUri:
-        type: string
-        description: "(optional) - Base URI for the server - Default: http://localhost"
-      workspaceMcpPort:
-        type: string
-        description: "(optional) - Port the server listens on - Default: 8000"
-      oauthlibInsecureTransport:
-        type: string
-        description: "(optional) - Set to '1' for development environments - Default: none"
-  commandFunction:
-    |-
-    (config) => ({
-      command: 'python',
-      args: ['main.py', '--transport', 'streamable-http'],
-      env: {
-        GOOGLE_OAUTH_CLIENT_ID: config.googleOauthClientId,
-        GOOGLE_OAUTH_CLIENT_SECRET: config.googleOauthClientSecret,
-        ...(config.googleOauthRedirectUri && { GOOGLE_OAUTH_REDIRECT_URI: config.googleOauthRedirectUri }),
-        ...(config.googleClientSecretPath && { GOOGLE_CLIENT_SECRET_PATH: config.googleClientSecretPath }),
-        ...(config.workspaceMcpBaseUri && { WORKSPACE_MCP_BASE_URI: config.workspaceMcpBaseUri }),
-        ...(config.workspaceMcpPort && { WORKSPACE_MCP_PORT: config.workspaceMcpPort }),
-        ...(config.oauthlibInsecureTransport && { OAUTHLIB_INSECURE_TRANSPORT: config.oauthlibInsecureTransport })
-      }
-    })
+# Configuration schema for deployment environments
+configSchema:
+  type: object
+  required:
+    - googleOauthClientId
+    - googleOauthClientSecret
+  properties:
+    googleOauthClientId:
+      type: string
+      description: "(required) - Your Google OAuth 2.0 Client ID from Google Cloud Console"
+    googleOauthClientSecret:
+      type: string
+      description: "(required) - Your Google OAuth 2.0 Client Secret from Google Cloud Console"
+    userGoogleEmail:
+      type: string
+      description: "(optional) - Default email for single-user auth - avoids needing to specify email in system prompts"
+    googleOauthRedirectUri:
+      type: string
+      description: "(optional) - OAuth redirect URI - Default: http://localhost:8000/oauth2callback"
+    googleClientSecretPath:
+      type: string
+      description: "(optional) - Path to client_secret.json file (alternative to environment variables)"
+    workspaceMcpBaseUri:
+      type: string
+      description: "(optional) - Base URI for the server - Default: http://localhost (do not include port)"
+    port:
+      type: string
+      description: "(optional) - Port the server listens on - Default: 8000 (used by both PORT and WORKSPACE_MCP_PORT)"
+    mcpSingleUserMode:
+      type: string
+      description: "(optional) - Set to '1' to enable single-user mode - Default: false"
+    mcpEnableOauth21:
+      type: string
+      description: "(optional) - Set to 'true' to enable OAuth 2.1 multi-user support - Default: false"
+    oauthlibInsecureTransport:
+      type: string
+      description: "(optional) - Set to '1' for development environments - Default: none"
+    googlePseApiKey:
+      type: string
+      description: "(optional) - API key for Google Custom Search - required for search tools"
+    googlePseEngineId:
+      type: string
+      description: "(optional) - Programmable Search Engine ID for Custom Search - required for search tools"
+
+# Environment variable mapping for runtime
+envMapping:
+  GOOGLE_OAUTH_CLIENT_ID: googleOauthClientId
+  GOOGLE_OAUTH_CLIENT_SECRET: googleOauthClientSecret
+  USER_GOOGLE_EMAIL: userGoogleEmail
+  GOOGLE_OAUTH_REDIRECT_URI: googleOauthRedirectUri
+  GOOGLE_CLIENT_SECRET_PATH: googleClientSecretPath
+  WORKSPACE_MCP_BASE_URI: workspaceMcpBaseUri
+  PORT: port
+  WORKSPACE_MCP_PORT: port
+  MCP_SINGLE_USER_MODE: mcpSingleUserMode
+  MCP_ENABLE_OAUTH21: mcpEnableOauth21
+  OAUTHLIB_INSECURE_TRANSPORT: oauthlibInsecureTransport
+  GOOGLE_PSE_API_KEY: googlePseApiKey
+  GOOGLE_PSE_ENGINE_ID: googlePseEngineId
