@@ -152,7 +152,6 @@ Claude Desktop stores these securely in the OS keychain; set them once in the ex
      ```bash
      export GOOGLE_OAUTH_CLIENT_ID="your-client-id.apps.googleusercontent.com"
      export GOOGLE_OAUTH_CLIENT_SECRET="your-client-secret"
-     export GOOGLE_OAUTH_REDIRECT_URI="http://localhost:8000/oauth2callback"  # Optional - see Reverse Proxy Setup below
      ```
 
      **Option B: File-based (Traditional)**
