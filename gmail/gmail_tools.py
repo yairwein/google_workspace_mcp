@@ -66,7 +66,7 @@ def _extract_message_bodies(payload):
         part = part_queue.pop(0)
         mime_type = part.get("mimeType", "")
         body_data = part.get("body", {}).get("data")
-        
+
         if body_data:
             try:
                 decoded_data = base64.urlsafe_b64decode(body_data).decode("utf-8", errors="ignore")
@@ -76,7 +76,7 @@ def _extract_message_bodies(payload):
                     html_body = decoded_data
             except Exception as e:
                 logger.warning(f"Failed to decode body part: {e}")
-                
+
         # Add sub-parts to queue for multipart messages
         if mime_type.startswith("multipart/") and "parts" in part:
             part_queue.extend(part.get("parts", []))
@@ -97,6 +97,28 @@ def _extract_message_bodies(payload):
         "text": text_body,
         "html": html_body
     }
+
+
+def _format_body_content(text_body: str, html_body: str) -> str:
+    """
+    Helper function to format message body content with HTML fallback and truncation.
+
+    Args:
+        text_body: Plain text body content
+        html_body: HTML body content
+
+    Returns:
+        Formatted body content string
+    """
+    if text_body.strip():
+        return text_body
+    elif html_body.strip():
+        # Truncate very large HTML to keep responses manageable
+        if len(html_body) > HTML_BODY_TRUNCATE_LIMIT:
+            html_body = html_body[:HTML_BODY_TRUNCATE_LIMIT] + "\n\n[HTML content truncated...]"
+        return f"[HTML Content Converted]\n{html_body}"
+    else:
+        return "[No readable content found]"
 
 
 def _extract_headers(payload: dict, header_names: List[str]) -> Dict[str, str]:
@@ -129,7 +151,7 @@ def _prepare_gmail_message(
 ) -> tuple[str, Optional[str]]:
     """
     Prepare a Gmail message with threading support.
-    
+
     Args:
         subject: Email subject
         body: Email body (plain text)
@@ -139,7 +161,7 @@ def _prepare_gmail_message(
         thread_id: Optional Gmail thread ID to reply within
         in_reply_to: Optional Message-ID of the message being replied to
         references: Optional chain of Message-IDs for proper threading
-        
+
     Returns:
         Tuple of (raw_message, thread_id) where raw_message is base64 encoded
     """
@@ -163,13 +185,13 @@ def _prepare_gmail_message(
     # Add reply headers for threading
     if in_reply_to:
         message["In-Reply-To"] = in_reply_to
-    
+
     if references:
         message["References"] = references
 
     # Encode message
     raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
-    
+
     return raw_message, thread_id
 
 
@@ -355,17 +377,9 @@ async def get_gmail_message_content(
     bodies = _extract_message_bodies(payload)
     text_body = bodies.get("text", "")
     html_body = bodies.get("html", "")
-    
+
     # Format body content with HTML fallback
-    if text_body.strip():
-        body_data = text_body
-    elif html_body.strip():
-        # Truncate very large HTML to keep responses manageable
-        if len(html_body) > HTML_BODY_TRUNCATE_LIMIT:
-            html_body = html_body[:HTML_BODY_TRUNCATE_LIMIT] + "\n\n[HTML content truncated...]"
-        body_data = f"[HTML Content Converted]\n{html_body}"
-    else:
-        body_data = "[No readable content found]"
+    body_data = _format_body_content(text_body, html_body)
 
     content_text = "\n".join(
         [
@@ -527,22 +541,14 @@ async def get_gmail_messages_content_batch(
                     headers = _extract_headers(payload, ["Subject", "From"])
                     subject = headers.get("Subject", "(no subject)")
                     sender = headers.get("From", "(unknown sender)")
-                    
+
                     # Extract both text and HTML bodies using enhanced helper function
                     bodies = _extract_message_bodies(payload)
                     text_body = bodies.get("text", "")
                     html_body = bodies.get("html", "")
-                    
+
                     # Format body content with HTML fallback
-                    if text_body.strip():
-                        body_data = text_body
-                    elif html_body.strip():
-                        # Truncate very large HTML to keep batch responses manageable
-                        if len(html_body) > HTML_BODY_TRUNCATE_LIMIT:
-                            html_body = html_body[:HTML_BODY_TRUNCATE_LIMIT] + "\n\n[HTML content truncated...]"
-                        body_data = f"[HTML Content Converted]\n{html_body}"
-                    else:
-                        body_data = "[No readable content found]"
+                    body_data = _format_body_content(text_body, html_body)
 
                     output_messages.append(
                         f"Message ID: {mid}\n"
@@ -590,24 +596,24 @@ async def send_gmail_message(
 
     Returns:
         str: Confirmation message with the sent email's message ID.
-        
+
     Examples:
         # Send a new email
         send_gmail_message(to="user@example.com", subject="Hello", body="Hi there!")
-        
+
         # Send an email with CC and BCC
         send_gmail_message(
-            to="user@example.com", 
+            to="user@example.com",
             cc="manager@example.com",
             bcc="archive@example.com",
-            subject="Project Update", 
+            subject="Project Update",
             body="Here's the latest update..."
         )
-        
+
         # Send a reply
         send_gmail_message(
-            to="user@example.com", 
-            subject="Re: Meeting tomorrow", 
+            to="user@example.com",
+            subject="Re: Meeting tomorrow",
             body="Thanks for the update!",
             thread_id="thread_123",
             in_reply_to="<message123@gmail.com>",
@@ -629,9 +635,9 @@ async def send_gmail_message(
         in_reply_to=in_reply_to,
         references=references,
     )
-    
+
     send_body = {"raw": raw_message}
-    
+
     # Associate with thread if provided
     if thread_id_final:
         send_body["threadId"] = thread_id_final
@@ -675,23 +681,23 @@ async def draft_gmail_message(
 
     Returns:
         str: Confirmation message with the created draft's ID.
-        
+
     Examples:
         # Create a new draft
         draft_gmail_message(subject="Hello", body="Hi there!", to="user@example.com")
-        
+
         # Create a draft with CC and BCC
         draft_gmail_message(
-            subject="Project Update", 
+            subject="Project Update",
             body="Here's the latest update...",
             to="user@example.com",
             cc="manager@example.com",
             bcc="archive@example.com"
         )
-        
+
         # Create a reply draft
         draft_gmail_message(
-            subject="Re: Meeting tomorrow", 
+            subject="Re: Meeting tomorrow",
             body="Thanks for the update!",
             to="user@example.com",
             thread_id="thread_123",
@@ -717,7 +723,7 @@ async def draft_gmail_message(
 
     # Create a draft instead of sending
     draft_body = {"message": {"raw": raw_message}}
-    
+
     # Associate with thread if provided
     if thread_id_final:
         draft_body["message"]["threadId"] = thread_id_final
@@ -777,17 +783,9 @@ def _format_thread_content(thread_data: dict, thread_id: str) -> str:
         bodies = _extract_message_bodies(payload)
         text_body = bodies.get("text", "")
         html_body = bodies.get("html", "")
-        
+
         # Format body content with HTML fallback
-        if text_body.strip():
-            body_data = text_body
-        elif html_body.strip():
-            # Truncate very large HTML to keep batch responses manageable
-            if len(html_body) > HTML_BODY_TRUNCATE_LIMIT:
-                html_body = html_body[:HTML_BODY_TRUNCATE_LIMIT] + "\n\n[HTML content truncated...]"
-            body_data = f"[HTML Content Converted]\n{html_body}"
-        else:
-            body_data = "[No readable content found]"
+        body_data = _format_body_content(text_body, html_body)
 
         # Add message to content
         content_lines.extend(
