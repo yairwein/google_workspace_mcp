@@ -304,19 +304,8 @@ The server supports two transport modes:
 
 #### Stdio Mode (Default - Recommended for Claude Desktop)
 
-**Guided Setup (Recommended if not using DXT)**
-
-```bash
-python install_claude.py
-```
-
-This script automatically:
-- Prompts you for your Google OAuth credentials (Client ID and Secret)
-- Creates the Claude Desktop config file in the correct location
-- Sets up all necessary environment variables
-- No manual file editing required!
-
-After running the script, just restart Claude Desktop and you're ready to go.
+In general, you should use the one-click DXT installer package for Claude Desktop.
+If you are unable to for some reason, you can configure it manually via `claude_desktop_config.json`
 
 **Manual Claude Configuration (Alternative)**
 1. Open Claude Desktop Settings → Developer → Edit Config
