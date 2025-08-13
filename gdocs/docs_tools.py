@@ -24,24 +24,17 @@ from gdocs.docs_helpers import (
     create_insert_table_request,
     create_insert_page_break_request,
     create_insert_image_request,
-    create_bullet_list_request,
-    validate_operation
+    create_bullet_list_request
 )
 
 # Import document structure and table utilities
 from gdocs.docs_structure import (
     parse_document_structure,
     find_tables,
-    get_table_cell_indices,
-    find_element_at_index,
     analyze_document_complexity
 )
 from gdocs.docs_tables import (
-    build_table_population_requests,
-    format_table_data,
-    validate_table_data,
-    extract_table_as_data,
-    find_table_by_content
+    extract_table_as_data
 )
 
 # Import operation managers for complex business logic
@@ -524,7 +517,7 @@ async def insert_doc_elements(
     # Handle the special case where we can't insert at the first section break
     # If index is 0, bump it to 1 to avoid the section break
     if index == 0:
-        logger.debug(f"Adjusting index from 0 to 1 to avoid first section break")
+        logger.debug("Adjusting index from 0 to 1 to avoid first section break")
         index = 1
 
     requests = []
@@ -602,7 +595,7 @@ async def insert_doc_image(
     # Handle the special case where we can't insert at the first section break
     # If index is 0, bump it to 1 to avoid the section break
     if index == 0:
-        logger.debug(f"Adjusting index from 0 to 1 to avoid first section break")
+        logger.debug("Adjusting index from 0 to 1 to avoid first section break")
         index = 1
 
     # Determine if source is a Drive file ID or URL

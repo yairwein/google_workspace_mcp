@@ -6,7 +6,7 @@ multiple Google Docs API calls for complex table manipulations.
 """
 import logging
 import asyncio
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Tuple
 
 from gdocs.docs_helpers import create_insert_table_request
 from gdocs.docs_structure import find_tables
