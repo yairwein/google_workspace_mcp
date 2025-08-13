@@ -83,7 +83,16 @@ def _detect_oauth_version(authenticated_user: Optional[str], mcp_session_id: Opt
     return use_oauth21
 
 
-def _override_user_email_for_oauth21(
+def _update_email_in_args(args: tuple, index: int, new_email: str) -> tuple:
+    """Update email at specific index in args tuple."""
+    if index < len(args):
+        args_list = list(args)
+        args_list[index] = new_email
+        return tuple(args_list)
+    return args
+
+
+def _override_oauth21_user_email(
     use_oauth21: bool,
     authenticated_user: Optional[str],
     bound_args: inspect.BoundArguments,
@@ -118,15 +127,12 @@ def _override_user_email_for_oauth21(
     wrapper_params = list(wrapper_sig.parameters.keys())
     if 'user_google_email' in wrapper_params:
         user_email_index = wrapper_params.index('user_google_email')
-        if user_email_index < len(args):
-            args_list = list(args)
-            args_list[user_email_index] = authenticated_user
-            args = tuple(args_list)
+        args = _update_email_in_args(args, user_email_index, authenticated_user)
             
     return authenticated_user, args
 
 
-def _override_user_email_for_multiple_services(
+def _override_oauth21_user_email_multiple_services(
     use_oauth21: bool,
     authenticated_user: Optional[str],
     user_google_email: str,
@@ -154,10 +160,7 @@ def _override_user_email_for_multiple_services(
     # Update in args if user_google_email is passed positionally
     try:
         user_email_index = param_names.index('user_google_email')
-        if user_email_index < len(args):
-            args_list = list(args)
-            args_list[user_email_index] = authenticated_user
-            args = tuple(args_list)
+        args = _update_email_in_args(args, user_email_index, authenticated_user)
     except ValueError:
         pass  # user_google_email not in positional parameters
         
@@ -492,7 +495,7 @@ def require_google_service(
                     use_oauth21 = _detect_oauth_version(authenticated_user, mcp_session_id, tool_name)
 
                     # Override user_google_email with authenticated user when using OAuth 2.1
-                    user_google_email, args = _override_user_email_for_oauth21(
+                    user_google_email, args = _override_oauth21_user_email(
                         use_oauth21, authenticated_user, bound_args, args, kwargs, wrapper_sig, tool_name
                     )
 
@@ -592,7 +595,7 @@ def require_multiple_services(service_configs: List[Dict[str, Any]]):
                     use_oauth21 = is_oauth21_enabled() and authenticated_user is not None
 
                     # Override user_google_email with authenticated user when using OAuth 2.1
-                    user_google_email, args = _override_user_email_for_multiple_services(
+                    user_google_email, args = _override_oauth21_user_email_multiple_services(
                         use_oauth21, authenticated_user, user_google_email, args, kwargs, 
                         param_names, tool_name, service_type
                     )
