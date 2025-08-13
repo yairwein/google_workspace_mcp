@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 async def handle_oauth_authorize(request: Request):
     """Common handler for OAuth authorization proxy."""
     origin = request.headers.get("origin")
-    
+
     if request.method == "OPTIONS":
         cors_headers = get_development_cors_headers(origin)
         return JSONResponse(content={}, headers=cors_headers)
@@ -69,7 +69,7 @@ async def handle_oauth_authorize(request: Request):
 async def handle_proxy_token_exchange(request: Request):
     """Common handler for OAuth token exchange proxy with comprehensive error handling."""
     origin = request.headers.get("origin")
-    
+
     if request.method == "OPTIONS":
         cors_headers = get_development_cors_headers(origin)
         return JSONResponse(content={}, headers=cors_headers)
@@ -200,7 +200,7 @@ async def handle_proxy_token_exchange(request: Request):
                     "Cache-Control": "no-store"
                 }
                 response_headers.update(cors_headers)
-                
+
                 return JSONResponse(
                     status_code=response.status,
                     content=response_data,
@@ -227,7 +227,7 @@ async def handle_oauth_protected_resource(request: Request):
     Handle OAuth protected resource metadata requests.
     """
     origin = request.headers.get("origin")
-    
+
     # Handle preflight
     if request.method == "OPTIONS":
         cors_headers = get_development_cors_headers(origin)
@@ -261,7 +261,7 @@ async def handle_oauth_protected_resource(request: Request):
         "Cache-Control": "public, max-age=3600"
     }
     response_headers.update(cors_headers)
-    
+
     return JSONResponse(
         content=metadata,
         headers=response_headers
@@ -273,13 +273,13 @@ async def handle_oauth_authorization_server(request: Request):
     Handle OAuth authorization server metadata.
     """
     origin = request.headers.get("origin")
-    
+
     if request.method == "OPTIONS":
         cors_headers = get_development_cors_headers(origin)
         return JSONResponse(content={}, headers=cors_headers)
 
     config = get_oauth_config()
-    
+
     # Get authorization server metadata from centralized config
     # Pass scopes directly to keep all metadata generation in one place
     metadata = config.get_authorization_server_metadata(scopes=get_current_scopes())
@@ -293,7 +293,7 @@ async def handle_oauth_authorization_server(request: Request):
         "Cache-Control": "public, max-age=3600"
     }
     response_headers.update(cors_headers)
-    
+
     return JSONResponse(
         content=metadata,
         headers=response_headers
@@ -303,7 +303,7 @@ async def handle_oauth_authorization_server(request: Request):
 async def handle_oauth_client_config(request: Request):
     """Common handler for OAuth client configuration."""
     origin = request.headers.get("origin")
-    
+
     if request.method == "OPTIONS":
         cors_headers = get_development_cors_headers(origin)
         return JSONResponse(content={}, headers=cors_headers)
@@ -327,7 +327,6 @@ async def handle_oauth_client_config(request: Request):
             "client_uri": config.base_url,
             "redirect_uris": [
                 f"{config.base_url}/oauth2callback",
-                "http://localhost:5173/auth/callback"
             ],
             "grant_types": ["authorization_code", "refresh_token"],
             "response_types": ["code"],
@@ -346,7 +345,7 @@ async def handle_oauth_client_config(request: Request):
 async def handle_oauth_register(request: Request):
     """Common handler for OAuth dynamic client registration with comprehensive error handling."""
     origin = request.headers.get("origin")
-    
+
     if request.method == "OPTIONS":
         cors_headers = get_development_cors_headers(origin)
         return JSONResponse(content={}, headers=cors_headers)
