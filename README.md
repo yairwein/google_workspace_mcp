@@ -97,7 +97,7 @@ A production-ready MCP server that integrates all major Google Workspace service
 | `USER_GOOGLE_EMAIL` *(optional)* | Default email for single-user auth |
 | `GOOGLE_PSE_API_KEY` *(optional)* | API key for Google Custom Search - see [Custom Search Setup](#google-custom-search-setup) |
 | `GOOGLE_PSE_ENGINE_ID` *(optional)* | Programmable Search Engine ID for Custom Search |
-| `MCP_ENABLE_OAUTH21` *(optional)* | Set to `true` to enable OAuth 2.1 support (requires streamable-http transport) |
+| `MCP_ENABLE_OAUTH21` *(optional)* | Set to `true` to enable OAuth 2.1 support (requires streamable-http transport & will remove user_google_email from tool docstrings) |
 | `OAUTHLIB_INSECURE_TRANSPORT=1` | Development only (allows `http://` redirect) |
 
 Claude Desktop stores these securely in the OS keychain; set them once in the extension pane.

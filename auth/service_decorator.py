@@ -1,5 +1,6 @@
 import inspect
 import logging
+import re
 from functools import wraps
 from typing import Dict, List, Optional, Any, Callable, Union, Tuple
 
@@ -237,6 +238,39 @@ async def get_authenticated_google_service_oauth21(
 
 logger = logging.getLogger(__name__)
 
+
+def _remove_user_email_arg_from_docstring(docstring: str) -> str:
+    """
+    Remove user_google_email parameter documentation from docstring.
+
+    Args:
+        docstring: The original function docstring
+
+    Returns:
+        Modified docstring with user_google_email parameter removed
+    """
+    if not docstring:
+        return docstring
+
+    # Pattern to match user_google_email parameter documentation
+    # Handles various formats like:
+    # - user_google_email (str): The user's Google email address. Required.
+    # - user_google_email: Description
+    # - user_google_email (str) - Description
+    patterns = [
+        r'^\s*user_google_email\s*\([^)]*\)\s*:\s*[^\n]*\.?\s*(?:Required\.?)?\s*\n',
+        r'^\s*user_google_email\s*:\s*[^\n]*\n',
+        r'^\s*user_google_email\s*\([^)]*\)\s*-\s*[^\n]*\n',
+    ]
+
+    modified_docstring = docstring
+    for pattern in patterns:
+        modified_docstring = re.sub(pattern, '', modified_docstring, flags=re.MULTILINE)
+
+    # Clean up any sequence of 3 or more newlines that might have been created
+    modified_docstring = re.sub(r'\n{3,}', '\n\n', modified_docstring)
+    return modified_docstring
+
 # Service configuration mapping
 SERVICE_CONFIGS = {
     "gmail": {"service": "gmail", "version": "v1"},
@@ -449,7 +483,7 @@ def require_google_service(
                     wrapper_params,
                     tool_name,
                 )
-                
+
                 # Update bound_args for consistency
                 if use_oauth21 and authenticated_user and user_google_email == authenticated_user:
                     bound_args.arguments["user_google_email"] = authenticated_user
@@ -485,6 +519,13 @@ def require_google_service(
 
         # Set the wrapper's signature to the one without 'service'
         wrapper.__signature__ = wrapper_sig
+
+        # Conditionally modify docstring to remove user_google_email parameter documentation
+        if is_oauth21_enabled():
+            logger.debug('OAuth 2.1 mode enabled, removing user_google_email from docstring')
+            if func.__doc__:
+                wrapper.__doc__ = _remove_user_email_arg_from_docstring(func.__doc__)
+
         return wrapper
 
     return decorator
