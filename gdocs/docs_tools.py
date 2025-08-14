@@ -329,7 +329,7 @@ async def modify_doc_text(
         end_index: End position for text replacement/formatting (if not provided with text, text is inserted)
         text: New text to insert or replace with (optional - can format existing text without changing it)
         bold: Whether to make text bold (True/False/None to leave unchanged)
-        italic: Whether to make text italic (True/False/None to leave unchanged) 
+        italic: Whether to make text italic (True/False/None to leave unchanged)
         underline: Whether to underline text (True/False/None to leave unchanged)
         font_size: Font size in points
         font_family: Font family name (e.g., "Arial", "Times New Roman")
@@ -341,25 +341,25 @@ async def modify_doc_text(
 
     # Input validation
     validator = ValidationManager()
-    
+
     is_valid, error_msg = validator.validate_document_id(document_id)
     if not is_valid:
         return f"Error: {error_msg}"
-    
+
     # Validate that we have something to do
     if text is None and not any([bold is not None, italic is not None, underline is not None, font_size, font_family]):
         return "Error: Must provide either 'text' to insert/replace, or formatting parameters (bold, italic, underline, font_size, font_family)."
-    
+
     # Validate text formatting params if provided
     if any([bold is not None, italic is not None, underline is not None, font_size, font_family]):
         is_valid, error_msg = validator.validate_text_formatting_params(bold, italic, underline, font_size, font_family)
         if not is_valid:
             return f"Error: {error_msg}"
-            
+
         # For formatting, we need end_index
         if end_index is None:
             return "Error: 'end_index' is required when applying formatting."
-            
+
         is_valid, error_msg = validator.validate_index_range(start_index, end_index)
         if not is_valid:
             return f"Error: {error_msg}"
@@ -396,37 +396,37 @@ async def modify_doc_text(
         # Adjust range for formatting based on text operations
         format_start = start_index
         format_end = end_index
-        
+
         if text is not None:
             if end_index is not None and end_index > start_index:
                 # Text was replaced - format the new text
                 format_end = start_index + len(text)
             else:
-                # Text was inserted - format the inserted text  
+                # Text was inserted - format the inserted text
                 actual_index = 1 if start_index == 0 else start_index
                 format_start = actual_index
                 format_end = actual_index + len(text)
-        
+
         # Handle special case for formatting at index 0
         if format_start == 0:
             format_start = 1
         if format_end is not None and format_end <= format_start:
             format_end = format_start + 1
-            
+
         requests.append(create_format_text_request(format_start, format_end, bold, italic, underline, font_size, font_family))
-        
+
         format_details = []
         if bold is not None:
             format_details.append(f"bold={bold}")
         if italic is not None:
-            format_details.append(f"italic={italic}")  
+            format_details.append(f"italic={italic}")
         if underline is not None:
             format_details.append(f"underline={underline}")
         if font_size:
             format_details.append(f"font_size={font_size}")
         if font_family:
             format_details.append(f"font_family={font_family}")
-        
+
         operations.append(f"Applied formatting ({', '.join(format_details)}) to range {format_start}-{format_end}")
 
     await asyncio.to_thread(
@@ -518,7 +518,7 @@ async def insert_doc_elements(
         str: Confirmation message with insertion details
     """
     logger.info(f"[insert_doc_elements] Doc={document_id}, type={element_type}, index={index}")
-    
+
     # Handle the special case where we can't insert at the first section break
     # If index is 0, bump it to 1 to avoid the section break
     if index == 0:
@@ -596,7 +596,7 @@ async def insert_doc_image(
         str: Confirmation message with insertion details
     """
     logger.info(f"[insert_doc_image] Doc={document_id}, source={image_source}, index={index}")
-    
+
     # Handle the special case where we can't insert at the first section break
     # If index is 0, bump it to 1 to avoid the section break
     if index == 0:
@@ -669,29 +669,29 @@ async def update_doc_headers_footers(
         str: Confirmation message with update details
     """
     logger.info(f"[update_doc_headers_footers] Doc={document_id}, type={section_type}")
-    
+
     # Input validation
     validator = ValidationManager()
-    
+
     is_valid, error_msg = validator.validate_document_id(document_id)
     if not is_valid:
         return f"Error: {error_msg}"
-    
+
     is_valid, error_msg = validator.validate_header_footer_params(section_type, header_footer_type)
     if not is_valid:
         return f"Error: {error_msg}"
-    
+
     is_valid, error_msg = validator.validate_text_content(content)
     if not is_valid:
         return f"Error: {error_msg}"
 
     # Use HeaderFooterManager to handle the complex logic
     header_footer_manager = HeaderFooterManager(service)
-    
+
     success, message = await header_footer_manager.update_header_footer_content(
         document_id, section_type, content, header_footer_type
     )
-    
+
     if success:
         link = f"https://docs.google.com/document/d/{document_id}/edit"
         return f"{message}. Link: {link}"
@@ -728,25 +728,25 @@ async def batch_update_doc(
         str: Confirmation message with batch operation results
     """
     logger.debug(f"[batch_update_doc] Doc={document_id}, operations={len(operations)}")
-    
+
     # Input validation
     validator = ValidationManager()
-    
+
     is_valid, error_msg = validator.validate_document_id(document_id)
     if not is_valid:
         return f"Error: {error_msg}"
-    
+
     is_valid, error_msg = validator.validate_batch_operations(operations)
     if not is_valid:
         return f"Error: {error_msg}"
 
     # Use BatchOperationManager to handle the complex logic
     batch_manager = BatchOperationManager(service)
-    
+
     success, message, metadata = await batch_manager.execute_batch_operations(
         document_id, operations
     )
-    
+
     if success:
         link = f"https://docs.google.com/document/d/{document_id}/edit"
         replies_count = metadata.get('replies_count', 0)
@@ -774,7 +774,6 @@ async def inspect_doc_structure(
 
     CRITICAL FOR TABLE OPERATIONS:
     ALWAYS call this BEFORE creating tables to get a safe insertion index.
-    Look for "total_length" in the output - use values less than this for insertion.
 
     WHAT THE OUTPUT SHOWS:
     - total_elements: Number of document elements
@@ -924,42 +923,42 @@ async def create_table_with_data(
         str: Confirmation with table details and link
     """
     logger.debug(f"[create_table_with_data] Doc={document_id}, index={index}")
-    
+
     # Input validation
     validator = ValidationManager()
-    
+
     is_valid, error_msg = validator.validate_document_id(document_id)
     if not is_valid:
         return f"ERROR: {error_msg}"
-    
+
     is_valid, error_msg = validator.validate_table_data(table_data)
     if not is_valid:
         return f"ERROR: {error_msg}"
-    
+
     is_valid, error_msg = validator.validate_index(index, "Index")
     if not is_valid:
         return f"ERROR: {error_msg}"
 
     # Use TableOperationManager to handle the complex logic
     table_manager = TableOperationManager(service)
-    
+
     # Try to create the table, and if it fails due to index being at document end, retry with index-1
     success, message, metadata = await table_manager.create_and_populate_table(
         document_id, table_data, index, bold_headers
     )
-    
+
     # If it failed due to index being at or beyond document end, retry with adjusted index
     if not success and "must be less than the end index" in message:
         logger.debug(f"Index {index} is at document boundary, retrying with index {index - 1}")
         success, message, metadata = await table_manager.create_and_populate_table(
             document_id, table_data, index - 1, bold_headers
         )
-    
+
     if success:
         link = f"https://docs.google.com/document/d/{document_id}/edit"
         rows = metadata.get('rows', 0)
         columns = metadata.get('columns', 0)
-        
+
         return f"SUCCESS: {message}. Table: {rows}x{columns}, Index: {index}. Link: {link}"
     else:
         return f"ERROR: {message}"

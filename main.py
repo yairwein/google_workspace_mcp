@@ -208,12 +208,12 @@ def main():
             # Check port availability before starting HTTP server
             try:
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                    s.settimeout(1.0)  # Prevent hanging on bind
-                    s.bind(("0.0.0.0", port))
-            except OSError:
+                    s.bind((socket.gethostbyname(""), port))
+            except OSError as e:
+                print(e)
                 safe_print(f"❌ Port {port} is already in use. Cannot start HTTP server.")
                 sys.exit(1)
-            
+
             # The server has CORS middleware built-in via CORSEnabledFastMCP
             server.run(transport="streamable-http", host="0.0.0.0", port=port)
         else:
