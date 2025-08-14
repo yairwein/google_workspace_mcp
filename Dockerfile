@@ -10,34 +10,10 @@ RUN apt-get update && apt-get install -y \
 # Install uv for faster dependency management
 RUN pip install --no-cache-dir uv
 
-# Copy all application code first (needed for uv sync to work with local package)
 COPY . .
 
 # Install Python dependencies using uv sync
 RUN uv sync --frozen --no-dev
-
-# Activate virtual environment for all subsequent commands
-ENV PATH="/app/.venv/bin:$PATH"
-
-# Create placeholder client_secrets.json for lazy loading capability
-RUN echo '{"installed":{"client_id":"placeholder","client_secret":"placeholder","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","redirect_uris":["http://localhost:8000/oauth2callback"]}}' > /app/client_secrets.json
-
-# Debug: Check PORT environment variable first
-RUN echo "=== Debug: Environment Variables ===" && \
-    echo "PORT=${PORT:-8000}" && \
-    echo "WORKSPACE_MCP_PORT=${WORKSPACE_MCP_PORT:-8000}" && \
-    echo "WORKSPACE_MCP_BASE_URI=${WORKSPACE_MCP_BASE_URI:-http://localhost}"
-
-# Debug: List files to verify structure
-RUN echo "=== Debug: Listing app directory contents ===" && \
-    ls -la /app && \
-    echo "=== Debug: Checking if main.py exists ===" && \
-    ls -la /app/main.py && \
-    echo "=== Debug: Checking Python path and imports ===" && \
-    python -c "import sys; print('Python path:', sys.path)" && \
-    python -c "import core.server; print('Server import successful')" && \
-    echo "=== Debug: Testing health endpoint ===" && \
-    python -c "from core.server import health_check; print('Health check function exists')"
 
 # Create non-root user for security
 RUN useradd --create-home --shell /bin/bash app \
@@ -54,9 +30,4 @@ EXPOSE ${PORT:-8000}
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD sh -c 'curl -f http://localhost:${PORT:-8000}/health || exit 1'
 
-# Debug startup
-RUN echo "=== Debug: Final startup test ===" && \
-    python -c "print('Testing main.py import...'); import main; print('Main.py import successful')"
-
-# Command to run the application (use uv run to ensure virtual environment)
 CMD ["uv", "run", "main.py", "--transport", "streamable-http"]

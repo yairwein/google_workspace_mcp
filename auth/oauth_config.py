@@ -203,6 +203,18 @@ class OAuthConfig:
         if params.has_pkce:
             return "oauth21"
 
+        # Additional detection: Check if we have an active OAuth 2.1 session
+        # This is important for tool calls where PKCE params aren't available
+        authenticated_user = request_params.get("authenticated_user")
+        if authenticated_user:
+            try:
+                from auth.oauth21_session_store import get_oauth21_session_store
+                store = get_oauth21_session_store()
+                if store.has_session(authenticated_user):
+                    return "oauth21"
+            except (ImportError, AttributeError, RuntimeError):
+                pass  # Fall back to OAuth 2.0 if session check fails
+
         # For public clients in OAuth 2.1 mode, we require PKCE
         # But since they didn't send PKCE, fall back to OAuth 2.0
         # This ensures backward compatibility
