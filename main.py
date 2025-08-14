@@ -210,7 +210,7 @@ def main():
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                     s.bind((socket.gethostbyname(""), port))
             except OSError as e:
-                print(e)
+                safe_print(f"Socket error: {e}")
                 safe_print(f"❌ Port {port} is already in use. Cannot start HTTP server.")
                 sys.exit(1)
 
