@@ -5,7 +5,6 @@ This module provides tools for checking and managing file permissions in Google 
 """
 import logging
 import asyncio
-from typing import Optional, Dict, Any
 
 from auth.service_decorator import require_google_service
 from core.utils import handle_http_errors
@@ -51,7 +50,7 @@ async def get_drive_file_permissions(
             f"Type: {file_metadata.get('mimeType', 'Unknown')}",
             f"Size: {file_metadata.get('size', 'N/A')} bytes",
             f"Modified: {file_metadata.get('modifiedTime', 'N/A')}",
-            f"",
+            "",
             "Sharing Status:",
             f"  Shared: {file_metadata.get('shared', False)}",
         ]
