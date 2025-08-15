@@ -645,6 +645,166 @@ async def insert_doc_image(
     return f"Inserted {source_description}{size_info} at index {index} in document {document_id}. Link: {link}"
 
 @server.tool()
+@handle_http_errors("insert_doc_image_from_drive", service_type="docs")
+@require_multiple_services([
+    {"service_type": "drive", "scopes": "drive_read", "param_name": "drive_service"},
+    {"service_type": "docs", "scopes": "docs_write", "param_name": "docs_service"}
+])
+async def insert_doc_image_from_drive(
+    drive_service,
+    docs_service,
+    user_google_email: str,
+    document_id: str,
+    drive_file_name: str,
+    index: int,
+    width: int = None,
+    height: int = None,
+) -> str:
+    """
+    Searches for an image in Google Drive by name and inserts it into a Google Doc.
+    Checks permissions first and provides helpful error messages if the image isn't publicly shared.
+    
+    Args:
+        user_google_email: User's Google email address
+        document_id: ID of the document to update
+        drive_file_name: Name of the image file in Google Drive (e.g., "product_roadmap_2025.png")
+        index: Position to insert image (0-based)
+        width: Image width in points (optional)
+        height: Image height in points (optional)
+    
+    Returns:
+        str: Confirmation message with insertion details or error with instructions
+    """
+    logger.info(f"[insert_doc_image_from_drive] Doc={document_id}, file={drive_file_name}, index={index}")
+    
+    # Build search query for the specific file name
+    escaped_name = drive_file_name.replace("'", "\\'")
+    search_query = f"name = '{escaped_name}'"
+    
+    # Search for the file in Drive with permission information
+    list_params = {
+        "q": search_query,
+        "pageSize": 5,
+        "fields": "files(id, name, mimeType, webViewLink, permissions, shared)",
+        "supportsAllDrives": True,
+        "includeItemsFromAllDrives": True,
+    }
+    
+    search_results = await asyncio.to_thread(
+        drive_service.files().list(**list_params).execute
+    )
+    
+    files = search_results.get('files', [])
+    if not files:
+        return f"❌ Error: File '{drive_file_name}' not found in Google Drive"
+    
+    # Use the first matching file
+    file_info = files[0]
+    file_id = file_info.get('id')
+    file_name = file_info.get('name')
+    mime_type = file_info.get('mimeType', '')
+    
+    # Check if it's an image file
+    if not mime_type.startswith('image/'):
+        logger.warning(f"File '{drive_file_name}' has MIME type '{mime_type}' which may not be an image")
+    
+    # Check permissions to see if file has "anyone with link" permission
+    from gdrive.drive_helpers import check_public_link_permission
+    permissions = file_info.get('permissions', [])
+    has_public_link = check_public_link_permission(permissions)
+    
+    if not has_public_link:
+        from gdrive.drive_helpers import format_public_sharing_error
+        return format_public_sharing_error(file_name, file_id)
+    
+    # File has public access - proceed with insertion
+    from gdrive.drive_helpers import get_drive_image_url
+    image_uri = get_drive_image_url(file_id)
+    
+    # Use helper function to create request
+    request = create_insert_image_request(index, image_uri, width, height)
+    requests = [request]
+    
+    try:
+        await asyncio.to_thread(
+            docs_service.documents().batchUpdate(
+                documentId=document_id,
+                body={'requests': requests}
+            ).execute
+        )
+        
+        size_info = ""
+        if width or height:
+            size_info = f" (size: {width or 'auto'}x{height or 'auto'} points)"
+        
+        link = f"https://docs.google.com/document/d/{document_id}/edit"
+        return f"✅ Successfully inserted Drive image '{file_name}' (ID: {file_id}){size_info} at index {index} in document {document_id}. Link: {link}"
+        
+    except Exception as e:
+        error_str = str(e)
+        if "publicly accessible" in error_str or "forbidden" in error_str.lower():
+            return f"❌ API Error: Drive image '{file_name}' access denied despite public sharing. May need propagation time or use insert_doc_image_url with: {get_drive_image_url(file_id)}"
+        else:
+            return f"❌ Error inserting image '{file_name}': {e}"
+
+@server.tool()
+@handle_http_errors("insert_doc_image_url", service_type="docs")
+@require_google_service("docs", "docs_write")
+async def insert_doc_image_url(
+    service,
+    user_google_email: str,
+    document_id: str,
+    image_url: str,
+    index: int,
+    width: int = None,
+    height: int = None,
+) -> str:
+    """
+    Inserts an image from a URL into a Google Doc.
+    Simplified version that only works with URLs, not Drive files.
+    
+    Args:
+        user_google_email: User's Google email address
+        document_id: ID of the document to update
+        image_url: Public image URL (must start with http:// or https://)
+        index: Position to insert image (0-based)
+        width: Image width in points (optional)
+        height: Image height in points (optional)
+    
+    Returns:
+        str: Confirmation message with insertion details
+    """
+    logger.info(f"[insert_doc_image_url] Doc={document_id}, url={image_url}, index={index}")
+    
+    # Validate URL format
+    if not (image_url.startswith('http://') or image_url.startswith('https://')):
+        return f"❌ Error: image_url must be a valid HTTP/HTTPS URL. Got: {image_url}"
+    
+    # Handle the special case where we can't insert at the first section break
+    # If index is 0, bump it to 1 to avoid the section break
+    if index == 0:
+        logger.debug("Adjusting index from 0 to 1 to avoid first section break")
+        index = 1
+    
+    # Use helper function to create request
+    request = create_insert_image_request(index, image_url, width, height)
+    requests = [request]
+    
+    await asyncio.to_thread(
+        service.documents().batchUpdate(
+            documentId=document_id,
+            body={'requests': requests}
+        ).execute
+    )
+    
+    size_info = ""
+    if width or height:
+        size_info = f" (size: {width or 'auto'}x{height or 'auto'} points)"
+    
+    link = f"https://docs.google.com/document/d/{document_id}/edit"
+    return f"✅ Successfully inserted URL image{size_info} at index {index} in document {document_id}. Link: {link}"
+
+@server.tool()
 @handle_http_errors("update_doc_headers_footers", service_type="docs")
 @require_google_service("docs", "docs_write")
 async def update_doc_headers_footers(

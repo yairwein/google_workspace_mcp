@@ -295,12 +295,16 @@ def handle_http_errors(tool_name: str, is_read_only: bool = False, service_type:
                                 f"The required API is not enabled for your project. "
                                 f"Please check the Google Cloud Console to enable it."
                             )
-                    else:
+                    elif error.resp.status in [401, 403]:
+                        # Authentication/authorization errors
                         message = (
                             f"API error in {tool_name}: {error}. "
                             f"You might need to re-authenticate for user '{user_google_email}'. "
                             f"LLM: Try 'start_google_auth' with the user's email and the appropriate service_name."
                         )
+                    else:
+                        # Other HTTP errors (400 Bad Request, etc.) - don't suggest re-auth
+                        message = f"API error in {tool_name}: {error}"
                     
                     logger.error(f"API error in {tool_name}: {error}", exc_info=True)
                     raise Exception(message) from error

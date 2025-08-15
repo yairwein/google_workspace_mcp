@@ -72,6 +72,28 @@ def create_insert_text_request(index: int, text: str) -> Dict[str, Any]:
         }
     }
 
+def create_insert_text_segment_request(index: int, text: str, segment_id: str) -> Dict[str, Any]:
+    """
+    Create an insertText request for Google Docs API with segmentId (for headers/footers).
+    
+    Args:
+        index: Position to insert text
+        text: Text to insert
+        segment_id: Segment ID (for targeting headers/footers)
+    
+    Returns:
+        Dictionary representing the insertText request with segmentId
+    """
+    return {
+        'insertText': {
+            'location': {
+                'segmentId': segment_id,
+                'index': index
+            },
+            'text': text
+        }
+    }
+
 def create_delete_range_request(start_index: int, end_index: int) -> Dict[str, Any]:
     """
     Create a deleteContentRange request for Google Docs API.
