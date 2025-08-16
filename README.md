@@ -487,9 +487,9 @@ The server supports **tool tiers** for simplified deployment and usage patterns.
 
 | Tier | Description | Use Case |
 |------|-------------|----------|
-| 🟢 `core` | Essential tools for basic functionality | Light usage, minimal API quotas, getting started |
-| 🟡 `extended` | Core tools + additional features | Regular usage, expanded capabilities |
-| 🔴 `complete` | All available tools including advanced features | Power users, full API access |
+| <span style="color:#2d5b69">•</span> `core` | Essential tools for basic functionality | Light usage, minimal API quotas, getting started |
+| <span style="color:#72898f">•</span> `extended` | Core tools + additional features | Regular usage, expanded capabilities |
+| <span style="color:#adbcbc">•</span> `complete` | All available tools including advanced features | Power users, full API access |
 
 </td><td width="60%" valign="top">
 
@@ -832,136 +832,136 @@ cp .env.oauth21 .env
 <tr>
 <td width="50%" valign="top">
 
-### @ Gmail • [`gmail_tools.py`](gmail/gmail_tools.py)
+### <span style="color:#72898f">@</span> Gmail • [`gmail_tools.py`](gmail/gmail_tools.py)
 | Tool | Tier |
 |------|------|
 | **Core Tools** | |
-| `search_gmail_messages` | ● Core |
-| `get_gmail_message_content` | ● Core |
-| `get_gmail_messages_content_batch` | ● Core |
-| `send_gmail_message` | ● Core |
+| `search_gmail_messages` | <span style="color:#2d5b69">•</span> Core |
+| `get_gmail_message_content` | <span style="color:#2d5b69">•</span> Core |
+| `get_gmail_messages_content_batch` | <span style="color:#2d5b69">•</span> Core |
+| `send_gmail_message` | <span style="color:#2d5b69">•</span> Core |
 | **Extended Tools** | |
-| `get_gmail_thread_content` | ◐ Extended |
-| `modify_gmail_message_labels` | ◐ Extended |
-| `list_gmail_labels` | ◐ Extended |
-| `manage_gmail_label` | ◐ Extended |
-| `draft_gmail_message` | ◐ Extended |
+| `get_gmail_thread_content` | <span style="color:#72898f">•</span> Extended |
+| `modify_gmail_message_labels` | <span style="color:#72898f">•</span> Extended |
+| `list_gmail_labels` | <span style="color:#72898f">•</span> Extended |
+| `manage_gmail_label` | <span style="color:#72898f">•</span> Extended |
+| `draft_gmail_message` | <span style="color:#72898f">•</span> Extended |
 | **Complete Tools** | |
-| `get_gmail_threads_content_batch` | ○ Complete |
-| `batch_modify_gmail_message_labels` | ○ Complete |
+| `get_gmail_threads_content_batch` | <span style="color:#adbcbc">•</span> Complete |
+| `batch_modify_gmail_message_labels` | <span style="color:#adbcbc">•</span> Complete |
 
-### ≡ Drive • [`drive_tools.py`](gdrive/drive_tools.py)
+### <span style="color:#72898f">≡</span> Drive • [`drive_tools.py`](gdrive/drive_tools.py)
 | Tool | Tier |
 |------|------|
 | **Core Tools** | |
-| `search_drive_files` | ● Core |
-| `get_drive_file_content` | ● Core |
-| `create_drive_file` | ● Core |
+| `search_drive_files` | <span style="color:#2d5b69">•</span> Core |
+| `get_drive_file_content` | <span style="color:#2d5b69">•</span> Core |
+| `create_drive_file` | <span style="color:#2d5b69">•</span> Core |
 | **Extended Tools** | |
-| `list_drive_items` | ◐ Extended |
+| `list_drive_items` | <span style="color:#72898f">•</span> Extended |
 
-### ⧖ Calendar • [`calendar_tools.py`](gcalendar/calendar_tools.py)
+### <span style="color:#72898f">⧖</span> Calendar • [`calendar_tools.py`](gcalendar/calendar_tools.py)
 | Tool | Tier |
 |------|------|
 | **Core Tools** | |
-| `list_calendars` | ● Core |
-| `get_events` | ● Core |
-| `create_event` | ● Core |
-| `modify_event` | ● Core |
+| `list_calendars` | <span style="color:#2d5b69">•</span> Core |
+| `get_events` | <span style="color:#2d5b69">•</span> Core |
+| `create_event` | <span style="color:#2d5b69">•</span> Core |
+| `modify_event` | <span style="color:#2d5b69">•</span> Core |
 | **Extended Tools** | |
-| `delete_event` | ◐ Extended |
+| `delete_event` | <span style="color:#72898f">•</span> Extended |
 
-### @ Chat • [`chat_tools.py`](gchat/chat_tools.py)
+### <span style="color:#72898f">@</span> Chat • [`chat_tools.py`](gchat/chat_tools.py)
 | Tool | Tier |
 |------|------|
 | **Core Tools** | |
-| `send_message` | ● Core |
-| `get_messages` | ● Core |
-| `search_messages` | ● Core |
+| `send_message` | <span style="color:#2d5b69">•</span> Core |
+| `get_messages` | <span style="color:#2d5b69">•</span> Core |
+| `search_messages` | <span style="color:#2d5b69">•</span> Core |
 | **Extended Tools** | |
-| `list_spaces` | ◐ Extended |
+| `list_spaces` | <span style="color:#72898f">•</span> Extended |
 
 </td>
 <td width="50%" valign="top">
 
-### ≡ Docs • [`docs_tools.py`](gdocs/docs_tools.py)
+### <span style="color:#72898f">≡</span> Docs • [`docs_tools.py`](gdocs/docs_tools.py)
 | Tool | Tier |
 |------|------|
 | **Core Tools** | |
-| `get_doc_content` | ● Core |
-| `create_doc` | ● Core |
-| `modify_doc_text` | ● Core |
+| `get_doc_content` | <span style="color:#2d5b69">•</span> Core |
+| `create_doc` | <span style="color:#2d5b69">•</span> Core |
+| `modify_doc_text` | <span style="color:#2d5b69">•</span> Core |
 | **Extended Tools** | |
-| `search_docs` | ◐ Extended |
-| `find_and_replace_doc` | ◐ Extended |
-| `list_docs_in_folder` | ◐ Extended |
-| `insert_doc_elements` | ◐ Extended |
+| `search_docs` | <span style="color:#72898f">•</span> Extended |
+| `find_and_replace_doc` | <span style="color:#72898f">•</span> Extended |
+| `list_docs_in_folder` | <span style="color:#72898f">•</span> Extended |
+| `insert_doc_elements` | <span style="color:#72898f">•</span> Extended |
 | **Complete Tools** | |
-| `insert_doc_image` | ○ Complete |
-| `update_doc_headers_footers` | ○ Complete |
-| `batch_update_doc` | ○ Complete |
-| `inspect_doc_structure` | ○ Complete |
-| `create_table_with_data` | ○ Complete |
-| `read_document_comments` | ○ Complete |
-| `create_document_comment` | ○ Complete |
-| `reply_to_document_comment` | ○ Complete |
-| `resolve_document_comment` | ○ Complete |
+| `insert_doc_image` | <span style="color:#adbcbc">•</span> Complete |
+| `update_doc_headers_footers` | <span style="color:#adbcbc">•</span> Complete |
+| `batch_update_doc` | <span style="color:#adbcbc">•</span> Complete |
+| `inspect_doc_structure` | <span style="color:#adbcbc">•</span> Complete |
+| `create_table_with_data` | <span style="color:#adbcbc">•</span> Complete |
+| `read_document_comments` | <span style="color:#adbcbc">•</span> Complete |
+| `create_document_comment` | <span style="color:#adbcbc">•</span> Complete |
+| `reply_to_document_comment` | <span style="color:#adbcbc">•</span> Complete |
+| `resolve_document_comment` | <span style="color:#adbcbc">•</span> Complete |
 
-### ≡ Sheets • [`sheets_tools.py`](gsheets/sheets_tools.py)
+### <span style="color:#72898f">≡</span> Sheets • [`sheets_tools.py`](gsheets/sheets_tools.py)
 | Tool | Tier |
 |------|------|
 | **Core Tools** | |
-| `create_spreadsheet` | ● Core |
-| `read_sheet_values` | ● Core |
-| `modify_sheet_values` | ● Core |
+| `create_spreadsheet` | <span style="color:#2d5b69">•</span> Core |
+| `read_sheet_values` | <span style="color:#2d5b69">•</span> Core |
+| `modify_sheet_values` | <span style="color:#2d5b69">•</span> Core |
 | **Extended Tools** | |
-| `list_spreadsheets` | ◐ Extended |
-| `get_spreadsheet_info` | ◐ Extended |
+| `list_spreadsheets` | <span style="color:#72898f">•</span> Extended |
+| `get_spreadsheet_info` | <span style="color:#72898f">•</span> Extended |
 | **Complete Tools** | |
-| `create_sheet` | ○ Complete |
-| `read_spreadsheet_comments` | ○ Complete |
-| `create_spreadsheet_comment` | ○ Complete |
-| `reply_to_spreadsheet_comment` | ○ Complete |
-| `resolve_spreadsheet_comment` | ○ Complete |
+| `create_sheet` | <span style="color:#adbcbc">•</span> Complete |
+| `read_spreadsheet_comments` | <span style="color:#adbcbc">•</span> Complete |
+| `create_spreadsheet_comment` | <span style="color:#adbcbc">•</span> Complete |
+| `reply_to_spreadsheet_comment` | <span style="color:#adbcbc">•</span> Complete |
+| `resolve_spreadsheet_comment` | <span style="color:#adbcbc">•</span> Complete |
 
 </td>
 </tr>
 <tr>
 <td colspan="2" valign="top">
 
-### ≡ Slides • [`slides_tools.py`](gslides/slides_tools.py) | ✓ Tasks • [`tasks_tools.py`](gtasks/tasks_tools.py) | ≡ Forms • [`forms_tools.py`](gforms/forms_tools.py) | ◆ Search • [`search_tools.py`](gsearch/search_tools.py)
+### <span style="color:#72898f">≡</span> Slides • [`slides_tools.py`](gslides/slides_tools.py) | <span style="color:#72898f">✓</span> Tasks • [`tasks_tools.py`](gtasks/tasks_tools.py) | <span style="color:#72898f">≡</span> Forms • [`forms_tools.py`](gforms/forms_tools.py) | <span style="color:#72898f">◆</span> Search • [`search_tools.py`](gsearch/search_tools.py)
 | Slides | Tier | Tasks | Tier | Forms | Tier | Search | Tier |
 |--------|------|-------|------|-------|------|--------|------|
 | **Core Tools** | | **Core Tools** | | **Core Tools** | | **Core Tools** | |
-| `create_presentation` | ● | `get_task` | ● | `create_form` | ● | `search_custom` | ● |
-| `get_presentation` | ● | `list_tasks` | ● | `get_form` | ● | **Extended Tools** | |
-| **Extended Tools** | | `create_task` | ● | **Extended Tools** | | `search_custom_siterestrict` | ◐ |
-| `batch_update_presentation` | ◐ | `update_task` | ● | `list_form_responses` | ◐ | **Complete Tools** | |
-| `get_page` | ◐ | **Extended Tools** | | **Complete Tools** | | `get_search_engine_info` | ○ |
-| `get_page_thumbnail` | ◐ | `delete_task` | ◐ | `set_publish_settings` | ○ | | |
-| **Complete Tools** | | **Complete Tools** | | `get_form_response` | ○ | | |
-| `read_presentation_comments` | ○ | `list_task_lists` | ○ | | | | |
-| `create_presentation_comment` | ○ | `get_task_list` | ○ | | | | |
-| `reply_to_presentation_comment` | ○ | `create_task_list` | ○ | | | | |
-| `resolve_presentation_comment` | ○ | `update_task_list` | ○ | | | | |
-| | | `delete_task_list` | ○ | | | | |
-| | | `move_task` | ○ | | | | |
-| | | `clear_completed_tasks` | ○ | | | | |
+| `create_presentation` | <span style="color:#2d5b69">•</span> | `get_task` | <span style="color:#2d5b69">•</span> | `create_form` | <span style="color:#2d5b69">•</span> | `search_custom` | <span style="color:#2d5b69">•</span> |
+| `get_presentation` | <span style="color:#2d5b69">•</span> | `list_tasks` | <span style="color:#2d5b69">•</span> | `get_form` | <span style="color:#2d5b69">•</span> | **Extended Tools** | |
+| **Extended Tools** | | `create_task` | <span style="color:#2d5b69">•</span> | **Extended Tools** | | `search_custom_siterestrict` | <span style="color:#72898f">•</span> |
+| `batch_update_presentation` | <span style="color:#72898f">•</span> | `update_task` | <span style="color:#2d5b69">•</span> | `list_form_responses` | <span style="color:#72898f">•</span> | **Complete Tools** | |
+| `get_page` | <span style="color:#72898f">•</span> | **Extended Tools** | | **Complete Tools** | | `get_search_engine_info` | <span style="color:#adbcbc">•</span> |
+| `get_page_thumbnail` | <span style="color:#72898f">•</span> | `delete_task` | <span style="color:#72898f">•</span> | `set_publish_settings` | <span style="color:#adbcbc">•</span> | | |
+| **Complete Tools** | | **Complete Tools** | | `get_form_response` | <span style="color:#adbcbc">•</span> | | |
+| `read_presentation_comments` | <span style="color:#adbcbc">•</span> | `list_task_lists` | <span style="color:#adbcbc">•</span> | | | | |
+| `create_presentation_comment` | <span style="color:#adbcbc">•</span> | `get_task_list` | <span style="color:#adbcbc">•</span> | | | | |
+| `reply_to_presentation_comment` | <span style="color:#adbcbc">•</span> | `create_task_list` | <span style="color:#adbcbc">•</span> | | | | |
+| `resolve_presentation_comment` | <span style="color:#adbcbc">•</span> | `update_task_list` | <span style="color:#adbcbc">•</span> | | | | |
+| | | `delete_task_list` | <span style="color:#adbcbc">•</span> | | | | |
+| | | `move_task` | <span style="color:#adbcbc">•</span> | | | | |
+| | | `clear_completed_tasks` | <span style="color:#adbcbc">•</span> | | | | |
 
 </td>
 </tr>
 </table>
 
 **Tool Tier Legend:**
-- ● **Core**: Essential tools for basic functionality • Minimal API usage • Getting started
-- ◐ **Extended**: Core tools + additional features • Regular usage • Expanded capabilities
-- ○ **Complete**: All available tools including advanced features • Power users • Full API access
+- <span style="color:#2d5b69">•</span> **Core**: Essential tools for basic functionality • Minimal API usage • Getting started
+- <span style="color:#72898f">•</span> **Extended**: Core tools + additional features • Regular usage • Expanded capabilities
+- <span style="color:#adbcbc">•</span> **Complete**: All available tools including advanced features • Power users • Full API access
 
 ---
 
-## ◆ Development
+## <span style="color:#adbcbc">◆ Development</span>
 
-### Project Structure
+### <span style="color:#72898f">Project Structure</span>
 
 ```
 google_workspace_mcp/
@@ -995,7 +995,7 @@ async def your_new_tool(service, param1: str, param2: int = 10):
 
 ---
 
-## ⊠ Security
+## <span style="color:#adbcbc">⊠ Security</span>
 
 - **Credentials**: Never commit `.env`, `client_secret.json` or the `.credentials/` directory to source control!
 - **OAuth Callback**: Uses `http://localhost:8000/oauth2callback` for development (requires `OAUTHLIB_INSECURE_TRANSPORT=1`)
@@ -1006,7 +1006,7 @@ async def your_new_tool(service, param1: str, param2: int = 10):
 
 ---
 
-## ◆ Integration with Open WebUI
+## <span style="color:#adbcbc">◆ Integration with Open WebUI</span>
 
 <details open>
 <summary>◆ <b>Open WebUI Integration</b> <sub><sup>← Connect to Open WebUI as tool provider</sup></sub></summary>
@@ -1057,7 +1057,7 @@ mcpo --port 8001 --config config.json
 
 ---
 
-## ≡ License
+## <span style="color:#adbcbc">≡ License</span>
 
 MIT License - see `LICENSE` file for details.
 
