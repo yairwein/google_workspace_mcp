@@ -234,12 +234,45 @@ uv run main.py --tools gmail drive calendar tasks
 uv run main.py --tools sheets docs
 uv run main.py --single-user --tools gmail  # Can combine with other flags
 
+# Tool tiers (load pre-configured tool sets by complexity level)
+uv run main.py --tool-tier core      # Essential tools only
+uv run main.py --tool-tier extended  # Core + additional functionality  
+uv run main.py --tool-tier complete  # All available tools including advanced features
+
 # Docker
 docker build -t workspace-mcp .
 docker run -p 8000:8000 -v $(pwd):/app workspace-mcp --transport streamable-http
 ```
 
 **Available Tools for `--tools` flag**: `gmail`, `drive`, `calendar`, `docs`, `sheets`, `forms`, `tasks`, `chat`, `search`
+
+### Tool Tiers
+
+The server supports **tool tiers** for simplified deployment and usage patterns. Instead of manually selecting individual tools, you can specify a tier level that automatically loads the appropriate tool set:
+
+| Tier | Description | Use Case |
+|------|-------------|----------|
+| `core` | Essential tools for basic functionality | Light usage, minimal API quotas, getting started |
+| `extended` | Core tools + additional features | Regular usage, expanded capabilities |
+| `complete` | All available tools including advanced features | Power users, full API access |
+
+**Usage Examples:**
+```bash
+# Load only essential tools (minimal API usage)
+uv run main.py --tool-tier core
+
+# Load core + extended functionality 
+uv run main.py --tool-tier extended
+
+# Load everything (maximum functionality)
+uv run main.py --tool-tier complete
+```
+
+**Important Notes:**
+- Tool tiers and explicit tool selection (`--tools`) are mutually exclusive
+- Tier configuration is defined in `core/tool_tiers.yaml`
+- Each service (Gmail, Drive, etc.) can have different tools in each tier
+- All tiers include necessary authentication and scope management automatically
 
 ### OAuth 2.1 Support (Multi-User Bearer Token Authentication)
 
@@ -338,7 +371,7 @@ If you’re developing, deploying to servers, or using another MCP-capable clien
 # Requires Python 3.10+ and uvx
 export GOOGLE_OAUTH_CLIENT_ID="xxx"
 export GOOGLE_OAUTH_CLIENT_SECRET="yyy"
-uvx workspace-mcp --tools gmail drive calendar
+uvx workspace-mcp --tool-tier core  # or --tools gmail drive calendar
 ```
 
 > Run instantly without manual installation - you must configure OAuth credentials when using uvx. You can use either environment variables (recommended for production) or set the `GOOGLE_CLIENT_SECRET_PATH` (or legacy `GOOGLE_CLIENT_SECRETS`) environment variable to point to your `client_secret.json` file.
@@ -375,6 +408,11 @@ export GOOGLE_OAUTH_CLIENT_SECRET="your-client-secret"
 
 # Start with specific tools only
 uvx workspace-mcp --tools gmail drive calendar tasks
+
+# Start with tool tiers (recommended for most users)
+uvx workspace-mcp --tool-tier core      # Essential tools
+uvx workspace-mcp --tool-tier extended  # Core + additional features
+uvx workspace-mcp --tool-tier complete  # All tools
 
 # Start in HTTP mode for debugging
 uvx workspace-mcp --transport streamable-http

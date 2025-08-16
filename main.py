@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from auth.oauth_config import reload_oauth_config
 from core.utils import check_credentials_directory_permissions
 from core.server import server, set_transport_mode, configure_server_for_http
+from core.tool_tier_loader import resolve_tools_from_tier
 
 dotenv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
 load_dotenv(dotenv_path=dotenv_path)
@@ -68,9 +69,15 @@ def main():
     parser.add_argument('--tools', nargs='*',
                         choices=['gmail', 'drive', 'calendar', 'docs', 'sheets', 'chat', 'forms', 'slides', 'tasks', 'search'],
                         help='Specify which tools to register. If not provided, all tools are registered.')
+    parser.add_argument('--tool-tier', choices=['core', 'extended', 'complete'],
+                        help='Load tools based on tier level. Cannot be used with --tools.')
     parser.add_argument('--transport', choices=['stdio', 'streamable-http'], default='stdio',
                         help='Transport mode: stdio (default) or streamable-http')
     args = parser.parse_args()
+
+    # Validate mutually exclusive arguments
+    if args.tools is not None and args.tool_tier is not None:
+        parser.error("--tools and --tool-tier cannot be used together")
 
     # Set port and base URI once for reuse throughout the function
     port = int(os.getenv("PORT", os.getenv("WORKSPACE_MCP_PORT", 8000)))
@@ -142,8 +149,20 @@ def main():
         'search': '🔍'
     }
 
-    # Import specified tools or all tools if none specified
-    tools_to_import = args.tools if args.tools is not None else tool_imports.keys()
+    # Determine which tools to import based on arguments
+    if args.tool_tier is not None:
+        # Use tier-based tool selection
+        try:
+            tools_to_import = resolve_tools_from_tier(args.tool_tier)
+        except Exception as e:
+            safe_print(f"❌ Error loading tools for tier '{args.tool_tier}': {e}")
+            sys.exit(1)
+    elif args.tools is not None:
+        # Use explicit tool list
+        tools_to_import = args.tools
+    else:
+        # Default: import all tools
+        tools_to_import = tool_imports.keys()
 
     # Set enabled tools for scope management
     from auth.scopes import set_enabled_tools
@@ -157,6 +176,8 @@ def main():
 
     safe_print("📊 Configuration Summary:")
     safe_print(f"   🔧 Tools Enabled: {len(tools_to_import)}/{len(tool_imports)}")
+    if args.tool_tier is not None:
+        safe_print(f"   📊 Tool Tier: {args.tool_tier}")
     safe_print(f"   📝 Log Level: {logging.getLogger().getEffectiveLevel()}")
     safe_print("")
 
