@@ -71,14 +71,10 @@ def main():
                         choices=['gmail', 'drive', 'calendar', 'docs', 'sheets', 'chat', 'forms', 'slides', 'tasks', 'search'],
                         help='Specify which tools to register. If not provided, all tools are registered.')
     parser.add_argument('--tool-tier', choices=['core', 'extended', 'complete'],
-                        help='Load tools based on tier level. Cannot be used with --tools.')
+                        help='Load tools based on tier level. Can be combined with --tools to filter services.')
     parser.add_argument('--transport', choices=['stdio', 'streamable-http'], default='stdio',
                         help='Transport mode: stdio (default) or streamable-http')
     args = parser.parse_args()
-
-    # Validate mutually exclusive arguments
-    if args.tools is not None and args.tool_tier is not None:
-        parser.error("--tools and --tool-tier cannot be used together")
 
     # Set port and base URI once for reuse throughout the function
     port = int(os.getenv("PORT", os.getenv("WORKSPACE_MCP_PORT", 8000)))
@@ -152,18 +148,25 @@ def main():
 
     # Determine which tools to import based on arguments
     if args.tool_tier is not None:
-        # Use tier-based tool selection
+        # Use tier-based tool selection, optionally filtered by services
         try:
-            tier_tools, tools_to_import = resolve_tools_from_tier(args.tool_tier)
+            tier_tools, suggested_services = resolve_tools_from_tier(args.tool_tier, args.tools)
+
+            # If --tools specified, use those services; otherwise use all services that have tier tools
+            if args.tools is not None:
+                tools_to_import = args.tools
+            else:
+                tools_to_import = suggested_services
+
             # Set the specific tools that should be registered
             set_enabled_tool_names(set(tier_tools))
         except Exception as e:
             safe_print(f"❌ Error loading tools for tier '{args.tool_tier}': {e}")
             sys.exit(1)
     elif args.tools is not None:
-        # Use explicit tool list
+        # Use explicit tool list without tier filtering
         tools_to_import = args.tools
-        # Don't filter individual tools when using explicit service list
+        # Don't filter individual tools when using explicit service list only
         set_enabled_tool_names(None)
     else:
         # Default: import all tools
@@ -171,10 +174,8 @@ def main():
         # Don't filter individual tools when importing all
         set_enabled_tool_names(None)
 
-    # Enable tool tracking for tier filtering (always done, even if no filtering needed)
     wrap_server_tool_method(server)
 
-    # Set enabled tools for scope management
     from auth.scopes import set_enabled_tools
     set_enabled_tools(list(tools_to_import))
 
@@ -188,9 +189,12 @@ def main():
     filter_server_tools(server)
 
     safe_print("📊 Configuration Summary:")
-    safe_print(f"   🔧 Tools Enabled: {len(tools_to_import)}/{len(tool_imports)}")
+    safe_print(f"   🔧 Services Loaded: {len(tools_to_import)}/{len(tool_imports)}")
     if args.tool_tier is not None:
-        safe_print(f"   📊 Tool Tier: {args.tool_tier}")
+        if args.tools is not None:
+            safe_print(f"   📊 Tool Tier: {args.tool_tier} (filtered to {', '.join(args.tools)})")
+        else:
+            safe_print(f"   📊 Tool Tier: {args.tool_tier}")
     safe_print(f"   📝 Log Level: {logging.getLogger().getEffectiveLevel()}")
     safe_print("")
 
@@ -240,13 +244,13 @@ def main():
 
         if args.transport == 'streamable-http':
             # Check port availability before starting HTTP server
-            # try:
-            #     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            #         s.bind(('', port))
-            # except OSError as e:
-            #     safe_print(f"Socket error: {e}")
-            #     safe_print(f"❌ Port {port} is already in use. Cannot start HTTP server.")
-            #     sys.exit(1)
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.bind(('', port))
+            except OSError as e:
+                safe_print(f"Socket error: {e}")
+                safe_print(f"❌ Port {port} is already in use. Cannot start HTTP server.")
+                sys.exit(1)
 
             server.run(transport="streamable-http", host="0.0.0.0", port=port)
         else:

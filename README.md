@@ -266,10 +266,16 @@ uv run main.py --tool-tier extended
 
 # Load everything (maximum functionality)
 uv run main.py --tool-tier complete
+
+# Load only Gmail's core tools (ultra-minimal)
+uv run main.py --tools gmail --tool-tier core
+
+# Load core tools for Gmail and Drive only
+uv run main.py --tools gmail drive --tool-tier core
 ```
 
 **Important Notes:**
-- Tool tiers and explicit tool selection (`--tools`) are mutually exclusive
+- Tool tiers can be combined with service selection: `--tools gmail --tool-tier core` loads only Gmail's core tools
 - Tier configuration is defined in `core/tool_tiers.yaml`
 - Each service (Gmail, Drive, etc.) can have different tools in each tier
 - All tiers include necessary authentication and scope management automatically
