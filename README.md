@@ -115,7 +115,7 @@ A production-ready MCP server that integrates all major Google Workspace service
 export GOOGLE_OAUTH_CLIENT_ID="..."
 export GOOGLE_OAUTH_CLIENT_SECRET="..."
 ```
-[Full setup →](#credential-configuration)
+[Full setup →](#-credential-configuration)
 
 </td><td width="33%" valign="top">
 
@@ -479,46 +479,54 @@ docker run -p 8000:8000 -v $(pwd):/app \
 
 ### Tool Tiers
 
+The server organizes tools into **three progressive tiers** for simplified deployment. Choose a tier that matches your usage needs and API quota requirements.
+
 <table>
-<tr><td width="40%" valign="top">
+<tr>
+<td width="50%" valign="top">
 
-**Overview**
-The server supports **tool tiers** for simplified deployment and usage patterns. Instead of manually selecting individual tools, you can specify a tier level that automatically loads the appropriate tool set.
+#### <span style="color:#72898f">Available Tiers</span>
 
-| Tier | Description | Use Case |
-|------|-------------|----------|
-| <span style="color:#2d5b69">•</span> `core` | Essential tools for basic functionality | Light usage, minimal API quotas, getting started |
-| <span style="color:#72898f">•</span> `extended` | Core tools + additional features | Regular usage, expanded capabilities |
-| <span style="color:#adbcbc">•</span> `complete` | All available tools including advanced features | Power users, full API access |
+**<span style="color:#2d5b69">●</span> Core** (`--tool-tier core`)
+Essential tools for everyday tasks. Perfect for light usage with minimal API quotas. Includes search, read, create, and basic modify operations across all services.
 
-</td><td width="60%" valign="top">
+**<span style="color:#72898f">●</span> Extended** (`--tool-tier extended`)
+Core functionality plus management tools. Adds labels, folders, batch operations, and advanced search. Ideal for regular usage with moderate API needs.
 
-**Usage Examples**
+**<span style="color:#adbcbc">●</span> Complete** (`--tool-tier complete`)
+Full API access including comments, headers/footers, publishing settings, and administrative functions. For power users needing maximum functionality.
+
+</td>
+<td width="50%" valign="top">
+
+#### <span style="color:#72898f">Quick Start</span>
+
 ```bash
-# Load only essential tools (minimal API usage)
+# Start with essential tools only
 uv run main.py --tool-tier core
 
-# Load core + extended functionality
+# Expand to include management features
 uv run main.py --tool-tier extended
 
-# Load everything (maximum functionality)
+# Enable all available functionality
 uv run main.py --tool-tier complete
-
-# Load only Gmail's core tools (ultra-minimal)
-uv run main.py --tools gmail --tool-tier core
-
-# Load core tools for Gmail and Drive only
-uv run main.py --tools gmail drive --tool-tier core
 ```
 
-**Important Notes:**
-- Tool tiers can be combined with service selection
-- Tier configuration is defined in `core/tool_tiers.yaml`
-- Each service can have different tools in each tier
-- All tiers include necessary authentication automatically
+#### <span style="color:#72898f">Selective Loading</span>
 
-</td></tr>
+```bash
+# Combine tiers with specific services
+uv run main.py --tools gmail drive --tool-tier core
+
+# Ultra-minimal: single service, core tools
+uv run main.py --tools gmail --tool-tier core
+```
+
+</td>
+</tr>
 </table>
+
+> **<span style="color:#72898f">▶</span> Pro Tip:** Start with `core` tier and upgrade as needed. Configuration lives in `core/tool_tiers.yaml` for customization.
 
 ### OAuth 2.1 Support (Multi-User Bearer Token Authentication)
 
