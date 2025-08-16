@@ -284,7 +284,7 @@ async def list_tasks(
     Args:
         user_google_email (str): The user's Google email address. Required.
         task_list_id (str): The ID of the task list to retrieve tasks from.
-        max_results (Optional[int]): Maximum number of tasks to return (default: 20, max: 100).
+        max_results (Optional[int]): Maximum number of tasks to return (default: 20, max: 10000).
         page_token (Optional[str]): Token for pagination.
         show_completed (Optional[bool]): Whether to include completed tasks (default: True).
         show_deleted (Optional[bool]): Whether to include deleted tasks (default: False).
@@ -333,6 +333,24 @@ async def list_tasks(
         tasks = result.get("items", [])
         next_page_token = result.get("nextPageToken")
 
+        # In order to return a sorted and organized list of tasks all at once, we support retrieving more than a single
+        # page from the Google tasks API.
+        results_remaining = min(max_results, 10000) if max_results else 20
+        results_remaining -= len(tasks)
+        while results_remaining > 0 and next_page_token:
+            params["pageToken"] = next_page_token
+            params["maxResults"] = str(results_remaining)
+            result = await asyncio.to_thread(
+                service.tasks().list(**params).execute
+            )
+            more_tasks = result.get("items", [])
+            next_page_token = result.get("nextPageToken")
+            if len(more_tasks) == 0:
+                # For some unexpected reason, no more tasks were returned. Break to avoid an infinite loop.
+                break
+            tasks.extend(more_tasks)
+            results_remaining -= len(more_tasks)
+
         if not tasks:
             return f"No tasks found in task list {task_list_id} for {user_google_email}."
 
@@ -355,7 +373,9 @@ async def list_tasks(
             response += f"Next page token: {next_page_token}\n"
         if orphaned_subtasks > 0:
             response += "\n"
-            response += f"{orphaned_subtasks} orphaned subtasks could not be positioned due to missing parent information. They were listed at the end of the task list. Callers could avoid this problem if max_results is large enough to contain all tasks (subtasks and their parents) without paging.\n"
+            response += f"{orphaned_subtasks} orphaned subtasks could not be placed in order due to missing parent information. They were listed at the end of the task list.\n"
+            response += "This can occur due to pagination. Callers can often avoid this problem if max_results is large enough to contain all tasks (subtasks and their parents) without paging.\n"
+            response += "This can also occur due to filtering that excludes parent tasks while including their subtasks or due to deleted or hidden parent tasks.\n"
 
         logger.info(f"Found {len(tasks)} tasks in list {task_list_id} for {user_google_email}")
         return response
@@ -378,6 +398,9 @@ def sort_tasks_by_position(tasks: List[Dict[str, str]]) -> int:
 
     Args:
         tasks (list): List of task dictionaries to sort.
+
+    Returns:
+        int: The number of orphaned subtasks encountered in the list.
     """
     parent_positions = {
         task["id"]: task["position"] for task in tasks if task.get("parent") is None
@@ -393,12 +416,12 @@ def sort_tasks_by_position(tasks: List[Dict[str, str]]) -> int:
         if parent is None:
             return (task["position"], "")
         else:
-            # Note that, due to paging, a subtask may have a parent with an unknown position
-            # because the information about its parent will be in a future page. We will return
-            # these orphaned subtasks at the end of the list, grouped by their parent task IDs.
+            # Note that, due to paging or filtering, a subtask may have a parent that is not present in the list of tasks.
+            # We will return these orphaned subtasks at the end of the list, grouped by their parent task IDs.
             parent_position = parent_positions.get(parent)
             if parent_position is None:
                 orphaned_subtasks += 1
+                logger.debug(f"Orphaned task: {task['title']}, id = {task['id']}, parent = {parent}")
             parent_position_sort_key = (
                 f"99999999999999999999_{parent}"
                 if parent_position is None
