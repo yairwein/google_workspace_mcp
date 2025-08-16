@@ -10,6 +10,7 @@ from auth.oauth_config import reload_oauth_config
 from core.utils import check_credentials_directory_permissions
 from core.server import server, set_transport_mode, configure_server_for_http
 from core.tool_tier_loader import resolve_tools_from_tier
+from core.tool_registry import set_enabled_tools as set_enabled_tool_names, wrap_server_tool_method, filter_server_tools
 
 dotenv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
 load_dotenv(dotenv_path=dotenv_path)
@@ -153,16 +154,25 @@ def main():
     if args.tool_tier is not None:
         # Use tier-based tool selection
         try:
-            tools_to_import = resolve_tools_from_tier(args.tool_tier)
+            tier_tools, tools_to_import = resolve_tools_from_tier(args.tool_tier)
+            # Set the specific tools that should be registered
+            set_enabled_tool_names(set(tier_tools))
         except Exception as e:
             safe_print(f"❌ Error loading tools for tier '{args.tool_tier}': {e}")
             sys.exit(1)
     elif args.tools is not None:
         # Use explicit tool list
         tools_to_import = args.tools
+        # Don't filter individual tools when using explicit service list
+        set_enabled_tool_names(None)
     else:
         # Default: import all tools
         tools_to_import = tool_imports.keys()
+        # Don't filter individual tools when importing all
+        set_enabled_tool_names(None)
+
+    # Enable tool tracking for tier filtering (always done, even if no filtering needed)
+    wrap_server_tool_method(server)
 
     # Set enabled tools for scope management
     from auth.scopes import set_enabled_tools
@@ -173,6 +183,9 @@ def main():
         tool_imports[tool]()
         safe_print(f"   {tool_icons[tool]} {tool.title()} - Google {tool.title()} API integration")
     safe_print("")
+
+    # Filter tools based on tier configuration (if tier-based loading is enabled)
+    filter_server_tools(server)
 
     safe_print("📊 Configuration Summary:")
     safe_print(f"   🔧 Tools Enabled: {len(tools_to_import)}/{len(tool_imports)}")
@@ -227,15 +240,14 @@ def main():
 
         if args.transport == 'streamable-http':
             # Check port availability before starting HTTP server
-            try:
-                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                    s.bind((socket.gethostbyname(""), port))
-            except OSError as e:
-                safe_print(f"Socket error: {e}")
-                safe_print(f"❌ Port {port} is already in use. Cannot start HTTP server.")
-                sys.exit(1)
+            # try:
+            #     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            #         s.bind(('', port))
+            # except OSError as e:
+            #     safe_print(f"Socket error: {e}")
+            #     safe_print(f"❌ Port {port} is already in use. Cannot start HTTP server.")
+            #     sys.exit(1)
 
-            # The server has CORS middleware built-in via CORSEnabledFastMCP
             server.run(transport="streamable-http", host="0.0.0.0", port=port)
         else:
             server.run()

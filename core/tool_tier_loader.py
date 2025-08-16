@@ -156,30 +156,27 @@ def get_tools_for_tier(tier: TierLevel, services: Optional[List[str]] = None) ->
     return loader.get_tools_up_to_tier(tier, services)
 
 
-def resolve_tools_from_tier(tier: TierLevel, services: Optional[List[str]] = None) -> List[str]:
+def resolve_tools_from_tier(tier: TierLevel, services: Optional[List[str]] = None) -> tuple[List[str], List[str]]:
     """
-    Resolve tool names to service names for the specified tier.
-    This function maps tool tier selections to the service names used in main.py.
+    Resolve tool names and service names for the specified tier.
     
     Args:
         tier: The tier level (core, extended, complete)
         services: Optional list of services to filter by
     
     Returns:
-        List of service names (gmail, drive, etc.) that should be imported
+        Tuple of (tool_names, service_names) where:
+        - tool_names: List of specific tool names for the tier
+        - service_names: List of service names that should be imported
     """
     loader = ToolTierLoader()
     
-    # If specific services are requested, just return those
-    if services:
-        return services
-    
     # Get all tools for the tier
-    tools = loader.get_tools_up_to_tier(tier)
+    tools = loader.get_tools_up_to_tier(tier, services)
     
     # Map back to service names
     service_names = loader.get_services_for_tools(tools)
     
     logger.info(f"Tier '{tier}' resolved to {len(tools)} tools across {len(service_names)} services: {sorted(service_names)}")
     
-    return sorted(service_names)
+    return tools, sorted(service_names)

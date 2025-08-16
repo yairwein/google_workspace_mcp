@@ -1,133 +1,135 @@
 gmail:
   core:
-    - tool_search_gmail_messages_post
-    - tool_get_gmail_message_content_post
-    - tool_get_gmail_messages_content_batch_post
-    - tool_send_gmail_message_post
+    - search_gmail_messages
+    - get_gmail_message_content
+    - get_gmail_messages_content_batch
+    - send_gmail_message
 
   extended:
-    - tool_get_gmail_thread_content_post
-    - tool_modify_gmail_message_labels_post
-    - tool_list_gmail_labels_post
-    - tool_manage_gmail_label_post
-    - tool_draft_gmail_message_post
+    - get_gmail_thread_content
+    - modify_gmail_message_labels
+    - list_gmail_labels
+    - manage_gmail_label
+    - draft_gmail_message
 
   complete:
-    - tool_get_gmail_threads_content_batch_post
-    - tool_batch_modify_gmail_message_labels_post
-    - tool_google_auth_post
+    - get_gmail_threads_content_batch
+    - batch_modify_gmail_message_labels
+    - start_google_auth
 
 drive:
   core:
-    - tool_search_drive_files_post
-    - tool_get_drive_file_content_post
-    - tool_create_drive_file_post
+    - search_drive_files
+    - get_drive_file_content
+    - create_drive_file
   extended:
-    - tool_list_drive_items_post
-  complete: []
+    - list_drive_items
+  complete:
+    - []
 
 calendar:
   core:
-    - tool_list_calendars_post
-    - tool_get_events_post
-    - tool_create_event_post
-    - tool_modify_event_post
+    - list_calendars
+    - get_events
+    - create_event
+    - modify_event
   extended:
-    - tool_delete_event_post
-  complete: []
+    - delete_event
+  complete:
+    - []
 
 docs:
   core:
-    - tool_get_doc_content_post
-    - tool_create_doc_post
-    - tool_modify_doc_text_post
+    - get_doc_content
+    - create_doc
+    - modify_doc_text
   extended:
-    - tool_search_docs_post
-    - tool_find_and_replace_doc_post
-    - tool_list_docs_in_folder_post
-    - tool_insert_doc_elements_post
+    - search_docs
+    - find_and_replace_doc
+    - list_docs_in_folder
+    - insert_doc_elements
   complete:
-    - tool_insert_doc_image_post
-    - tool_update_doc_headers_footers_post
-    - tool_batch_update_doc_post
-    - tool_inspect_doc_structure_post
-    - tool_create_table_with_data_post
-    - tool_debug_table_structure_post
-    - tool_read_document_comments_post
-    - tool_create_document_comment_post
-    - tool_reply_to_document_comment_post
-    - tool_resolve_document_comment_post
+    - insert_doc_image
+    - update_doc_headers_footers
+    - batch_update_doc
+    - inspect_doc_structure
+    - create_table_with_data
+    - debug_table_structure
+    - read_document_comments
+    - create_document_comment
+    - reply_to_document_comment
+    - resolve_document_comment
 
 sheets:
   core:
-    - tool_create_spreadsheet_post
-    - tool_read_sheet_values_post
-    - tool_modify_sheet_values_post
+    - create_spreadsheet
+    - read_sheet_values
+    - modify_sheet_values
   extended:
-    - tool_list_spreadsheets_post
-    - tool_get_spreadsheet_info_post
+    - list_spreadsheets
+    - get_spreadsheet_info
   complete:
-    - tool_create_sheet_post
-    - tool_read_spreadsheet_comments_post
-    - tool_create_spreadsheet_comment_post
-    - tool_reply_to_spreadsheet_comment_post
-    - tool_resolve_spreadsheet_comment_post
+    - create_sheet
+    - read_spreadsheet_comments
+    - create_spreadsheet_comment
+    - reply_to_spreadsheet_comment
+    - resolve_spreadsheet_comment
 
 chat:
   core:
-    - tool_send_message_post
-    - tool_get_messages_post
-    - tool_search_messages_post
+    - send_message
+    - get_messages
+    - search_messages
   extended:
-    - tool_list_spaces_post
+    - list_spaces
   complete:
     - []
 
 forms:
   core:
-    - tool_create_form_post
-    - tool_get_form_post
+    - create_form
+    - get_form
   extended:
-    - tool_list_form_responses_post
+    - list_form_responses
   complete:
-    - tool_set_publish_settings_post
-    - tool_get_form_response_post
+    - set_publish_settings
+    - get_form_response
 
 slides:
   core:
-    - tool_create_presentation_post
-    - tool_get_presentation_post
+    - create_presentation
+    - get_presentation
   extended:
-    - tool_batch_update_presentation_post
-    - tool_get_page_post
-    - tool_get_page_thumbnail_post
+    - batch_update_presentation
+    - get_page
+    - get_page_thumbnail
   complete:
-    - tool_read_presentation_comments_post
-    - tool_create_presentation_comment_post
-    - tool_reply_to_presentation_comment_post
-    - tool_resolve_presentation_comment_post
+    - read_presentation_comments
+    - create_presentation_comment
+    - reply_to_presentation_comment
+    - resolve_presentation_comment
 
 tasks:
   core:
-    - tool_get_task_post
-    - tool_list_tasks_post
-    - tool_create_task_post
-    - tool_update_task_post
+    - get_task
+    - list_tasks
+    - create_task
+    - update_task
   extended:
-    - tool_delete_task_post
+    - delete_task
   complete:
-    - tool_list_task_lists_post
-    - tool_get_task_list_post
-    - tool_create_task_list_post
-    - tool_update_task_list_post
-    - tool_delete_task_list_post
-    - tool_move_task_post
-    - tool_clear_completed_tasks_post
+    - list_task_lists
+    - get_task_list
+    - create_task_list
+    - update_task_list
+    - delete_task_list
+    - move_task
+    - clear_completed_tasks
 
 search:
   core:
-    - tool_search_custom_post
+    - search_custom
   extended:
-    - tool_search_custom_siterestrict_post
+    - search_custom_siterestrict
   complete:
-    - tool_get_search_engine_info_post
+    - get_search_engine_info
