@@ -39,7 +39,7 @@
 
 ### A quick plug for AI-Enhanced Docs
 <details>
-<summary>🤖 <b>But why?</b></summary>
+<summary>◆ <b>But why?</b></summary>
 
 **This README was written with AI assistance, and here's why that matters**
 >
@@ -60,19 +60,19 @@ A production-ready MCP server that integrates all major Google Workspace service
 <tr>
 <td width="50%" valign="top">
 
-**🔐 Authentication & Security**
+**⊠ Authentication & Security**
 - Advanced OAuth 2.0 & OAuth 2.1 support
 - Automatic token refresh & session management
 - Transport-aware callback handling
 - Multi-user bearer token authentication
 - Innovative CORS proxy architecture
 
-**📧 Gmail** • **📁 Drive** • **📅 Calendar**
+**@ Gmail** • **≡ Drive** • **⧖ Calendar**
 - Complete email management (search, send, drafts)
 - File operations with Office format support
 - Full calendar management with CRUD operations
 
-**📄 Docs** • **📊 Sheets** • **🖼️ Slides**
+**≡ Docs** • **≡ Sheets** • **≡ Slides**
 - Document creation, editing & comment management
 - Spreadsheet operations with flexible cell management
 - Presentation creation, updates & content manipulation
@@ -80,17 +80,17 @@ A production-ready MCP server that integrates all major Google Workspace service
 </td>
 <td width="50%" valign="top">
 
-**📝 Forms** • **✓ Tasks** • **💬 Chat**
+**≡ Forms** • **✓ Tasks** • **@ Chat**
 - Form creation, publish settings & response management
 - Task & task list management with hierarchy
 - Space management & messaging capabilities
 
-**🔍 Custom Search** • **🔄 Transport Support**
+**◆ Custom Search** • **↻ Transport Support**
 - Programmable Search Engine (PSE) integration
 - Stdio, Streamable HTTP & SSE support
 - OpenAPI compatibility via `mcpo`
 
-**⚡ Performance & Developer Experience**
+**▶ Performance & Developer Experience**
 - Service caching with 30-minute TTL
 - Thread-safe sessions & FastMCP integration
 - Minimal boilerplate & automatic service injection
@@ -102,15 +102,15 @@ A production-ready MCP server that integrates all major Google Workspace service
 
 ---
 
-## 🚀 Quick Start
+## ▶ Quick Start
 
 <details>
-<summary>📖 <b>Quick Reference Card</b> <sub><sup>← Essential commands & configs at a glance</sup></sub></summary>
+<summary>≡ <b>Quick Reference Card</b> <sub><sup>← Essential commands & configs at a glance</sup></sub></summary>
 
 <table>
 <tr><td width="33%" valign="top">
 
-**🔑 Credentials**
+**⊠ Credentials**
 ```bash
 export GOOGLE_OAUTH_CLIENT_ID="..."
 export GOOGLE_OAUTH_CLIENT_SECRET="..."
@@ -119,7 +119,7 @@ export GOOGLE_OAUTH_CLIENT_SECRET="..."
 
 </td><td width="33%" valign="top">
 
-**⚡ Launch Commands**
+**▶ Launch Commands**
 ```bash
 uvx workspace-mcp --tool-tier core
 uv run main.py --tools gmail drive
@@ -128,10 +128,10 @@ uv run main.py --tools gmail drive
 
 </td><td width="34%" valign="top">
 
-**🎯 Tool Tiers**
-- 🟢 `core` - Essential tools
-- 🟡 `extended` - Core + extras
-- 🔴 `complete` - Everything
+**★ Tool Tiers**
+- ● `core` - Essential tools
+- ◐ `extended` - Core + extras
+- ○ `complete` - Everything
 [Details →](#tool-tiers)
 
 </td></tr>
@@ -152,7 +152,7 @@ uv run main.py --tools gmail drive
 
 #### Required Configuration
 <details>
-<summary>⚙️ <b>Environment Variables</b> <sub><sup>← Click to configure in Claude Desktop</sup></sub></summary>
+<summary>◆ <b>Environment Variables</b> <sub><sup>← Click to configure in Claude Desktop</sup></sub></summary>
 
 <table>
 <tr><td width="50%" valign="top">
@@ -206,7 +206,7 @@ Claude Desktop stores these securely in the OS keychain; set them once in the ex
    - Search for & enable Calendar, Drive, Gmail, Docs, Sheets, Slides, Forms, Tasks, Chat
    - Expand the section below marked "API Enablement Links" for direct links to each!
 <details>
-  <summary>🔗 <b>Quick API Enable Links</b> <sub><sup>← One-click enable each Google API</sup></sub></summary>
+  <summary>⊥ <b>Quick API Enable Links</b> <sub><sup>← One-click enable each Google API</sup></sub></summary>
   You can enable each one by clicking the links below (make sure you're logged into the Google Cloud Console and have the correct project selected):
 
 * [Enable Google Calendar API](https://console.cloud.google.com/flows/enableapi?apiid=calendar-json.googleapis.com)
@@ -227,13 +227,13 @@ Claude Desktop stores these securely in the OS keychain; set them once in the ex
 2. **Environment Configuration**:
 
 <details open>
-<summary>🌍 <b>Environment Variables</b> <sub><sup>← Configure your runtime environment</sup></sub></summary>
+<summary>◆ <b>Environment Variables</b> <sub><sup>← Configure your runtime environment</sup></sub></summary>
 
 <table>
 <tr>
 <td width="33%" align="center">
 
-**🔧 Development Mode**
+**◆ Development Mode**
 ```bash
 export OAUTHLIB_INSECURE_TRANSPORT=1
 ```
@@ -242,7 +242,7 @@ export OAUTHLIB_INSECURE_TRANSPORT=1
 </td>
 <td width="33%" align="center">
 
-**👤 Default User**
+**@ Default User**
 ```bash
 export USER_GOOGLE_EMAIL=\
   your.email@gmail.com
@@ -252,7 +252,7 @@ export USER_GOOGLE_EMAIL=\
 </td>
 <td width="34%" align="center">
 
-**🔍 Custom Search**
+**◆ Custom Search**
 ```bash
 export GOOGLE_PSE_API_KEY=xxx
 export GOOGLE_PSE_ENGINE_ID=yyy
@@ -268,13 +268,13 @@ export GOOGLE_PSE_ENGINE_ID=yyy
 3. **Server Configuration**:
 
 <details open>
-<summary>⚙️ <b>Server Settings</b> <sub><sup>← Customize ports, URIs & proxies</sup></sub></summary>
+<summary>◆ <b>Server Settings</b> <sub><sup>← Customize ports, URIs & proxies</sup></sub></summary>
 
 <table>
 <tr>
 <td width="33%" align="center">
 
-**🌐 Base Configuration**
+**◆ Base Configuration**
 ```bash
 export WORKSPACE_MCP_BASE_URI=\
   http://localhost
@@ -285,7 +285,7 @@ export WORKSPACE_MCP_PORT=8000
 </td>
 <td width="33%" align="center">
 
-**🔀 Proxy Support**
+**↻ Proxy Support**
 ```bash
 export GOOGLE_OAUTH_REDIRECT_URI=\
   https://your-domain.com/oauth2callback
@@ -295,7 +295,7 @@ export GOOGLE_OAUTH_REDIRECT_URI=\
 </td>
 <td width="34%" align="center">
 
-**📧 Default Email**
+**@ Default Email**
 ```bash
 export USER_GOOGLE_EMAIL=\
   your.email@gmail.com
@@ -307,7 +307,7 @@ export USER_GOOGLE_EMAIL=\
 </table>
 
 <details>
-<summary>📖 <b>Configuration Details</b> <sub><sup>← Learn more about each setting</sup></sub></summary>
+<summary>≡ <b>Configuration Details</b> <sub><sup>← Learn more about each setting</sup></sub></summary>
 
 | Variable | Description | Default |
 |----------|-------------|---------|
@@ -323,13 +323,13 @@ export USER_GOOGLE_EMAIL=\
 ### Google Custom Search Setup
 
 <details>
-<summary>🔍 <b>Custom Search Configuration</b> <sub><sup>← Enable web search capabilities</sup></sub></summary>
+<summary>◆ <b>Custom Search Configuration</b> <sub><sup>← Enable web search capabilities</sup></sub></summary>
 
 <table>
 <tr>
 <td width="33%" align="center">
 
-**1️⃣ Create Search Engine**
+**1. Create Search Engine**
 ```text
 programmablesearchengine.google.com
 /controlpanel/create
@@ -342,7 +342,7 @@ programmablesearchengine.google.com
 </td>
 <td width="33%" align="center">
 
-**2️⃣ Get API Key**
+**2. Get API Key**
 ```text
 developers.google.com
 /custom-search/v1/overview
@@ -356,7 +356,7 @@ developers.google.com
 </td>
 <td width="34%" align="center">
 
-**3️⃣ Set Variables**
+**3. Set Variables**
 ```bash
 export GOOGLE_PSE_API_KEY=\
   "your-api-key"
@@ -371,7 +371,7 @@ export GOOGLE_PSE_ENGINE_ID=\
 <td colspan="3">
 
 <details>
-<summary>📖 <b>Quick Setup Guide</b> <sub><sup>← Step-by-step instructions</sup></sub></summary>
+<summary>≡ <b>Quick Setup Guide</b> <sub><sup>← Step-by-step instructions</sup></sub></summary>
 
 **Complete Setup Process:**
 
@@ -390,7 +390,7 @@ export GOOGLE_PSE_ENGINE_ID=\
    export GOOGLE_PSE_ENGINE_ID="01764344478..."
    ```
 
-📚 [Full Documentation →](https://developers.google.com/custom-search/v1/overview)
+≡ [Full Documentation →](https://developers.google.com/custom-search/v1/overview)
 
 </details>
 
@@ -403,13 +403,13 @@ export GOOGLE_PSE_ENGINE_ID=\
 ### Start the Server
 
 <details open>
-<summary>💻 <b>Launch Commands</b> <sub><sup>← Choose your startup mode</sup></sub></summary>
+<summary>▶ <b>Launch Commands</b> <sub><sup>← Choose your startup mode</sup></sub></summary>
 
 <table>
 <tr>
 <td width="33%" align="center">
 
-**🎯 Quick Start**
+**▶ Quick Start**
 ```bash
 uv run main.py
 ```
@@ -418,7 +418,7 @@ uv run main.py
 </td>
 <td width="33%" align="center">
 
-**🌐 HTTP Mode**
+**◆ HTTP Mode**
 ```bash
 uv run main.py \
   --transport streamable-http
@@ -428,7 +428,7 @@ uv run main.py \
 </td>
 <td width="34%" align="center">
 
-**👤 Single User**
+**@ Single User**
 ```bash
 uv run main.py \
   --single-user
@@ -441,9 +441,9 @@ uv run main.py \
 <td colspan="3">
 
 <details>
-<summary>⚙️ <b>Advanced Options</b> <sub><sup>← Tool selection, tiers & Docker</sup></sub></summary>
+<summary>◆ <b>Advanced Options</b> <sub><sup>← Tool selection, tiers & Docker</sup></sub></summary>
 
-**🎯 Selective Tool Loading**
+**▶ Selective Tool Loading**
 ```bash
 # Load specific services only
 uv run main.py --tools gmail drive calendar
@@ -453,14 +453,14 @@ uv run main.py --tools sheets docs
 uv run main.py --single-user --tools gmail
 ```
 
-**📊 Tool Tiers**
+**★ Tool Tiers**
 ```bash
-uv run main.py --tool-tier core      # 🟢 Essential tools only
-uv run main.py --tool-tier extended  # 🟡 Core + additional
-uv run main.py --tool-tier complete  # 🔴 All available tools
+uv run main.py --tool-tier core      # ● Essential tools only
+uv run main.py --tool-tier extended  # ◐ Core + additional
+uv run main.py --tool-tier complete  # ○ All available tools
 ```
 
-**🐳 Docker Deployment**
+**◆ Docker Deployment**
 ```bash
 docker build -t workspace-mcp .
 docker run -p 8000:8000 -v $(pwd):/app \
@@ -824,7 +824,7 @@ cp .env.oauth21 .env
 
 ---
 
-## 🧰 Available Tools
+## ◆ Available Tools
 
 > **Note**: All tools support automatic authentication via `@require_google_service()` decorators with 30-minute service caching.
 
@@ -832,134 +832,134 @@ cp .env.oauth21 .env
 <tr>
 <td width="50%" valign="top">
 
-### 📧 Gmail • [`gmail_tools.py`](gmail/gmail_tools.py)
+### @ Gmail • [`gmail_tools.py`](gmail/gmail_tools.py)
 | Tool | Tier |
 |------|------|
 | **Core Tools** | |
-| `search_gmail_messages` | 🟢 Core |
-| `get_gmail_message_content` | 🟢 Core |
-| `get_gmail_messages_content_batch` | 🟢 Core |
-| `send_gmail_message` | 🟢 Core |
+| `search_gmail_messages` | ● Core |
+| `get_gmail_message_content` | ● Core |
+| `get_gmail_messages_content_batch` | ● Core |
+| `send_gmail_message` | ● Core |
 | **Extended Tools** | |
-| `get_gmail_thread_content` | 🟡 Extended |
-| `modify_gmail_message_labels` | 🟡 Extended |
-| `list_gmail_labels` | 🟡 Extended |
-| `manage_gmail_label` | 🟡 Extended |
-| `draft_gmail_message` | 🟡 Extended |
+| `get_gmail_thread_content` | ◐ Extended |
+| `modify_gmail_message_labels` | ◐ Extended |
+| `list_gmail_labels` | ◐ Extended |
+| `manage_gmail_label` | ◐ Extended |
+| `draft_gmail_message` | ◐ Extended |
 | **Complete Tools** | |
-| `get_gmail_threads_content_batch` | 🔴 Complete |
-| `batch_modify_gmail_message_labels` | 🔴 Complete |
+| `get_gmail_threads_content_batch` | ○ Complete |
+| `batch_modify_gmail_message_labels` | ○ Complete |
 
-### 📁 Drive • [`drive_tools.py`](gdrive/drive_tools.py)
+### ≡ Drive • [`drive_tools.py`](gdrive/drive_tools.py)
 | Tool | Tier |
 |------|------|
 | **Core Tools** | |
-| `search_drive_files` | 🟢 Core |
-| `get_drive_file_content` | 🟢 Core |
-| `create_drive_file` | 🟢 Core |
+| `search_drive_files` | ● Core |
+| `get_drive_file_content` | ● Core |
+| `create_drive_file` | ● Core |
 | **Extended Tools** | |
-| `list_drive_items` | 🟡 Extended |
+| `list_drive_items` | ◐ Extended |
 
-### 📅 Calendar • [`calendar_tools.py`](gcalendar/calendar_tools.py)
+### ⧖ Calendar • [`calendar_tools.py`](gcalendar/calendar_tools.py)
 | Tool | Tier |
 |------|------|
 | **Core Tools** | |
-| `list_calendars` | 🟢 Core |
-| `get_events` | 🟢 Core |
-| `create_event` | 🟢 Core |
-| `modify_event` | 🟢 Core |
+| `list_calendars` | ● Core |
+| `get_events` | ● Core |
+| `create_event` | ● Core |
+| `modify_event` | ● Core |
 | **Extended Tools** | |
-| `delete_event` | 🟡 Extended |
+| `delete_event` | ◐ Extended |
 
-### 💬 Chat • [`chat_tools.py`](gchat/chat_tools.py)
+### @ Chat • [`chat_tools.py`](gchat/chat_tools.py)
 | Tool | Tier |
 |------|------|
 | **Core Tools** | |
-| `send_message` | 🟢 Core |
-| `get_messages` | 🟢 Core |
-| `search_messages` | 🟢 Core |
+| `send_message` | ● Core |
+| `get_messages` | ● Core |
+| `search_messages` | ● Core |
 | **Extended Tools** | |
-| `list_spaces` | 🟡 Extended |
+| `list_spaces` | ◐ Extended |
 
 </td>
 <td width="50%" valign="top">
 
-### 📝 Docs • [`docs_tools.py`](gdocs/docs_tools.py)
+### ≡ Docs • [`docs_tools.py`](gdocs/docs_tools.py)
 | Tool | Tier |
 |------|------|
 | **Core Tools** | |
-| `get_doc_content` | 🟢 Core |
-| `create_doc` | 🟢 Core |
-| `modify_doc_text` | 🟢 Core |
+| `get_doc_content` | ● Core |
+| `create_doc` | ● Core |
+| `modify_doc_text` | ● Core |
 | **Extended Tools** | |
-| `search_docs` | 🟡 Extended |
-| `find_and_replace_doc` | 🟡 Extended |
-| `list_docs_in_folder` | 🟡 Extended |
-| `insert_doc_elements` | 🟡 Extended |
+| `search_docs` | ◐ Extended |
+| `find_and_replace_doc` | ◐ Extended |
+| `list_docs_in_folder` | ◐ Extended |
+| `insert_doc_elements` | ◐ Extended |
 | **Complete Tools** | |
-| `insert_doc_image` | 🔴 Complete |
-| `update_doc_headers_footers` | 🔴 Complete |
-| `batch_update_doc` | 🔴 Complete |
-| `inspect_doc_structure` | 🔴 Complete |
-| `create_table_with_data` | 🔴 Complete |
-| `read_document_comments` | 🔴 Complete |
-| `create_document_comment` | 🔴 Complete |
-| `reply_to_document_comment` | 🔴 Complete |
-| `resolve_document_comment` | 🔴 Complete |
+| `insert_doc_image` | ○ Complete |
+| `update_doc_headers_footers` | ○ Complete |
+| `batch_update_doc` | ○ Complete |
+| `inspect_doc_structure` | ○ Complete |
+| `create_table_with_data` | ○ Complete |
+| `read_document_comments` | ○ Complete |
+| `create_document_comment` | ○ Complete |
+| `reply_to_document_comment` | ○ Complete |
+| `resolve_document_comment` | ○ Complete |
 
-### 📊 Sheets • [`sheets_tools.py`](gsheets/sheets_tools.py)
+### ≡ Sheets • [`sheets_tools.py`](gsheets/sheets_tools.py)
 | Tool | Tier |
 |------|------|
 | **Core Tools** | |
-| `create_spreadsheet` | 🟢 Core |
-| `read_sheet_values` | 🟢 Core |
-| `modify_sheet_values` | 🟢 Core |
+| `create_spreadsheet` | ● Core |
+| `read_sheet_values` | ● Core |
+| `modify_sheet_values` | ● Core |
 | **Extended Tools** | |
-| `list_spreadsheets` | 🟡 Extended |
-| `get_spreadsheet_info` | 🟡 Extended |
+| `list_spreadsheets` | ◐ Extended |
+| `get_spreadsheet_info` | ◐ Extended |
 | **Complete Tools** | |
-| `create_sheet` | 🔴 Complete |
-| `read_spreadsheet_comments` | 🔴 Complete |
-| `create_spreadsheet_comment` | 🔴 Complete |
-| `reply_to_spreadsheet_comment` | 🔴 Complete |
-| `resolve_spreadsheet_comment` | 🔴 Complete |
+| `create_sheet` | ○ Complete |
+| `read_spreadsheet_comments` | ○ Complete |
+| `create_spreadsheet_comment` | ○ Complete |
+| `reply_to_spreadsheet_comment` | ○ Complete |
+| `resolve_spreadsheet_comment` | ○ Complete |
 
 </td>
 </tr>
 <tr>
 <td colspan="2" valign="top">
 
-### 🖼️ Slides • [`slides_tools.py`](gslides/slides_tools.py) | ✓ Tasks • [`tasks_tools.py`](gtasks/tasks_tools.py) | 📝 Forms • [`forms_tools.py`](gforms/forms_tools.py) | 🔍 Search • [`search_tools.py`](gsearch/search_tools.py)
+### ≡ Slides • [`slides_tools.py`](gslides/slides_tools.py) | ✓ Tasks • [`tasks_tools.py`](gtasks/tasks_tools.py) | ≡ Forms • [`forms_tools.py`](gforms/forms_tools.py) | ◆ Search • [`search_tools.py`](gsearch/search_tools.py)
 | Slides | Tier | Tasks | Tier | Forms | Tier | Search | Tier |
 |--------|------|-------|------|-------|------|--------|------|
 | **Core Tools** | | **Core Tools** | | **Core Tools** | | **Core Tools** | |
-| `create_presentation` | 🟢 | `get_task` | 🟢 | `create_form` | 🟢 | `search_custom` | 🟢 |
-| `get_presentation` | 🟢 | `list_tasks` | 🟢 | `get_form` | 🟢 | **Extended Tools** | |
-| **Extended Tools** | | `create_task` | 🟢 | **Extended Tools** | | `search_custom_siterestrict` | 🟡 |
-| `batch_update_presentation` | 🟡 | `update_task` | 🟢 | `list_form_responses` | 🟡 | **Complete Tools** | |
-| `get_page` | 🟡 | **Extended Tools** | | **Complete Tools** | | `get_search_engine_info` | 🔴 |
-| `get_page_thumbnail` | 🟡 | `delete_task` | 🟡 | `set_publish_settings` | 🔴 | | |
-| **Complete Tools** | | **Complete Tools** | | `get_form_response` | 🔴 | | |
-| `read_presentation_comments` | 🔴 | `list_task_lists` | 🔴 | | | | |
-| `create_presentation_comment` | 🔴 | `get_task_list` | 🔴 | | | | |
-| `reply_to_presentation_comment` | 🔴 | `create_task_list` | 🔴 | | | | |
-| `resolve_presentation_comment` | 🔴 | `update_task_list` | 🔴 | | | | |
-| | | `delete_task_list` | 🔴 | | | | |
-| | | `move_task` | 🔴 | | | | |
-| | | `clear_completed_tasks` | 🔴 | | | | |
+| `create_presentation` | ● | `get_task` | ● | `create_form` | ● | `search_custom` | ● |
+| `get_presentation` | ● | `list_tasks` | ● | `get_form` | ● | **Extended Tools** | |
+| **Extended Tools** | | `create_task` | ● | **Extended Tools** | | `search_custom_siterestrict` | ◐ |
+| `batch_update_presentation` | ◐ | `update_task` | ● | `list_form_responses` | ◐ | **Complete Tools** | |
+| `get_page` | ◐ | **Extended Tools** | | **Complete Tools** | | `get_search_engine_info` | ○ |
+| `get_page_thumbnail` | ◐ | `delete_task` | ◐ | `set_publish_settings` | ○ | | |
+| **Complete Tools** | | **Complete Tools** | | `get_form_response` | ○ | | |
+| `read_presentation_comments` | ○ | `list_task_lists` | ○ | | | | |
+| `create_presentation_comment` | ○ | `get_task_list` | ○ | | | | |
+| `reply_to_presentation_comment` | ○ | `create_task_list` | ○ | | | | |
+| `resolve_presentation_comment` | ○ | `update_task_list` | ○ | | | | |
+| | | `delete_task_list` | ○ | | | | |
+| | | `move_task` | ○ | | | | |
+| | | `clear_completed_tasks` | ○ | | | | |
 
 </td>
 </tr>
 </table>
 
 **Tool Tier Legend:**
-- 🟢 **Core**: Essential tools for basic functionality • Minimal API usage • Getting started
-- 🟡 **Extended**: Core tools + additional features • Regular usage • Expanded capabilities
-- 🔴 **Complete**: All available tools including advanced features • Power users • Full API access
+- ● **Core**: Essential tools for basic functionality • Minimal API usage • Getting started
+- ◐ **Extended**: Core tools + additional features • Regular usage • Expanded capabilities
+- ○ **Complete**: All available tools including advanced features • Power users • Full API access
 
 ---
 
-## 🛠️ Development
+## ◆ Development
 
 ### Project Structure
 
@@ -995,7 +995,7 @@ async def your_new_tool(service, param1: str, param2: int = 10):
 
 ---
 
-## 🔒 Security
+## ⊠ Security
 
 - **Credentials**: Never commit `.env`, `client_secret.json` or the `.credentials/` directory to source control!
 - **OAuth Callback**: Uses `http://localhost:8000/oauth2callback` for development (requires `OAUTHLIB_INSECURE_TRANSPORT=1`)
@@ -1006,15 +1006,15 @@ async def your_new_tool(service, param1: str, param2: int = 10):
 
 ---
 
-## 🌐 Integration with Open WebUI
+## ◆ Integration with Open WebUI
 
 <details open>
-<summary>🔌 <b>Open WebUI Integration</b> <sub><sup>← Connect to Open WebUI as tool provider</sup></sub></summary>
+<summary>◆ <b>Open WebUI Integration</b> <sub><sup>← Connect to Open WebUI as tool provider</sup></sub></summary>
 
 <table>
 <tr><td width="50%" valign="top">
 
-### ⚡ Instant Start (No Config)
+### ▶ Instant Start (No Config)
 ```bash
 # Set credentials & launch in one command
 GOOGLE_OAUTH_CLIENT_ID="your_id" \
@@ -1025,7 +1025,7 @@ uvx mcpo --port 8000 --api-key "secret" \
 
 </td><td width="50%" valign="top">
 
-### 🔧 Manual Configuration
+### ◆ Manual Configuration
 1. Create `config.json`:
 ```json
 {
@@ -1046,7 +1046,7 @@ mcpo --port 8001 --config config.json
 </td></tr>
 </table>
 
-### 📝 Configure Open WebUI
+### ≡ Configure Open WebUI
 1. Navigate to **Settings** → **Connections** → **Tools**
 2. Click **Add Tool** and enter:
    - **Server URL**: `http://localhost:8001/google_workspace`
@@ -1057,7 +1057,7 @@ mcpo --port 8001 --config config.json
 
 ---
 
-## 📄 License
+## ≡ License
 
 MIT License - see `LICENSE` file for details.
 
