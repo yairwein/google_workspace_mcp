@@ -336,7 +336,7 @@ async def list_tasks(
         if not tasks:
             return f"No tasks found in task list {task_list_id} for {user_google_email}."
 
-        sort_tasks_by_position(tasks)
+        orphaned_subtasks = sort_tasks_by_position(tasks)
 
         response = f"Tasks in list {task_list_id} for {user_google_email}:\n"
         for task in tasks:
@@ -352,7 +352,10 @@ async def list_tasks(
             response += "\n"
 
         if next_page_token:
-            response += f"Next page token: {next_page_token}"
+            response += f"Next page token: {next_page_token}\n"
+        if orphaned_subtasks > 0:
+            response += "\n"
+            response += f"{orphaned_subtasks} orphaned subtasks could not be positioned due to missing parent information. They were listed at the end of the task list. Callers could avoid this problem if max_results is large enough to contain all tasks (subtasks and their parents) without paging.\n"
 
         logger.info(f"Found {len(tasks)} tasks in list {task_list_id} for {user_google_email}")
         return response
@@ -367,7 +370,7 @@ async def list_tasks(
         raise Exception(message)
 
 
-def sort_tasks_by_position(tasks: List[Dict[str, str]]) -> None:
+def sort_tasks_by_position(tasks: List[Dict[str, str]]) -> int:
     """
     Sort tasks to match the order in which they are displayed in the Google Tasks UI according to:
     1. parent: Subtasks should be listed immediately following their parent task.
@@ -380,7 +383,11 @@ def sort_tasks_by_position(tasks: List[Dict[str, str]]) -> None:
         task["id"]: task["position"] for task in tasks if task.get("parent") is None
     }
 
+    orphaned_subtasks = 0
+
     def get_sort_key(task: Dict[str, str]) -> Tuple[str, str]:
+        nonlocal orphaned_subtasks
+
         parent = task.get("parent")
         position = task["position"]
         if parent is None:
@@ -389,14 +396,18 @@ def sort_tasks_by_position(tasks: List[Dict[str, str]]) -> None:
             # Note that, due to paging, a subtask may have a parent with an unknown position
             # because the information about its parent will be in a future page. We will return
             # these orphaned subtasks at the end of the list, grouped by their parent task IDs.
-            # Callers could avoid this problem if maxResults is large enough to contain all tasks
-            # (subtasks and their parents).
-            parent_position = parent_positions.get(
-                parent, f"99999999999999999999_{parent}"
+            parent_position = parent_positions.get(parent)
+            if parent_position is None:
+                orphaned_subtasks += 1
+            parent_position_sort_key = (
+                f"99999999999999999999_{parent}"
+                if parent_position is None
+                else parent_position
             )
-            return (parent_position, position)
+            return (parent_position_sort_key, position)
 
     tasks.sort(key=get_sort_key)
+    return orphaned_subtasks
 
 
 @server.tool()
