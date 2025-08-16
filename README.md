@@ -39,13 +39,13 @@
 
 ### A quick plug for AI-Enhanced Docs
 <details>
-<summary>But why?</summary>
+<summary>🤖 <b>But why?</b></summary>
 
 **This README was written with AI assistance, and here's why that matters**
 >
 > As a solo dev building open source tools, comprehensive documentation often wouldn't happen without AI help. Using agentic dev tools like **Roo** & **Claude Code** that understand the entire codebase, AI doesn't just regurgitate generic content - it extracts real implementation details and creates accurate, specific documentation.
 >
-> In this case, Sonnet 4 took a pass & a human (me) verified them 8/9/25.
+> In this case, Sonnet 4 took a pass & a human (me) verified them 8/16/25.
 </details>
 
 ## Overview
@@ -56,24 +56,88 @@ A production-ready MCP server that integrates all major Google Workspace service
 
 ## Features
 
-- **🔐 Advanced OAuth 2.0 & OAuth 2.1**: Secure authentication with automatic token refresh, transport-aware callback handling, session management, centralized scope management, and OAuth 2.1 bearer token support for multi-user environments with innovative CORS proxy architecture
-- **📅 Google Calendar**: Full calendar management with event CRUD operations
-- **📁 Google Drive**: File operations with native Microsoft Office format support (.docx, .xlsx)
-- **📧 Gmail**: Complete email management with search, send, and draft capabilities
-- **📄 Google Docs**: Complete document management including content extraction, creation, full editing capabilities, and comment management
-- **📊 Google Sheets**: Comprehensive spreadsheet management with flexible cell operations and comment management
-- **🖼️ Google Slides**: Presentation management with slide creation, updates, content manipulation, and comment management
-- **📝 Google Forms**: Form creation, retrieval, publish settings, and response management
-- **✓ Google Tasks**: Complete task and task list management with hierarchy, due dates, and status tracking
-- **💬 Google Chat**: Space management and messaging capabilities
-- **🔍 Google Custom Search**: Programmable Search Engine (PSE) integration for custom web searches
-- **🔄 All Transports**: Stdio, Streamable HTTP & SSE, OpenAPI compatibility via `mcpo`
-- **⚡ High Performance**: Service caching, thread-safe sessions, FastMCP integration
-- **Developer Friendly**: Minimal boilerplate, automatic service injection, centralized configuration
+<table>
+<tr>
+<td width="50%" valign="top">
+
+**🔐 Authentication & Security**
+- Advanced OAuth 2.0 & OAuth 2.1 support
+- Automatic token refresh & session management
+- Transport-aware callback handling
+- Multi-user bearer token authentication
+- Innovative CORS proxy architecture
+
+**📧 Gmail** • **📁 Drive** • **📅 Calendar**
+- Complete email management (search, send, drafts)
+- File operations with Office format support
+- Full calendar management with CRUD operations
+
+**📄 Docs** • **📊 Sheets** • **🖼️ Slides**
+- Document creation, editing & comment management
+- Spreadsheet operations with flexible cell management
+- Presentation creation, updates & content manipulation
+
+</td>
+<td width="50%" valign="top">
+
+**📝 Forms** • **✓ Tasks** • **💬 Chat**
+- Form creation, publish settings & response management
+- Task & task list management with hierarchy
+- Space management & messaging capabilities
+
+**🔍 Custom Search** • **🔄 Transport Support**
+- Programmable Search Engine (PSE) integration
+- Stdio, Streamable HTTP & SSE support
+- OpenAPI compatibility via `mcpo`
+
+**⚡ Performance & Developer Experience**
+- Service caching with 30-minute TTL
+- Thread-safe sessions & FastMCP integration
+- Minimal boilerplate & automatic service injection
+- Centralized configuration management
+
+</td>
+</tr>
+</table>
 
 ---
 
 ## 🚀 Quick Start
+
+<details>
+<summary>📖 <b>Quick Reference Card</b> <sub><sup>← Essential commands & configs at a glance</sup></sub></summary>
+
+<table>
+<tr><td width="33%" valign="top">
+
+**🔑 Credentials**
+```bash
+export GOOGLE_OAUTH_CLIENT_ID="..."
+export GOOGLE_OAUTH_CLIENT_SECRET="..."
+```
+[Full setup →](#credential-configuration)
+
+</td><td width="33%" valign="top">
+
+**⚡ Launch Commands**
+```bash
+uvx workspace-mcp --tool-tier core
+uv run main.py --tools gmail drive
+```
+[More options →](#start-the-server)
+
+</td><td width="34%" valign="top">
+
+**🎯 Tool Tiers**
+- 🟢 `core` - Essential tools
+- 🟡 `extended` - Core + extras
+- 🔴 `complete` - Everything
+[Details →](#tool-tiers)
+
+</td></tr>
+</table>
+
+</details>
 
 ### 1. One-Click Claude Desktop Install (Recommended)
 
@@ -88,17 +152,30 @@ A production-ready MCP server that integrates all major Google Workspace service
 
 #### Required Configuration
 <details>
-<summary>Environment - you will configure these in Claude itself, see screenshot:</summary>
+<summary>⚙️ <b>Environment Variables</b> <sub><sup>← Click to configure in Claude Desktop</sup></sub></summary>
 
+<table>
+<tr><td width="50%" valign="top">
+
+**Required**
 | Variable | Purpose |
 |----------|---------|
-| `GOOGLE_OAUTH_CLIENT_ID` | OAuth client ID from Google Cloud (used by both legacy auth and OAuth 2.1) |
-| `GOOGLE_OAUTH_CLIENT_SECRET` | OAuth client secret (used by both legacy auth and OAuth 2.1) |
-| `USER_GOOGLE_EMAIL` *(optional)* | Default email for single-user auth |
-| `GOOGLE_PSE_API_KEY` *(optional)* | API key for Google Custom Search - see [Custom Search Setup](#google-custom-search-setup) |
-| `GOOGLE_PSE_ENGINE_ID` *(optional)* | Programmable Search Engine ID for Custom Search |
-| `MCP_ENABLE_OAUTH21` *(optional)* | Set to `true` to enable OAuth 2.1 support (requires streamable-http transport & will remove user_google_email from tool docstrings) |
+| `GOOGLE_OAUTH_CLIENT_ID` | OAuth client ID from Google Cloud |
+| `GOOGLE_OAUTH_CLIENT_SECRET` | OAuth client secret |
 | `OAUTHLIB_INSECURE_TRANSPORT=1` | Development only (allows `http://` redirect) |
+
+</td><td width="50%" valign="top">
+
+**Optional**
+| Variable | Purpose |
+|----------|---------|
+| `USER_GOOGLE_EMAIL` | Default email for single-user auth |
+| `GOOGLE_PSE_API_KEY` | API key for Custom Search |
+| `GOOGLE_PSE_ENGINE_ID` | Search Engine ID for Custom Search |
+| `MCP_ENABLE_OAUTH21` | Set to `true` for OAuth 2.1 support |
+
+</td></tr>
+</table>
 
 Claude Desktop stores these securely in the OS keychain; set them once in the extension pane.
 </details>
@@ -129,7 +206,7 @@ Claude Desktop stores these securely in the OS keychain; set them once in the ex
    - Search for & enable Calendar, Drive, Gmail, Docs, Sheets, Slides, Forms, Tasks, Chat
    - Expand the section below marked "API Enablement Links" for direct links to each!
 <details>
-  <summary>API Enablement Links</summary>
+  <summary>🔗 <b>Quick API Enable Links</b> <sub><sup>← One-click enable each Google API</sup></sub></summary>
   You can enable each one by clicking the links below (make sure you're logged into the Google Cloud Console and have the correct project selected):
 
 * [Enable Google Calendar API](https://console.cloud.google.com/flows/enableapi?apiid=calendar-json.googleapis.com)
@@ -145,123 +222,283 @@ Claude Desktop stores these securely in the OS keychain; set them once in the ex
 
 </details>
 
-1.1. **Credentials**:
-   - Configure credentials using one of these methods:
+1.1. **Credentials**: See [Credential Configuration](#credential-configuration) for detailed setup options
 
-     **Option A: Environment Variables (Recommended for Production)**
-     ```bash
-     export GOOGLE_OAUTH_CLIENT_ID="your-client-id.apps.googleusercontent.com"
-     export GOOGLE_OAUTH_CLIENT_SECRET="your-client-secret"
-     ```
+2. **Environment Configuration**:
 
-     **Option B: File-based (Traditional)**
-     - Download credentials as `client_secret.json` in project root
-     - To use a different location, set `GOOGLE_CLIENT_SECRET_PATH` (or legacy `GOOGLE_CLIENT_SECRETS`) environment variable with the file path
+<details open>
+<summary>🌍 <b>Environment Variables</b> <sub><sup>← Configure your runtime environment</sup></sub></summary>
 
-     **Option C: .env File (Recommended for Development)**
-     - Copy the provided `.env.oauth21` example file to `.env` in the project root:
-     ```bash
-     cp .env.oauth21 .env
-     ```
-     - Edit the `.env` file to add your `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET`.
-     - The server automatically loads variables from this file on startup, simplifying local development.
+<table>
+<tr>
+<td width="33%" align="center">
 
-   **Credential Loading Priority**:
-   The server loads credentials in the following order of precedence:
-   1. Manually set environment variables (e.g., `export VAR=value`).
-   2. Variables defined in a `.env` file in the project root.
-   3. `client_secret.json` file specified by `GOOGLE_CLIENT_SECRET_PATH`.
-   4. Default `client_secret.json` file in the project root.
+**🔧 Development Mode**
+```bash
+export OAUTHLIB_INSECURE_TRANSPORT=1
+```
+<sub>Allows HTTP redirect URIs</sub>
 
-   **Why Environment Variables?**
-   - ✅ Containerized deployments (Docker, Kubernetes)
-   - ✅ Cloud platforms (Heroku, Railway, etc.)
-   - ✅ CI/CD pipelines
-   - ✅ No secrets in version control
-   - ✅ Easy credential rotation
+</td>
+<td width="33%" align="center">
 
-2. **Environment**:
-   ```bash
-   export OAUTHLIB_INSECURE_TRANSPORT=1  # Development only
-   export USER_GOOGLE_EMAIL=your.email@gmail.com  # Optional: Default email for auth - use this for single user setups and you won't need to set your email in system prompt for magic auth
-   export GOOGLE_PSE_API_KEY=your-custom-search-api-key  # Optional: Only needed for Google Custom Search tools
-   export GOOGLE_PSE_ENGINE_ID=your-search-engine-id  # Optional: Only needed for Google Custom Search tools
-   ```
+**👤 Default User**
+```bash
+export USER_GOOGLE_EMAIL=\
+  your.email@gmail.com
+```
+<sub>Single-user authentication</sub>
+
+</td>
+<td width="34%" align="center">
+
+**🔍 Custom Search**
+```bash
+export GOOGLE_PSE_API_KEY=xxx
+export GOOGLE_PSE_ENGINE_ID=yyy
+```
+<sub>Optional: Search API setup</sub>
+
+</td>
+</tr>
+</table>
+
+</details>
 
 3. **Server Configuration**:
-   The server's base URL and port can be customized using environment variables:
-   - `WORKSPACE_MCP_BASE_URI`: Sets the base URI for the server (default: http://localhost). Note: do not include a port in `WORKSPACE_MCP_BASE_URI` - set that with the variable below.
-   - `WORKSPACE_MCP_PORT`: Sets the port the server listens on (default: 8000).
-   - `GOOGLE_OAUTH_REDIRECT_URI`: Override the OAuth redirect URI (useful for reverse proxy setups - see below).
-   - `USER_GOOGLE_EMAIL`: Optional default email for authentication flows. If set, the LLM won't need to specify your email when calling `start_google_auth`.
+
+<details open>
+<summary>⚙️ <b>Server Settings</b> <sub><sup>← Customize ports, URIs & proxies</sup></sub></summary>
+
+<table>
+<tr>
+<td width="33%" align="center">
+
+**🌐 Base Configuration**
+```bash
+export WORKSPACE_MCP_BASE_URI=\
+  http://localhost
+export WORKSPACE_MCP_PORT=8000
+```
+<sub>Server URL & port settings</sub>
+
+</td>
+<td width="33%" align="center">
+
+**🔀 Proxy Support**
+```bash
+export GOOGLE_OAUTH_REDIRECT_URI=\
+  https://your-domain.com/oauth2callback
+```
+<sub>For nginx/Apache proxies</sub>
+
+</td>
+<td width="34%" align="center">
+
+**📧 Default Email**
+```bash
+export USER_GOOGLE_EMAIL=\
+  your.email@gmail.com
+```
+<sub>Skip email in auth flows</sub>
+
+</td>
+</tr>
+</table>
+
+<details>
+<summary>📖 <b>Configuration Details</b> <sub><sup>← Learn more about each setting</sup></sub></summary>
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `WORKSPACE_MCP_BASE_URI` | Base server URI (no port) | `http://localhost` |
+| `WORKSPACE_MCP_PORT` | Server listening port | `8000` |
+| `GOOGLE_OAUTH_REDIRECT_URI` | Override OAuth callback URL | Auto-constructed |
+| `USER_GOOGLE_EMAIL` | Default auth email | None |
+
+</details>
+
+</details>
 
 ### Google Custom Search Setup
 
-To use the Google Custom Search tools, you need to:
+<details>
+<summary>🔍 <b>Custom Search Configuration</b> <sub><sup>← Enable web search capabilities</sup></sub></summary>
 
-1. **Create a Programmable Search Engine**:
-   - Go to [Programmable Search Engine Control Panel](https://programmablesearchengine.google.com/controlpanel/create)
-   - Configure sites to search (or search the entire web)
-   - Note your Search Engine ID (cx parameter)
+<table>
+<tr>
+<td width="33%" align="center">
 
-2. **Get an API Key**:
-   - Visit [Google Developers Console](https://developers.google.com/custom-search/v1/overview)
-   - Create or select a project
-   - Enable the Custom Search API
-   - Create credentials (API Key)
-   - Set the `GOOGLE_PSE_API_KEY` environment variable with your API key
+**1️⃣ Create Search Engine**
+```text
+programmablesearchengine.google.com
+/controlpanel/create
 
-3. **Configure Environment Variables**:
-   - Set `GOOGLE_PSE_API_KEY` to your Custom Search API key
-   - Set `GOOGLE_PSE_ENGINE_ID` to your Search Engine ID (the cx parameter from step 1)
+→ Configure sites or entire web
+→ Note your Engine ID (cx)
+```
+<sub>[Open Control Panel →](https://programmablesearchengine.google.com/controlpanel/create)</sub>
 
-For detailed setup instructions, see the [Custom Search JSON API documentation](https://developers.google.com/custom-search/v1/overview).
+</td>
+<td width="33%" align="center">
+
+**2️⃣ Get API Key**
+```text
+developers.google.com
+/custom-search/v1/overview
+
+→ Create/select project
+→ Enable Custom Search API
+→ Create credentials (API Key)
+```
+<sub>[Get API Key →](https://developers.google.com/custom-search/v1/overview)</sub>
+
+</td>
+<td width="34%" align="center">
+
+**3️⃣ Set Variables**
+```bash
+export GOOGLE_PSE_API_KEY=\
+  "your-api-key"
+export GOOGLE_PSE_ENGINE_ID=\
+  "your-engine-id"
+```
+<sub>Configure in environment</sub>
+
+</td>
+</tr>
+<tr>
+<td colspan="3">
+
+<details>
+<summary>📖 <b>Quick Setup Guide</b> <sub><sup>← Step-by-step instructions</sup></sub></summary>
+
+**Complete Setup Process:**
+
+1. **Create Search Engine** - Visit the [Control Panel](https://programmablesearchengine.google.com/controlpanel/create)
+   - Choose "Search the entire web" or specify sites
+   - Copy the Search Engine ID (looks like: `017643444788157684527:6ivsjbpxpqw`)
+
+2. **Enable API & Get Key** - Visit [Google Developers Console](https://console.cloud.google.com/)
+   - Enable "Custom Search API" in your project
+   - Create credentials → API Key
+   - Restrict key to Custom Search API (recommended)
+
+3. **Configure Environment** - Add to your shell or `.env`:
+   ```bash
+   export GOOGLE_PSE_API_KEY="AIzaSy..."
+   export GOOGLE_PSE_ENGINE_ID="01764344478..."
+   ```
+
+📚 [Full Documentation →](https://developers.google.com/custom-search/v1/overview)
+
+</details>
+
+</td>
+</tr>
+</table>
+
+</details>
 
 ### Start the Server
 
+<details open>
+<summary>💻 <b>Launch Commands</b> <sub><sup>← Choose your startup mode</sup></sub></summary>
+
+<table>
+<tr>
+<td width="33%" align="center">
+
+**🎯 Quick Start**
 ```bash
-# Default (stdio mode for MCP clients)
 uv run main.py
+```
+<sub>Default stdio mode</sub>
 
-# HTTP mode (for web interfaces and debugging)
-uv run main.py --transport streamable-http
+</td>
+<td width="33%" align="center">
 
-# Single-user mode (simplified authentication)
-uv run main.py --single-user
+**🌐 HTTP Mode**
+```bash
+uv run main.py \
+  --transport streamable-http
+```
+<sub>Web interfaces & debugging</sub>
 
-# Selective tool registration (only register specific tools)
-uv run main.py --tools gmail drive calendar tasks
+</td>
+<td width="34%" align="center">
+
+**👤 Single User**
+```bash
+uv run main.py \
+  --single-user
+```
+<sub>Simplified authentication</sub>
+
+</td>
+</tr>
+<tr>
+<td colspan="3">
+
+<details>
+<summary>⚙️ <b>Advanced Options</b> <sub><sup>← Tool selection, tiers & Docker</sup></sub></summary>
+
+**🎯 Selective Tool Loading**
+```bash
+# Load specific services only
+uv run main.py --tools gmail drive calendar
 uv run main.py --tools sheets docs
-uv run main.py --single-user --tools gmail  # Can combine with other flags
 
-# Tool tiers (load pre-configured tool sets by complexity level)
-uv run main.py --tool-tier core      # Essential tools only
-uv run main.py --tool-tier extended  # Core + additional functionality  
-uv run main.py --tool-tier complete  # All available tools including advanced features
-
-# Docker
-docker build -t workspace-mcp .
-docker run -p 8000:8000 -v $(pwd):/app workspace-mcp --transport streamable-http
+# Combine with other flags
+uv run main.py --single-user --tools gmail
 ```
 
-**Available Tools for `--tools` flag**: `gmail`, `drive`, `calendar`, `docs`, `sheets`, `forms`, `tasks`, `chat`, `search`
+**📊 Tool Tiers**
+```bash
+uv run main.py --tool-tier core      # 🟢 Essential tools only
+uv run main.py --tool-tier extended  # 🟡 Core + additional
+uv run main.py --tool-tier complete  # 🔴 All available tools
+```
+
+**🐳 Docker Deployment**
+```bash
+docker build -t workspace-mcp .
+docker run -p 8000:8000 -v $(pwd):/app \
+  workspace-mcp --transport streamable-http
+```
+
+**Available Services**: `gmail` • `drive` • `calendar` • `docs` • `sheets` • `forms` • `tasks` • `chat` • `search`
+
+</details>
+
+</td>
+</tr>
+</table>
+
+</details>
 
 ### Tool Tiers
 
-The server supports **tool tiers** for simplified deployment and usage patterns. Instead of manually selecting individual tools, you can specify a tier level that automatically loads the appropriate tool set:
+<table>
+<tr><td width="40%" valign="top">
+
+**Overview**
+The server supports **tool tiers** for simplified deployment and usage patterns. Instead of manually selecting individual tools, you can specify a tier level that automatically loads the appropriate tool set.
 
 | Tier | Description | Use Case |
 |------|-------------|----------|
-| `core` | Essential tools for basic functionality | Light usage, minimal API quotas, getting started |
-| `extended` | Core tools + additional features | Regular usage, expanded capabilities |
-| `complete` | All available tools including advanced features | Power users, full API access |
+| 🟢 `core` | Essential tools for basic functionality | Light usage, minimal API quotas, getting started |
+| 🟡 `extended` | Core tools + additional features | Regular usage, expanded capabilities |
+| 🔴 `complete` | All available tools including advanced features | Power users, full API access |
 
-**Usage Examples:**
+</td><td width="60%" valign="top">
+
+**Usage Examples**
 ```bash
 # Load only essential tools (minimal API usage)
 uv run main.py --tool-tier core
 
-# Load core + extended functionality 
+# Load core + extended functionality
 uv run main.py --tool-tier extended
 
 # Load everything (maximum functionality)
@@ -275,10 +512,13 @@ uv run main.py --tools gmail drive --tool-tier core
 ```
 
 **Important Notes:**
-- Tool tiers can be combined with service selection: `--tools gmail --tool-tier core` loads only Gmail's core tools
+- Tool tiers can be combined with service selection
 - Tier configuration is defined in `core/tool_tiers.yaml`
-- Each service (Gmail, Drive, etc.) can have different tools in each tier
-- All tiers include necessary authentication and scope management automatically
+- Each service can have different tools in each tier
+- All tiers include necessary authentication automatically
+
+</td></tr>
+</table>
 
 ### OAuth 2.1 Support (Multi-User Bearer Token Authentication)
 
@@ -303,7 +543,7 @@ uv run main.py --transport streamable-http
 If `MCP_ENABLE_OAUTH21` is not set to `true`, the server will use legacy authentication, which is suitable for clients that do not support OAuth 2.1.
 
 <details>
-<summary><b>Innovative CORS Proxy Architecture</b></summary>
+<summary>🔐 <b>Innovative CORS Proxy Architecture</b> <sub><sup>← Advanced OAuth 2.1 details</sup></sub></summary>
 
 This implementation solves two critical challenges when using Google OAuth in browser environments:
 
@@ -324,7 +564,9 @@ This architecture enables any OAuth 2.1 compliant client to authenticate users t
 **Claude Code Inspector**: No additional configuration needed with desktop OAuth client.
 
 ### VS Code MCP Client Support
-**VS Code mcp.json Configuration Example**:
+
+<details>
+<summary>🆚 <b>VS Code Configuration</b> <sub><sup>← Setup for VS Code MCP extension</sup></sub></summary>
 
 ```json
 {
@@ -336,6 +578,7 @@ This architecture enables any OAuth 2.1 compliant client to authenticate users t
     }
 }
 ```
+</details>
 
 ### Connect to Claude Desktop
 
@@ -347,25 +590,31 @@ In general, you should use the one-click DXT installer package for Claude Deskto
 If you are unable to for some reason, you can configure it manually via `claude_desktop_config.json`
 
 **Manual Claude Configuration (Alternative)**
+
+<details>
+<summary>📝 <b>Claude Desktop JSON Config</b> <sub><sup>← Click for manual setup instructions</sup></sub></summary>
+
 1. Open Claude Desktop Settings → Developer → Edit Config
-   1. **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-   2. **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+   - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+   - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+
 2. Add the server configuration:
-   ```json
-   {
-     "mcpServers": {
-       "google_workspace": {
-         "command": "uvx",
-         "args": ["workspace-mcp"],
-         "env": {
-           "GOOGLE_OAUTH_CLIENT_ID": "your-client-id.apps.googleusercontent.com",
-           "GOOGLE_OAUTH_CLIENT_SECRET": "your-client-secret",
-           "OAUTHLIB_INSECURE_TRANSPORT": "1"
-         }
-       }
-     }
-   }
-   ```
+```json
+{
+  "mcpServers": {
+    "google_workspace": {
+      "command": "uvx",
+      "args": ["workspace-mcp"],
+      "env": {
+        "GOOGLE_OAUTH_CLIENT_ID": "your-client-id",
+        "GOOGLE_OAUTH_CLIENT_SECRET": "your-secret",
+        "OAUTHLIB_INSECURE_TRANSPORT": "1"
+      }
+    }
+  }
+}
+```
+</details>
 
 ### 2. Advanced / Cross-Platform Installation
 
@@ -373,14 +622,18 @@ If you’re developing, deploying to servers, or using another MCP-capable clien
 
 #### Instant CLI (uvx)
 
+<details open>
+<summary>⚡ <b>Quick Start with uvx</b> <sub><sup>← No installation required!</sup></sub></summary>
+
 ```bash
 # Requires Python 3.10+ and uvx
-export GOOGLE_OAUTH_CLIENT_ID="xxx"
-export GOOGLE_OAUTH_CLIENT_SECRET="yyy"
+# First, set credentials (see Credential Configuration above)
 uvx workspace-mcp --tool-tier core  # or --tools gmail drive calendar
 ```
 
-> Run instantly without manual installation - you must configure OAuth credentials when using uvx. You can use either environment variables (recommended for production) or set the `GOOGLE_CLIENT_SECRET_PATH` (or legacy `GOOGLE_CLIENT_SECRETS`) environment variable to point to your `client_secret.json` file.
+> **Note**: Configure [OAuth credentials](#credential-configuration) before running. Supports environment variables, `.env` file, or `client_secret.json`.
+
+</details>
 
 #### Reverse Proxy Setup
 
@@ -407,10 +660,11 @@ export GOOGLE_OAUTH_REDIRECT_URI="https://your-domain.com:8443/oauth2callback"
 - The server will use this value for all OAuth flows instead of constructing it from `WORKSPACE_MCP_BASE_URI` and `WORKSPACE_MCP_PORT`
 - Your reverse proxy must forward `/oauth2callback` requests to the MCP server
 
+<details>
+<summary>🚀 <b>Advanced uvx Commands</b> <sub><sup>← More startup options</sup></sub></summary>
+
 ```bash
-# Set OAuth credentials via environment variables (recommended)
-export GOOGLE_OAUTH_CLIENT_ID="your-client-id.apps.googleusercontent.com"
-export GOOGLE_OAUTH_CLIENT_SECRET="your-client-secret"
+# Configure credentials first (see Credential Configuration section)
 
 # Start with specific tools only
 uvx workspace-mcp --tools gmail drive calendar tasks
@@ -423,6 +677,7 @@ uvx workspace-mcp --tool-tier complete  # All tools
 # Start in HTTP mode for debugging
 uvx workspace-mcp --transport streamable-http
 ```
+</details>
 
 *Requires Python 3.10+ and [uvx](https://github.com/astral-sh/uv). The package is available on [PyPI](https://pypi.org/project/workspace-mcp).*
 
@@ -437,6 +692,10 @@ uv run main.py
 ```
 
 **Development Installation (For Contributors)**:
+
+<details>
+<summary>🔧 <b>Developer Setup JSON</b> <sub><sup>← For contributors & customization</sup></sub></summary>
+
 ```json
 {
   "mcpServers": {
@@ -449,14 +708,15 @@ uv run main.py
         "main.py"
       ],
       "env": {
-        "GOOGLE_OAUTH_CLIENT_ID": "your-client-id.apps.googleusercontent.com",
-        "GOOGLE_OAUTH_CLIENT_SECRET": "your-client-secret",
+        "GOOGLE_OAUTH_CLIENT_ID": "your-client-id",
+        "GOOGLE_OAUTH_CLIENT_SECRET": "your-secret",
         "OAUTHLIB_INSECURE_TRANSPORT": "1"
       }
     }
   }
 }
 ```
+</details>
 
 #### HTTP Mode (For debugging or web interfaces)
 If you need to use HTTP mode with Claude Desktop:
@@ -491,131 +751,211 @@ When calling a tool:
 
 ---
 
+## 📋 Credential Configuration
+
+<details open>
+<summary>🔑 <b>OAuth Credentials Setup</b> <sub><sup>← Essential for all installations</sup></sub></summary>
+
+<table>
+<tr>
+<td width="33%" align="center">
+
+**🚀 Environment Variables**
+```bash
+export GOOGLE_OAUTH_CLIENT_ID=\
+  "your-client-id"
+export GOOGLE_OAUTH_CLIENT_SECRET=\
+  "your-secret"
+```
+<sub>Best for production</sub>
+
+</td>
+<td width="33%" align="center">
+
+**📁 File-based**
+```bash
+# Download & place in project root
+client_secret.json
+
+# Or specify custom path
+export GOOGLE_CLIENT_SECRET_PATH=\
+  /path/to/secret.json
+```
+<sub>Traditional method</sub>
+
+</td>
+<td width="34%" align="center">
+
+**⚡ .env File**
+```bash
+cp .env.oauth21 .env
+# Edit .env with credentials
+```
+<sub>Best for development</sub>
+
+</td>
+</tr>
+<tr>
+<td colspan="3">
+
+<details>
+<summary>📖 <b>Credential Loading Details</b> <sub><sup>← Understanding priority & best practices</sup></sub></summary>
+
+**Loading Priority**
+1. Environment variables (`export VAR=value`)
+2. `.env` file in project root
+3. `client_secret.json` via `GOOGLE_CLIENT_SECRET_PATH`
+4. Default `client_secret.json` in project root
+
+**Why Environment Variables?**
+- ✅ **Docker/K8s ready** - Native container support
+- ✅ **Cloud platforms** - Heroku, Railway, Vercel
+- ✅ **CI/CD pipelines** - GitHub Actions, Jenkins
+- ✅ **No secrets in git** - Keep credentials secure
+- ✅ **Easy rotation** - Update without code changes
+
+</details>
+
+</td>
+</tr>
+</table>
+
+</details>
+
+---
+
 ## 🧰 Available Tools
 
 > **Note**: All tools support automatic authentication via `@require_google_service()` decorators with 30-minute service caching.
 
-### 📅 Google Calendar ([`calendar_tools.py`](gcalendar/calendar_tools.py))
+<table>
+<tr>
+<td width="50%" valign="top">
 
-| Tool | Description |
-|------|-------------|
-| `list_calendars` | List accessible calendars |
-| `get_events` | Retrieve events with time range filtering |
-| `get_event` | Fetch detailed information of a single event by ID |
-| `create_event` | Create events (all-day or timed) with optional Drive file attachments and custom reminders |
-| `modify_event` | Update existing events with intelligent reminder handling |
-| `delete_event` | Remove events |
+### 📧 Gmail • [`gmail_tools.py`](gmail/gmail_tools.py)
+| Tool | Tier |
+|------|------|
+| **Core Tools** | |
+| `search_gmail_messages` | 🟢 Core |
+| `get_gmail_message_content` | 🟢 Core |
+| `get_gmail_messages_content_batch` | 🟢 Core |
+| `send_gmail_message` | 🟢 Core |
+| **Extended Tools** | |
+| `get_gmail_thread_content` | 🟡 Extended |
+| `modify_gmail_message_labels` | 🟡 Extended |
+| `list_gmail_labels` | 🟡 Extended |
+| `manage_gmail_label` | 🟡 Extended |
+| `draft_gmail_message` | 🟡 Extended |
+| **Complete Tools** | |
+| `get_gmail_threads_content_batch` | 🔴 Complete |
+| `batch_modify_gmail_message_labels` | 🔴 Complete |
 
-### 📁 Google Drive ([`drive_tools.py`](gdrive/drive_tools.py))
+### 📁 Drive • [`drive_tools.py`](gdrive/drive_tools.py)
+| Tool | Tier |
+|------|------|
+| **Core Tools** | |
+| `search_drive_files` | 🟢 Core |
+| `get_drive_file_content` | 🟢 Core |
+| `create_drive_file` | 🟢 Core |
+| **Extended Tools** | |
+| `list_drive_items` | 🟡 Extended |
 
-| Tool | Description |
-|------|-------------|
-| `search_drive_files` | Search files with query syntax |
-| `get_drive_file_content` | Read file content (supports Office formats) |
-| `list_drive_items` | List folder contents |
-| `create_drive_file` | Create new files or fetch content from public URLs |
+### 📅 Calendar • [`calendar_tools.py`](gcalendar/calendar_tools.py)
+| Tool | Tier |
+|------|------|
+| **Core Tools** | |
+| `list_calendars` | 🟢 Core |
+| `get_events` | 🟢 Core |
+| `create_event` | 🟢 Core |
+| `modify_event` | 🟢 Core |
+| **Extended Tools** | |
+| `delete_event` | 🟡 Extended |
 
-### 📧 Gmail ([`gmail_tools.py`](gmail/gmail_tools.py))
+### 💬 Chat • [`chat_tools.py`](gchat/chat_tools.py)
+| Tool | Tier |
+|------|------|
+| **Core Tools** | |
+| `send_message` | 🟢 Core |
+| `get_messages` | 🟢 Core |
+| `search_messages` | 🟢 Core |
+| **Extended Tools** | |
+| `list_spaces` | 🟡 Extended |
 
-| Tool | Description |
-|------|-------------|
-| `search_gmail_messages` | Search with Gmail operators |
-| `get_gmail_message_content` | Retrieve message content |
-| `send_gmail_message` | Send emails |
-| `draft_gmail_message` | Create drafts |
+</td>
+<td width="50%" valign="top">
 
-### 📝 Google Docs ([`docs_tools.py`](gdocs/docs_tools.py))
+### 📝 Docs • [`docs_tools.py`](gdocs/docs_tools.py)
+| Tool | Tier |
+|------|------|
+| **Core Tools** | |
+| `get_doc_content` | 🟢 Core |
+| `create_doc` | 🟢 Core |
+| `modify_doc_text` | 🟢 Core |
+| **Extended Tools** | |
+| `search_docs` | 🟡 Extended |
+| `find_and_replace_doc` | 🟡 Extended |
+| `list_docs_in_folder` | 🟡 Extended |
+| `insert_doc_elements` | 🟡 Extended |
+| **Complete Tools** | |
+| `insert_doc_image` | 🔴 Complete |
+| `update_doc_headers_footers` | 🔴 Complete |
+| `batch_update_doc` | 🔴 Complete |
+| `inspect_doc_structure` | 🔴 Complete |
+| `create_table_with_data` | 🔴 Complete |
+| `read_document_comments` | 🔴 Complete |
+| `create_document_comment` | 🔴 Complete |
+| `reply_to_document_comment` | 🔴 Complete |
+| `resolve_document_comment` | 🔴 Complete |
 
-| Tool | Description |
-|------|-------------|
-| `search_docs` | Find documents by name |
-| `get_doc_content` | Extract document text |
-| `list_docs_in_folder` | List docs in folder |
-| `create_doc` | Create new documents |
-| `update_doc_text` | Insert or replace text at specific positions |
-| `find_and_replace_doc` | Find and replace text throughout document |
-| `format_doc_text` | Apply text formatting (bold, italic, underline, fonts) |
-| `insert_doc_elements` | Add tables, lists, or page breaks |
-| `insert_doc_image` | Insert images from Drive or URLs |
-| `update_doc_headers_footers` | Modify document headers and footers |
-| `batch_update_doc` | Execute multiple document operations atomically |
-| `read_doc_comments` | Read all comments and replies |
-| `create_doc_comment` | Create new comments |
-| `reply_to_comment` | Reply to existing comments |
-| `resolve_comment` | Resolve comments |
+### 📊 Sheets • [`sheets_tools.py`](gsheets/sheets_tools.py)
+| Tool | Tier |
+|------|------|
+| **Core Tools** | |
+| `create_spreadsheet` | 🟢 Core |
+| `read_sheet_values` | 🟢 Core |
+| `modify_sheet_values` | 🟢 Core |
+| **Extended Tools** | |
+| `list_spreadsheets` | 🟡 Extended |
+| `get_spreadsheet_info` | 🟡 Extended |
+| **Complete Tools** | |
+| `create_sheet` | 🔴 Complete |
+| `read_spreadsheet_comments` | 🔴 Complete |
+| `create_spreadsheet_comment` | 🔴 Complete |
+| `reply_to_spreadsheet_comment` | 🔴 Complete |
+| `resolve_spreadsheet_comment` | 🔴 Complete |
 
-### 📊 Google Sheets ([`sheets_tools.py`](gsheets/sheets_tools.py))
+</td>
+</tr>
+<tr>
+<td colspan="2" valign="top">
 
-| Tool | Description |
-|------|-------------|
-| `list_spreadsheets` | List accessible spreadsheets |
-| `get_spreadsheet_info` | Get spreadsheet metadata |
-| `read_sheet_values` | Read cell ranges |
-| `modify_sheet_values` | Write/update/clear cells |
-| `create_spreadsheet` | Create new spreadsheets |
-| `create_sheet` | Add sheets to existing files |
-| `read_sheet_comments` | Read all comments and replies |
-| `create_sheet_comment` | Create new comments |
-| `reply_to_sheet_comment` | Reply to existing comments |
-| `resolve_sheet_comment` | Resolve comments |
+### 🖼️ Slides • [`slides_tools.py`](gslides/slides_tools.py) | ✓ Tasks • [`tasks_tools.py`](gtasks/tasks_tools.py) | 📝 Forms • [`forms_tools.py`](gforms/forms_tools.py) | 🔍 Search • [`search_tools.py`](gsearch/search_tools.py)
+| Slides | Tier | Tasks | Tier | Forms | Tier | Search | Tier |
+|--------|------|-------|------|-------|------|--------|------|
+| **Core Tools** | | **Core Tools** | | **Core Tools** | | **Core Tools** | |
+| `create_presentation` | 🟢 | `get_task` | 🟢 | `create_form` | 🟢 | `search_custom` | 🟢 |
+| `get_presentation` | 🟢 | `list_tasks` | 🟢 | `get_form` | 🟢 | **Extended Tools** | |
+| **Extended Tools** | | `create_task` | 🟢 | **Extended Tools** | | `search_custom_siterestrict` | 🟡 |
+| `batch_update_presentation` | 🟡 | `update_task` | 🟢 | `list_form_responses` | 🟡 | **Complete Tools** | |
+| `get_page` | 🟡 | **Extended Tools** | | **Complete Tools** | | `get_search_engine_info` | 🔴 |
+| `get_page_thumbnail` | 🟡 | `delete_task` | 🟡 | `set_publish_settings` | 🔴 | | |
+| **Complete Tools** | | **Complete Tools** | | `get_form_response` | 🔴 | | |
+| `read_presentation_comments` | 🔴 | `list_task_lists` | 🔴 | | | | |
+| `create_presentation_comment` | 🔴 | `get_task_list` | 🔴 | | | | |
+| `reply_to_presentation_comment` | 🔴 | `create_task_list` | 🔴 | | | | |
+| `resolve_presentation_comment` | 🔴 | `update_task_list` | 🔴 | | | | |
+| | | `delete_task_list` | 🔴 | | | | |
+| | | `move_task` | 🔴 | | | | |
+| | | `clear_completed_tasks` | 🔴 | | | | |
 
-### 🖼️ Google Slides ([`slides_tools.py`](gslides/slides_tools.py))
+</td>
+</tr>
+</table>
 
-| Tool | Description |
-|------|-------------|
-| `create_presentation` | Create new presentations |
-| `get_presentation` | Retrieve presentation details |
-| `batch_update_presentation` | Apply multiple updates at once |
-| `get_page` | Get specific slide information |
-| `get_page_thumbnail` | Generate slide thumbnails |
-| `read_presentation_comments` | Read all comments and replies |
-| `create_presentation_comment` | Create new comments |
-| `reply_to_presentation_comment` | Reply to existing comments |
-| `resolve_presentation_comment` | Resolve comments |
-
-### 📝 Google Forms ([`forms_tools.py`](gforms/forms_tools.py))
-
-| Tool | Description |
-|------|-------------|
-| `create_form` | Create new forms with title and description |
-| `get_form` | Retrieve form details, questions, and URLs |
-| `set_publish_settings` | Configure form template and authentication settings |
-| `get_form_response` | Get individual form response details |
-| `list_form_responses` | List all responses to a form with pagination |
-
-### ✓ Google Tasks ([`tasks_tools.py`](gtasks/tasks_tools.py))
-
-| Tool | Description |
-|------|-------------|
-| `list_task_lists` | List all task lists with pagination support |
-| `get_task_list` | Retrieve details of a specific task list |
-| `create_task_list` | Create new task lists with custom titles |
-| `update_task_list` | Modify existing task list titles |
-| `delete_task_list` | Remove task lists and all contained tasks |
-| `list_tasks` | List tasks in a specific list with filtering options |
-| `get_task` | Retrieve detailed information about a specific task |
-| `create_task` | Create new tasks with title, notes, due dates, and hierarchy |
-| `update_task` | Modify task properties including title, notes, status, and due dates |
-| `delete_task` | Remove tasks from task lists |
-| `move_task` | Reposition tasks within lists or move between lists |
-| `clear_completed_tasks` | Hide all completed tasks from a list |
-
-### 💬 Google Chat ([`chat_tools.py`](gchat/chat_tools.py))
-
-| Tool | Description |
-|------|-------------|
-| `list_spaces` | List chat spaces/rooms |
-| `get_messages` | Retrieve space messages |
-| `send_message` | Send messages to spaces |
-| `search_messages` | Search across chat history |
-
-### 🔍 Google Custom Search ([`search_tools.py`](gsearch/search_tools.py))
-
-| Tool | Description |
-|------|-------------|
-| `search_custom` | Perform web searches using Programmable Search Engine |
-| `get_search_engine_info` | Retrieve search engine metadata and configuration |
-| `search_custom_siterestrict` | Search within specific sites/domains |
+**Tool Tier Legend:**
+- 🟢 **Core**: Essential tools for basic functionality • Minimal API usage • Getting started
+- 🟡 **Extended**: Core tools + additional features • Regular usage • Expanded capabilities
+- 🔴 **Complete**: All available tools including advanced features • Power users • Full API access
 
 ---
 
@@ -668,20 +1008,25 @@ async def your_new_tool(service, param1: str, param2: int = 10):
 
 ## 🌐 Integration with Open WebUI
 
-To use this server as a tool provider within Open WebUI:
+<details open>
+<summary>🔌 <b>Open WebUI Integration</b> <sub><sup>← Connect to Open WebUI as tool provider</sup></sub></summary>
 
-### Instant Start (No Config Needed)
-Just copy and paste the below, set your values and you're off!
+<table>
+<tr><td width="50%" valign="top">
+
+### ⚡ Instant Start (No Config)
 ```bash
-GOOGLE_OAUTH_CLIENT_ID="your_client_id" GOOGLE_OAUTH_CLIENT_SECRET="your_client_secret" uvx mcpo --port 8000 --api-key "top-secret" -- uvx workspace-mcp
+# Set credentials & launch in one command
+GOOGLE_OAUTH_CLIENT_ID="your_id" \
+GOOGLE_OAUTH_CLIENT_SECRET="your_secret" \
+uvx mcpo --port 8000 --api-key "secret" \
+-- uvx workspace-mcp
 ```
 
-Otherwise:
+</td><td width="50%" valign="top">
 
-### 1. Create MCPO Configuration
-
-Create a file named `config.json` with the following structure to have `mcpo` make the streamable HTTP endpoint available as an OpenAPI spec tool:
-
+### 🔧 Manual Configuration
+1. Create `config.json`:
 ```json
 {
   "mcpServers": {
@@ -693,24 +1038,22 @@ Create a file named `config.json` with the following structure to have `mcpo` ma
 }
 ```
 
-### 2. Start the MCPO Server
-
+2. Start MCPO:
 ```bash
-mcpo --port 8001 --config config.json --api-key "your-optional-secret-key"
+mcpo --port 8001 --config config.json
 ```
 
-This command starts the `mcpo` proxy, serving your active (assuming port 8000) Google Workspace MCP on port 8001.
+</td></tr>
+</table>
 
-### 3. Configure Open WebUI
+### 📝 Configure Open WebUI
+1. Navigate to **Settings** → **Connections** → **Tools**
+2. Click **Add Tool** and enter:
+   - **Server URL**: `http://localhost:8001/google_workspace`
+   - **API Key**: Your mcpo `--api-key` (if set)
+3. Save - Google Workspace tools are now available!
 
-1. Navigate to your Open WebUI settings
-2. Go to **"Connections"** → **"Tools"**
-3. Click **"Add Tool"**
-4. Enter the **Server URL**: `http://localhost:8001/google_workspace` (matching the mcpo base URL and server name from config.json)
-5. If you used an `--api-key` with mcpo, enter it as the **API Key**
-6. Save the configuration
-
-The Google Workspace tools should now be available when interacting with models in Open WebUI.
+</details>
 
 ---
 
