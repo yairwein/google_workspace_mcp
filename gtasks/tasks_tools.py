@@ -6,7 +6,7 @@ This module provides MCP tools for interacting with Google Tasks API.
 
 import logging
 import asyncio
-from typing import Optional
+from typing import Dict, List, Optional, Tuple
 
 from googleapiclient.errors import HttpError
 
@@ -336,6 +336,8 @@ async def list_tasks(
         if not tasks:
             return f"No tasks found in task list {task_list_id} for {user_google_email}."
 
+        sort_tasks_by_position(tasks)
+
         response = f"Tasks in list {task_list_id} for {user_google_email}:\n"
         for task in tasks:
             response += f"- {task.get('title', 'Untitled')} (ID: {task['id']})\n"
@@ -363,6 +365,38 @@ async def list_tasks(
         message = f"Unexpected error: {e}."
         logger.exception(message)
         raise Exception(message)
+
+
+def sort_tasks_by_position(tasks: List[Dict[str, str]]) -> None:
+    """
+    Sort tasks to match the order in which they are displayed in the Google Tasks UI according to:
+    1. parent: Subtasks should be listed immediately following their parent task.
+    2. position: The position field determines the order of tasks at the same level.
+
+    Args:
+        tasks (list): List of task dictionaries to sort.
+    """
+    parent_positions = {
+        task["id"]: task["position"] for task in tasks if task.get("parent") is None
+    }
+
+    def get_sort_key(task: Dict[str, str]) -> Tuple[str, str]:
+        parent = task.get("parent")
+        position = task["position"]
+        if parent is None:
+            return (task["position"], "")
+        else:
+            # Note that, due to paging, a subtask may have a parent with an unknown position
+            # because the information about its parent will be in a future page. We will return
+            # these orphaned subtasks at the end of the list, grouped by their parent task IDs.
+            # Callers could avoid this problem if maxResults is large enough to contain all tasks
+            # (subtasks and their parents).
+            parent_position = parent_positions.get(
+                parent, f"99999999999999999999_{parent}"
+            )
+            return (parent_position, position)
+
+    tasks.sort(key=get_sort_key)
 
 
 @server.tool()
