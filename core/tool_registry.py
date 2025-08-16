@@ -6,8 +6,7 @@ based on tier configuration, replacing direct @server.tool() decorators.
 """
 
 import logging
-from typing import Set, Optional, Dict, Any, Callable
-from functools import wraps
+from typing import Set, Optional, Callable
 
 logger = logging.getLogger(__name__)
 

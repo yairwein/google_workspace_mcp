@@ -1,6 +1,6 @@
 <div align="center">
 
-# Google Workspace MCP Server <img src="https://github.com/user-attachments/assets/b89524e4-6e6e-49e6-ba77-00d6df0c6e5c" width="80" align="right" />
+# <span style="color:#cad8d9">Google Workspace MCP Server</span> <img src="https://github.com/user-attachments/assets/b89524e4-6e6e-49e6-ba77-00d6df0c6e5c" width="80" align="right" />
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
@@ -48,31 +48,31 @@
 > In this case, Sonnet 4 took a pass & a human (me) verified them 8/16/25.
 </details>
 
-## Overview
+## <span style="color:#adbcbc">Overview</span>
 
 A production-ready MCP server that integrates all major Google Workspace services with AI assistants. It supports both single-user operation and multi-user authentication via OAuth 2.1, making it a powerful backend for custom applications. Built with FastMCP for optimal performance, featuring advanced authentication handling, service caching, and streamlined development patterns.
 
 **Simplified Setup**: Now uses Google Desktop OAuth clients - no redirect URIs or port configuration needed!
 
-## Features
+## <span style="color:#adbcbc">Features</span>
 
 <table>
 <tr>
 <td width="50%" valign="top">
 
-**⊠ Authentication & Security**
+**<span style="color:#72898f">⊠</span> Authentication & Security**
 - Advanced OAuth 2.0 & OAuth 2.1 support
 - Automatic token refresh & session management
 - Transport-aware callback handling
 - Multi-user bearer token authentication
 - Innovative CORS proxy architecture
 
-**@ Gmail** • **≡ Drive** • **⧖ Calendar**
+**<span style="color:#72898f">@</span> Gmail** • **<span style="color:#72898f">≡</span> Drive** • **<span style="color:#72898f">⧖</span> Calendar**
 - Complete email management (search, send, drafts)
 - File operations with Office format support
 - Full calendar management with CRUD operations
 
-**≡ Docs** • **≡ Sheets** • **≡ Slides**
+**<span style="color:#72898f">≡</span> Docs** • **<span style="color:#72898f">≡</span> Sheets** • **<span style="color:#72898f">≡</span> Slides**
 - Document creation, editing & comment management
 - Spreadsheet operations with flexible cell management
 - Presentation creation, updates & content manipulation
@@ -80,17 +80,17 @@ A production-ready MCP server that integrates all major Google Workspace service
 </td>
 <td width="50%" valign="top">
 
-**≡ Forms** • **✓ Tasks** • **@ Chat**
+**<span style="color:#72898f">≡</span> Forms** • **<span style="color:#72898f">✓</span> Tasks** • **<span style="color:#72898f">@</span> Chat**
 - Form creation, publish settings & response management
 - Task & task list management with hierarchy
 - Space management & messaging capabilities
 
-**◆ Custom Search** • **↻ Transport Support**
+**<span style="color:#72898f">◆</span> Custom Search** • **<span style="color:#72898f">↻</span> Transport Support**
 - Programmable Search Engine (PSE) integration
 - Stdio, Streamable HTTP & SSE support
 - OpenAPI compatibility via `mcpo`
 
-**▶ Performance & Developer Experience**
+**<span style="color:#72898f">▶</span> Performance & Developer Experience**
 - Service caching with 30-minute TTL
 - Thread-safe sessions & FastMCP integration
 - Minimal boilerplate & automatic service injection

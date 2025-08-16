@@ -5,7 +5,6 @@ This module provides functionality to load and resolve tool tiers from the YAML 
 It integrates with the existing tool enablement workflow to support tiered tool loading.
 """
 
-import os
 import logging
 from pathlib import Path
 from typing import Dict, List, Set, Literal, Optional
