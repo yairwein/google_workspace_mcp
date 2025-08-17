@@ -24,8 +24,7 @@ drive:
     - create_drive_file
   extended:
     - list_drive_items
-  complete:
-    - []
+  complete: []
 
 calendar:
   core:
@@ -35,8 +34,7 @@ calendar:
     - modify_event
   extended:
     - delete_event
-  complete:
-    - []
+  complete: []
 
 docs:
   core:
@@ -82,8 +80,7 @@ chat:
     - search_messages
   extended:
     - list_spaces
-  complete:
-    - []
+  complete: []
 
 forms:
   core:

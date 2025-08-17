@@ -283,7 +283,7 @@ async def get_events(
         else:
             return f"No events found in calendar '{calendar_id}' for {user_google_email} for the specified time range."
 
-    # Handle single event with detailed output (like the old get_event function)
+    # Handle returning detailed output for a single event when requested
     if event_id and detailed:
         item = items[0]
         summary = item.get("summary", "No Title")
