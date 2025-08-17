@@ -483,50 +483,47 @@ The server organizes tools into **three progressive tiers** for simplified deplo
 
 <table>
 <tr>
-<td width="50%" valign="top">
+<td width="65%" valign="top">
 
 #### <span style="color:#72898f">Available Tiers</span>
 
-**<span style="color:#2d5b69">●</span> Core** (`--tool-tier core`)
+**<span style="color:#2d5b69">●</span> Core** (`--tool-tier core`)  
 Essential tools for everyday tasks. Perfect for light usage with minimal API quotas. Includes search, read, create, and basic modify operations across all services.
 
-**<span style="color:#72898f">●</span> Extended** (`--tool-tier extended`)
+**<span style="color:#72898f">●</span> Extended** (`--tool-tier extended`)  
 Core functionality plus management tools. Adds labels, folders, batch operations, and advanced search. Ideal for regular usage with moderate API needs.
 
-**<span style="color:#adbcbc">●</span> Complete** (`--tool-tier complete`)
+**<span style="color:#adbcbc">●</span> Complete** (`--tool-tier complete`)  
 Full API access including comments, headers/footers, publishing settings, and administrative functions. For power users needing maximum functionality.
 
 </td>
-<td width="50%" valign="top">
+<td width="35%" valign="top">
 
-#### <span style="color:#72898f">Quick Start</span>
+#### <span style="color:#72898f">Important Notes</span>
 
-```bash
-# Start with essential tools only
-uv run main.py --tool-tier core
-
-# Expand to include management features
-uv run main.py --tool-tier extended
-
-# Enable all available functionality
-uv run main.py --tool-tier complete
-```
-
-#### <span style="color:#72898f">Selective Loading</span>
-
-```bash
-# Combine tiers with specific services
-uv run main.py --tools gmail drive --tool-tier core
-
-# Ultra-minimal: single service, core tools
-uv run main.py --tools gmail --tool-tier core
-```
+<span style="color:#72898f">▶</span> **Start with `core`** and upgrade as needed  
+<span style="color:#72898f">▶</span> **Tiers are cumulative** – each includes all previous  
+<span style="color:#72898f">▶</span> **Mix and match** with `--tools` for specific services  
+<span style="color:#72898f">▶</span> **Configuration** in `core/tool_tiers.yaml`  
+<span style="color:#72898f">▶</span> **Authentication** included in all tiers
 
 </td>
 </tr>
 </table>
 
-> **<span style="color:#72898f">▶</span> Pro Tip:** Start with `core` tier and upgrade as needed. Configuration lives in `core/tool_tiers.yaml` for customization.
+#### <span style="color:#72898f">Usage Examples</span>
+
+```bash
+# Basic tier selection
+uv run main.py --tool-tier core                            # Start with essential tools only
+uv run main.py --tool-tier extended                        # Expand to include management features  
+uv run main.py --tool-tier complete                        # Enable all available functionality
+
+# Selective service loading with tiers
+uv run main.py --tools gmail drive --tool-tier core        # Core tools for specific services
+uv run main.py --tools gmail --tool-tier extended          # Extended Gmail functionality only
+uv run main.py --tools docs sheets --tool-tier complete    # Full access to Docs and Sheets
+```
 
 ### OAuth 2.1 Support (Multi-User Bearer Token Authentication)
 
