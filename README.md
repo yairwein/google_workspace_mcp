@@ -88,10 +88,10 @@ A production-ready MCP server that integrates all major Google Workspace service
 ---
 
 **<span style="color:#72898f">✓</span> Tasks** • **<span style="color:#72898f">◆</span> Custom Search** • **<span style="color:#72898f">↻</span> Transport Support**
-- Full support for all MCP Transports - Stdio, Streamable HTTP & legacy SSE
-- Programmable Search Engine (PSE) integration
+- Full support for all MCP Transports
 - OpenAPI compatibility via `mcpo`
 - Task & task list management with hierarchy
+- Programmable Search Engine (PSE) integration
 
 </td>
 </tr>
