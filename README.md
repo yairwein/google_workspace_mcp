@@ -32,7 +32,7 @@
 
 **See it in action:**
 <div align="center">
-  <video width="832" src="https://github.com/user-attachments/assets/a342ebb4-1319-4060-a974-39d202329710"></video>
+  <video width="400" src="https://github.com/user-attachments/assets/a342ebb4-1319-4060-a974-39d202329710"></video>
 </div>
 
 ---
