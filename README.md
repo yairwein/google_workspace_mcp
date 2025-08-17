@@ -902,97 +902,49 @@ cp .env.oauth21 .env
 <tr>
 <td width="50%" valign="top">
 
-### <span style="color:#72898f">@</span> Gmail • [`gmail_tools.py`](gmail/gmail_tools.py)
-| Tool | Tier |
-|------|------|
-| **Core Tools** | |
-| `search_gmail_messages` | <span style="color:#2d5b69">•</span> Core |
-| `get_gmail_message_content` | <span style="color:#2d5b69">•</span> Core |
-| `get_gmail_messages_content_batch` | <span style="color:#2d5b69">•</span> Core |
-| `send_gmail_message` | <span style="color:#2d5b69">•</span> Core |
-| **Extended Tools** | |
-| `get_gmail_thread_content` | <span style="color:#72898f">•</span> Extended |
-| `modify_gmail_message_labels` | <span style="color:#72898f">•</span> Extended |
-| `list_gmail_labels` | <span style="color:#72898f">•</span> Extended |
-| `manage_gmail_label` | <span style="color:#72898f">•</span> Extended |
-| `draft_gmail_message` | <span style="color:#72898f">•</span> Extended |
-| **Complete Tools** | |
-| `get_gmail_threads_content_batch` | <span style="color:#adbcbc">•</span> Complete |
-| `batch_modify_gmail_message_labels` | <span style="color:#adbcbc">•</span> Complete |
-
-### <span style="color:#72898f">≡</span> Drive • [`drive_tools.py`](gdrive/drive_tools.py)
-| Tool | Tier |
-|------|------|
-| **Core Tools** | |
-| `search_drive_files` | <span style="color:#2d5b69">•</span> Core |
-| `get_drive_file_content` | <span style="color:#2d5b69">•</span> Core |
-| `create_drive_file` | <span style="color:#2d5b69">•</span> Core |
-| **Extended Tools** | |
-| `list_drive_items` | <span style="color:#72898f">•</span> Extended |
-
-### <span style="color:#72898f">⧖</span> Calendar • [`calendar_tools.py`](gcalendar/calendar_tools.py)
-| Tool | Tier |
-|------|------|
-| **Core Tools** | |
-| `list_calendars` | <span style="color:#2d5b69">•</span> Core |
-| `get_events` | <span style="color:#2d5b69">•</span> Core |
-| `create_event` | <span style="color:#2d5b69">•</span> Core |
-| `modify_event` | <span style="color:#2d5b69">•</span> Core |
-| **Extended Tools** | |
-| `delete_event` | <span style="color:#72898f">•</span> Extended |
-
-### <span style="color:#72898f">@</span> Chat • [`chat_tools.py`](gchat/chat_tools.py)
-| Tool | Tier |
-|------|------|
-| **Core Tools** | |
-| `send_message` | <span style="color:#2d5b69">•</span> Core |
-| `get_messages` | <span style="color:#2d5b69">•</span> Core |
-| `search_messages` | <span style="color:#2d5b69">•</span> Core |
-| **Extended Tools** | |
-| `list_spaces` | <span style="color:#72898f">•</span> Extended |
+### <span style="color:#72898f">@</span> Gmail • [`gmail_tools.py`](gmail/gmail_tools.py) | <span style="color:#72898f">≡</span> Drive • [`drive_tools.py`](gdrive/drive_tools.py) | <span style="color:#72898f">⧖</span> Calendar • [`calendar_tools.py`](gcalendar/calendar_tools.py) | <span style="color:#72898f">@</span> Chat • [`chat_tools.py`](gchat/chat_tools.py)
+| Gmail | Tier | Drive | Tier | Calendar | Tier | Chat | Tier |
+|-------|------|-------|------|----------|------|------|------|
+| **Core Tools** | | **Core Tools** | | **Core Tools** | | **Core Tools** | |
+| `search_gmail_messages` | <span style="color:#2d5b69">•</span> | `search_drive_files` | <span style="color:#2d5b69">•</span> | `list_calendars` | <span style="color:#2d5b69">•</span> | `send_message` | <span style="color:#2d5b69">•</span> |
+| `get_gmail_message_content` | <span style="color:#2d5b69">•</span> | `get_drive_file_content` | <span style="color:#2d5b69">•</span> | `get_events` | <span style="color:#2d5b69">•</span> | `get_messages` | <span style="color:#2d5b69">•</span> |
+| `get_gmail_messages_content_batch` | <span style="color:#2d5b69">•</span> | `create_drive_file` | <span style="color:#2d5b69">•</span> | `create_event` | <span style="color:#2d5b69">•</span> | `search_messages` | <span style="color:#2d5b69">•</span> |
+| `send_gmail_message` | <span style="color:#2d5b69">•</span> | **Extended Tools** | | `modify_event` | <span style="color:#2d5b69">•</span> | **Extended Tools** | |
+| **Extended Tools** | | `list_drive_items` | <span style="color:#72898f">•</span> | **Extended Tools** | | `list_spaces` | <span style="color:#72898f">•</span> |
+| `get_gmail_thread_content` | <span style="color:#72898f">•</span> | | | `delete_event` | <span style="color:#72898f">•</span> | | |
+| `modify_gmail_message_labels` | <span style="color:#72898f">•</span> | | | | | | |
+| `list_gmail_labels` | <span style="color:#72898f">•</span> | | | | | | |
+| `manage_gmail_label` | <span style="color:#72898f">•</span> | | | | | | |
+| `draft_gmail_message` | <span style="color:#72898f">•</span> | | | | | | |
+| **Complete Tools** | | | | | | | |
+| `get_gmail_threads_content_batch` | <span style="color:#adbcbc">•</span> | | | | | | |
+| `batch_modify_gmail_message_labels` | <span style="color:#adbcbc">•</span> | | | | | | |
 
 </td>
 <td width="50%" valign="top">
 
-### <span style="color:#72898f">≡</span> Docs • [`docs_tools.py`](gdocs/docs_tools.py)
-| Tool | Tier |
-|------|------|
-| **Core Tools** | |
-| `get_doc_content` | <span style="color:#2d5b69">•</span> Core |
-| `create_doc` | <span style="color:#2d5b69">•</span> Core |
-| `modify_doc_text` | <span style="color:#2d5b69">•</span> Core |
-| **Extended Tools** | |
-| `search_docs` | <span style="color:#72898f">•</span> Extended |
-| `find_and_replace_doc` | <span style="color:#72898f">•</span> Extended |
-| `list_docs_in_folder` | <span style="color:#72898f">•</span> Extended |
-| `insert_doc_elements` | <span style="color:#72898f">•</span> Extended |
-| **Complete Tools** | |
-| `insert_doc_image` | <span style="color:#adbcbc">•</span> Complete |
-| `update_doc_headers_footers` | <span style="color:#adbcbc">•</span> Complete |
-| `batch_update_doc` | <span style="color:#adbcbc">•</span> Complete |
-| `inspect_doc_structure` | <span style="color:#adbcbc">•</span> Complete |
-| `create_table_with_data` | <span style="color:#adbcbc">•</span> Complete |
-| `read_document_comments` | <span style="color:#adbcbc">•</span> Complete |
-| `create_document_comment` | <span style="color:#adbcbc">•</span> Complete |
-| `reply_to_document_comment` | <span style="color:#adbcbc">•</span> Complete |
-| `resolve_document_comment` | <span style="color:#adbcbc">•</span> Complete |
-
-### <span style="color:#72898f">≡</span> Sheets • [`sheets_tools.py`](gsheets/sheets_tools.py)
-| Tool | Tier |
-|------|------|
-| **Core Tools** | |
-| `create_spreadsheet` | <span style="color:#2d5b69">•</span> Core |
-| `read_sheet_values` | <span style="color:#2d5b69">•</span> Core |
-| `modify_sheet_values` | <span style="color:#2d5b69">•</span> Core |
-| **Extended Tools** | |
-| `list_spreadsheets` | <span style="color:#72898f">•</span> Extended |
-| `get_spreadsheet_info` | <span style="color:#72898f">•</span> Extended |
-| **Complete Tools** | |
-| `create_sheet` | <span style="color:#adbcbc">•</span> Complete |
-| `read_spreadsheet_comments` | <span style="color:#adbcbc">•</span> Complete |
-| `create_spreadsheet_comment` | <span style="color:#adbcbc">•</span> Complete |
-| `reply_to_spreadsheet_comment` | <span style="color:#adbcbc">•</span> Complete |
-| `resolve_spreadsheet_comment` | <span style="color:#adbcbc">•</span> Complete |
+### <span style="color:#72898f">≡</span> Docs • [`docs_tools.py`](gdocs/docs_tools.py) | <span style="color:#72898f">≡</span> Sheets • [`sheets_tools.py`](gsheets/sheets_tools.py)
+| Docs | Tier | Sheets | Tier |
+|------|------|--------|------|
+| **Core Tools** | | **Core Tools** | |
+| `get_doc_content` | <span style="color:#2d5b69">•</span> | `create_spreadsheet` | <span style="color:#2d5b69">•</span> |
+| `create_doc` | <span style="color:#2d5b69">•</span> | `read_sheet_values` | <span style="color:#2d5b69">•</span> |
+| `modify_doc_text` | <span style="color:#2d5b69">•</span> | `modify_sheet_values` | <span style="color:#2d5b69">•</span> |
+| **Extended Tools** | | **Extended Tools** | |
+| `search_docs` | <span style="color:#72898f">•</span> | `list_spreadsheets` | <span style="color:#72898f">•</span> |
+| `find_and_replace_doc` | <span style="color:#72898f">•</span> | `get_spreadsheet_info` | <span style="color:#72898f">•</span> |
+| `list_docs_in_folder` | <span style="color:#72898f">•</span> | **Complete Tools** | |
+| `insert_doc_elements` | <span style="color:#72898f">•</span> | `create_sheet` | <span style="color:#adbcbc">•</span> |
+| **Complete Tools** | | `read_spreadsheet_comments` | <span style="color:#adbcbc">•</span> |
+| `insert_doc_image` | <span style="color:#adbcbc">•</span> | `create_spreadsheet_comment` | <span style="color:#adbcbc">•</span> |
+| `update_doc_headers_footers` | <span style="color:#adbcbc">•</span> | `reply_to_spreadsheet_comment` | <span style="color:#adbcbc">•</span> |
+| `batch_update_doc` | <span style="color:#adbcbc">•</span> | `resolve_spreadsheet_comment` | <span style="color:#adbcbc">•</span> |
+| `inspect_doc_structure` | <span style="color:#adbcbc">•</span> | | |
+| `create_table_with_data` | <span style="color:#adbcbc">•</span> | | |
+| `read_document_comments` | <span style="color:#adbcbc">•</span> | | |
+| `create_document_comment` | <span style="color:#adbcbc">•</span> | | |
+| `reply_to_document_comment` | <span style="color:#adbcbc">•</span> | | |
+| `resolve_document_comment` | <span style="color:#adbcbc">•</span> | | |
 
 </td>
 </tr>
