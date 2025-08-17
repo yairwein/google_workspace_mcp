@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 LIST_TASKS_MAX_RESULTS_DEFAULT = 20
 LIST_TASKS_MAX_RESULTS_MAX = 10_000
+LIST_TASKS_MAX_POSITION = "99999999999999999999"
 
 
 def docstring_format(**values):
@@ -430,13 +431,13 @@ def sort_tasks_by_position(tasks: List[Dict[str, str]]) -> int:
 
     orphaned_subtasks = 0
 
-    def get_sort_key(task: Dict[str, str]) -> Tuple[str, str]:
+    def get_sort_key(task: Dict[str, str]) -> Tuple[str, str, str]:
         nonlocal orphaned_subtasks
 
         parent = task.get("parent")
         position = task["position"]
         if parent is None:
-            return (task["position"], "")
+            return (task["position"], "", "")
         else:
             # Note that, due to paging or filtering, a subtask may have a parent that is not present in the list of tasks.
             # We will return these orphaned subtasks at the end of the list, grouped by their parent task IDs.
@@ -444,12 +445,8 @@ def sort_tasks_by_position(tasks: List[Dict[str, str]]) -> int:
             if parent_position is None:
                 orphaned_subtasks += 1
                 logger.debug(f"Orphaned task: {task['title']}, id = {task['id']}, parent = {parent}")
-            parent_position_sort_key = (
-                f"99999999999999999999_{parent}"
-                if parent_position is None
-                else parent_position
-            )
-            return (parent_position_sort_key, position)
+                return (f"{LIST_TASKS_MAX_POSITION}", parent, position)
+            return (parent_position, position, "")
 
     tasks.sort(key=get_sort_key)
     return orphaned_subtasks
