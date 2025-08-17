@@ -894,85 +894,178 @@ cp .env.oauth21 .env
 
 ---
 
-## ◆ Available Tools
+## 🧰 Available Tools
 
 > **Note**: All tools support automatic authentication via `@require_google_service()` decorators with 30-minute service caching.
 
-<table>
+<table width="100%">
 <tr>
 <td width="50%" valign="top">
 
-### <span style="color:#72898f">@</span> Gmail • [`gmail_tools.py`](gmail/gmail_tools.py) | <span style="color:#72898f">≡</span> Drive • [`drive_tools.py`](gdrive/drive_tools.py) | <span style="color:#72898f">⧖</span> Calendar • [`calendar_tools.py`](gcalendar/calendar_tools.py) | <span style="color:#72898f">@</span> Chat • [`chat_tools.py`](gchat/chat_tools.py)
-| Gmail | Tier | Drive | Tier | Calendar | Tier | Chat | Tier |
-|-------|------|-------|------|----------|------|------|------|
-| **Core Tools** | | **Core Tools** | | **Core Tools** | | **Core Tools** | |
-| `search_gmail_messages` | <span style="color:#2d5b69">•</span> | `search_drive_files` | <span style="color:#2d5b69">•</span> | `list_calendars` | <span style="color:#2d5b69">•</span> | `send_message` | <span style="color:#2d5b69">•</span> |
-| `get_gmail_message_content` | <span style="color:#2d5b69">•</span> | `get_drive_file_content` | <span style="color:#2d5b69">•</span> | `get_events` | <span style="color:#2d5b69">•</span> | `get_messages` | <span style="color:#2d5b69">•</span> |
-| `get_gmail_messages_content_batch` | <span style="color:#2d5b69">•</span> | `create_drive_file` | <span style="color:#2d5b69">•</span> | `create_event` | <span style="color:#2d5b69">•</span> | `search_messages` | <span style="color:#2d5b69">•</span> |
-| `send_gmail_message` | <span style="color:#2d5b69">•</span> | **Extended Tools** | | `modify_event` | <span style="color:#2d5b69">•</span> | **Extended Tools** | |
-| **Extended Tools** | | `list_drive_items` | <span style="color:#72898f">•</span> | **Extended Tools** | | `list_spaces` | <span style="color:#72898f">•</span> |
-| `get_gmail_thread_content` | <span style="color:#72898f">•</span> | | | `delete_event` | <span style="color:#72898f">•</span> | | |
-| `modify_gmail_message_labels` | <span style="color:#72898f">•</span> | | | | | | |
-| `list_gmail_labels` | <span style="color:#72898f">•</span> | | | | | | |
-| `manage_gmail_label` | <span style="color:#72898f">•</span> | | | | | | |
-| `draft_gmail_message` | <span style="color:#72898f">•</span> | | | | | | |
-| **Complete Tools** | | | | | | | |
-| `get_gmail_threads_content_batch` | <span style="color:#adbcbc">•</span> | | | | | | |
-| `batch_modify_gmail_message_labels` | <span style="color:#adbcbc">•</span> | | | | | | |
+### 📅 **Google Calendar** <sub>[`calendar_tools.py`](gcalendar/calendar_tools.py)</sub>
+
+| Tool | Tier | Description |
+|------|------|-------------|
+| `list_calendars` | **Core** | List accessible calendars |
+| `get_events` | **Core** | Retrieve events with time range filtering |
+| `create_event` | **Core** | Create events with attachments & reminders |
+| `modify_event` | **Core** | Update existing events |
+| `delete_event` | Extended | Remove events |
 
 </td>
 <td width="50%" valign="top">
 
-### <span style="color:#72898f">≡</span> Docs • [`docs_tools.py`](gdocs/docs_tools.py) | <span style="color:#72898f">≡</span> Sheets • [`sheets_tools.py`](gsheets/sheets_tools.py)
-| Docs | Tier | Sheets | Tier |
-|------|------|--------|------|
-| **Core Tools** | | **Core Tools** | |
-| `get_doc_content` | <span style="color:#2d5b69">•</span> | `create_spreadsheet` | <span style="color:#2d5b69">•</span> |
-| `create_doc` | <span style="color:#2d5b69">•</span> | `read_sheet_values` | <span style="color:#2d5b69">•</span> |
-| `modify_doc_text` | <span style="color:#2d5b69">•</span> | `modify_sheet_values` | <span style="color:#2d5b69">•</span> |
-| **Extended Tools** | | **Extended Tools** | |
-| `search_docs` | <span style="color:#72898f">•</span> | `list_spreadsheets` | <span style="color:#72898f">•</span> |
-| `find_and_replace_doc` | <span style="color:#72898f">•</span> | `get_spreadsheet_info` | <span style="color:#72898f">•</span> |
-| `list_docs_in_folder` | <span style="color:#72898f">•</span> | **Complete Tools** | |
-| `insert_doc_elements` | <span style="color:#72898f">•</span> | `create_sheet` | <span style="color:#adbcbc">•</span> |
-| **Complete Tools** | | `read_spreadsheet_comments` | <span style="color:#adbcbc">•</span> |
-| `insert_doc_image` | <span style="color:#adbcbc">•</span> | `create_spreadsheet_comment` | <span style="color:#adbcbc">•</span> |
-| `update_doc_headers_footers` | <span style="color:#adbcbc">•</span> | `reply_to_spreadsheet_comment` | <span style="color:#adbcbc">•</span> |
-| `batch_update_doc` | <span style="color:#adbcbc">•</span> | `resolve_spreadsheet_comment` | <span style="color:#adbcbc">•</span> |
-| `inspect_doc_structure` | <span style="color:#adbcbc">•</span> | | |
-| `create_table_with_data` | <span style="color:#adbcbc">•</span> | | |
-| `read_document_comments` | <span style="color:#adbcbc">•</span> | | |
-| `create_document_comment` | <span style="color:#adbcbc">•</span> | | |
-| `reply_to_document_comment` | <span style="color:#adbcbc">•</span> | | |
-| `resolve_document_comment` | <span style="color:#adbcbc">•</span> | | |
+### 📁 **Google Drive** <sub>[`drive_tools.py`](gdrive/drive_tools.py)</sub>
+
+| Tool | Tier | Description |
+|------|------|-------------|
+| `search_drive_files` | **Core** | Search files with query syntax |
+| `get_drive_file_content` | **Core** | Read file content (Office formats) |
+| `list_drive_items` | Extended | List folder contents |
+| `create_drive_file` | **Core** | Create files or fetch from URLs |
 
 </td>
 </tr>
 <tr>
-<td colspan="2" valign="top">
+<td width="50%" valign="top">
 
-### <span style="color:#72898f">≡</span> Slides • [`slides_tools.py`](gslides/slides_tools.py) | <span style="color:#72898f">✓</span> Tasks • [`tasks_tools.py`](gtasks/tasks_tools.py) | <span style="color:#72898f">≡</span> Forms • [`forms_tools.py`](gforms/forms_tools.py) | <span style="color:#72898f">◆</span> Search • [`search_tools.py`](gsearch/search_tools.py)
-| Slides | Tier | Tasks | Tier | Forms | Tier | Search | Tier |
-|--------|------|-------|------|-------|------|--------|------|
-| **Core Tools** | | **Core Tools** | | **Core Tools** | | **Core Tools** | |
-| `create_presentation` | <span style="color:#2d5b69">•</span> | `get_task` | <span style="color:#2d5b69">•</span> | `create_form` | <span style="color:#2d5b69">•</span> | `search_custom` | <span style="color:#2d5b69">•</span> |
-| `get_presentation` | <span style="color:#2d5b69">•</span> | `list_tasks` | <span style="color:#2d5b69">•</span> | `get_form` | <span style="color:#2d5b69">•</span> | **Extended Tools** | |
-| **Extended Tools** | | `create_task` | <span style="color:#2d5b69">•</span> | **Extended Tools** | | `search_custom_siterestrict` | <span style="color:#72898f">•</span> |
-| `batch_update_presentation` | <span style="color:#72898f">•</span> | `update_task` | <span style="color:#2d5b69">•</span> | `list_form_responses` | <span style="color:#72898f">•</span> | **Complete Tools** | |
-| `get_page` | <span style="color:#72898f">•</span> | **Extended Tools** | | **Complete Tools** | | `get_search_engine_info` | <span style="color:#adbcbc">•</span> |
-| `get_page_thumbnail` | <span style="color:#72898f">•</span> | `delete_task` | <span style="color:#72898f">•</span> | `set_publish_settings` | <span style="color:#adbcbc">•</span> | | |
-| **Complete Tools** | | **Complete Tools** | | `get_form_response` | <span style="color:#adbcbc">•</span> | | |
-| `read_presentation_comments` | <span style="color:#adbcbc">•</span> | `list_task_lists` | <span style="color:#adbcbc">•</span> | | | | |
-| `create_presentation_comment` | <span style="color:#adbcbc">•</span> | `get_task_list` | <span style="color:#adbcbc">•</span> | | | | |
-| `reply_to_presentation_comment` | <span style="color:#adbcbc">•</span> | `create_task_list` | <span style="color:#adbcbc">•</span> | | | | |
-| `resolve_presentation_comment` | <span style="color:#adbcbc">•</span> | `update_task_list` | <span style="color:#adbcbc">•</span> | | | | |
-| | | `delete_task_list` | <span style="color:#adbcbc">•</span> | | | | |
-| | | `move_task` | <span style="color:#adbcbc">•</span> | | | | |
-| | | `clear_completed_tasks` | <span style="color:#adbcbc">•</span> | | | | |
+Here's the corrected version with all missing tools included:
+
+<table width="100%">
+<tr>
+<td width="50%" valign="top">
+
+### 📧 **Gmail** <sub>[`gmail_tools.py`](gmail/gmail_tools.py)</sub>
+
+| Tool | Tier | Description |
+|------|------|-------------|
+| `search_gmail_messages` | **Core** | Search with Gmail operators |
+| `get_gmail_message_content` | **Core** | Retrieve message content |
+| `get_gmail_messages_content_batch` | **Core** | Batch retrieve message content |
+| `send_gmail_message` | **Core** | Send emails |
+| `get_gmail_thread_content` | Extended | Get full thread content |
+| `modify_gmail_message_labels` | Extended | Modify message labels |
+| `list_gmail_labels` | Extended | List available labels |
+| `manage_gmail_label` | Extended | Create/update/delete labels |
+| `draft_gmail_message` | Extended | Create drafts |
+| `get_gmail_threads_content_batch` | Complete | Batch retrieve thread content |
+| `batch_modify_gmail_message_labels` | Complete | Batch modify labels |
+| `start_google_auth` | Complete | Initialize authentication |
+
+</td>
+<td width="50%" valign="top">
+
+### 📝 **Google Docs** <sub>[`docs_tools.py`](gdocs/docs_tools.py)</sub>
+
+| Tool | Tier | Description |
+|------|------|-------------|
+| `get_doc_content` | **Core** | Extract document text |
+| `create_doc` | **Core** | Create new documents |
+| `modify_doc_text` | **Core** | Modify document text |
+| `search_docs` | Extended | Find documents by name |
+| `find_and_replace_doc` | Extended | Find and replace text |
+| `list_docs_in_folder` | Extended | List docs in folder |
+| `insert_doc_elements` | Extended | Add tables, lists, page breaks |
+| `insert_doc_image` | Complete | Insert images from Drive/URLs |
+| `update_doc_headers_footers` | Complete | Modify headers and footers |
+| `batch_update_doc` | Complete | Execute multiple operations |
+| `inspect_doc_structure` | Complete | Analyze document structure |
+| `create_table_with_data` | Complete | Create data tables |
+| `debug_table_structure` | Complete | Debug table issues |
+| `*_document_comments` | Complete | Read, Reply, Create, Resolve |
+
+</td>
+</tr>
+
+<tr>
+<td width="50%" valign="top">
+
+### 📊 **Google Sheets** <sub>[`sheets_tools.py`](gsheets/sheets_tools.py)</sub>
+
+| Tool | Tier | Description |
+|------|------|-------------|
+| `read_sheet_values` | **Core** | Read cell ranges |
+| `modify_sheet_values` | **Core** | Write/update/clear cells |
+| `create_spreadsheet` | **Core** | Create new spreadsheets |
+| `list_spreadsheets` | Extended | List accessible spreadsheets |
+| `get_spreadsheet_info` | Extended | Get spreadsheet metadata |
+| `create_sheet` | Complete | Add sheets to existing files |
+| `*_sheet_comment` | Complete | Read/create/reply/resolve comments |
+
+</td>
+<td width="50%" valign="top">
+
+### 🖼️ **Google Slides** <sub>[`slides_tools.py`](gslides/slides_tools.py)</sub>
+
+| Tool | Tier | Description |
+|------|------|-------------|
+| `create_presentation` | **Core** | Create new presentations |
+| `get_presentation` | **Core** | Retrieve presentation details |
+| `batch_update_presentation` | Extended | Apply multiple updates |
+| `get_page` | Extended | Get specific slide information |
+| `get_page_thumbnail` | Extended | Generate slide thumbnails |
+| `*_presentation_comment` | Complete | Read/create/reply/resolve comments |
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+### 📝 **Google Forms** <sub>[`forms_tools.py`](gforms/forms_tools.py)</sub>
+
+| Tool | Tier | Description |
+|------|------|-------------|
+| `create_form` | **Core** | Create new forms |
+| `get_form` | **Core** | Retrieve form details & URLs |
+| `set_publish_settings` | Complete | Configure form settings |
+| `get_form_response` | Complete | Get individual responses |
+| `list_form_responses` | Extended | List all responses with pagination |
+
+</td>
+<td width="50%" valign="top">
+
+### ✓ **Google Tasks** <sub>[`tasks_tools.py`](gtasks/tasks_tools.py)</sub>
+
+| Tool | Tier | Description |
+|------|------|-------------|
+| `list_tasks` | **Core** | List tasks with filtering |
+| `get_task` | **Core** | Retrieve task details |
+| `create_task` | **Core** | Create tasks with hierarchy |
+| `update_task` | **Core** | Modify task properties |
+| `delete_task` | Extended | Remove tasks |
+| `move_task` | Complete | Reposition tasks |
+| `clear_completed_tasks` | Complete | Hide completed tasks |
+| `*_task_list` | Complete | List/get/create/update/delete task lists |
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+### 💬 **Google Chat** <sub>[`chat_tools.py`](gchat/chat_tools.py)</sub>
+
+| Tool | Tier | Description |
+|------|------|-------------|
+| `list_spaces` | Extended | List chat spaces/rooms |
+| `get_messages` | **Core** | Retrieve space messages |
+| `send_message` | **Core** | Send messages to spaces |
+| `search_messages` | **Core** | Search across chat history |
+
+</td>
+<td width="50%" valign="top">
+
+### 🔍 **Google Custom Search** <sub>[`search_tools.py`](gsearch/search_tools.py)</sub>
+
+| Tool | Tier | Description |
+|------|------|-------------|
+| `search_custom` | **Core** | Perform web searches |
+| `get_search_engine_info` | Complete | Retrieve search engine metadata |
+| `search_custom_siterestrict` | Extended | Search within specific domains |
 
 </td>
 </tr>
 </table>
+
 
 **Tool Tier Legend:**
 - <span style="color:#2d5b69">•</span> **Core**: Essential tools for basic functionality • Minimal API usage • Getting started
