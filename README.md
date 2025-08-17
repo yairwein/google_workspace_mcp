@@ -56,9 +56,9 @@ A production-ready MCP server that integrates all major Google Workspace service
 
 ## <span style="color:#adbcbc">Features</span>
 
-<table width="100%">
+<table width="inherit">
 <tr>
-<td width="49%" valign="top">
+<td width="50%" valign="top">
 
 **<span style="color:#72898f">@</span> Gmail** • **<span style="color:#72898f">≡</span> Drive** • **<span style="color:#72898f">⧖</span> Calendar** **<span style="color:#72898f">≡</span> Docs**
 - Complete Gmail management, end to end coverage
@@ -76,7 +76,7 @@ A production-ready MCP server that integrates all major Google Workspace service
 - Presentation creation, updates & content manipulation
 
 </td>
-<td width="49%" valign="top">
+<td width="50%" valign="top">
 
 **<span style="color:#72898f">⊠</span> Authentication & Security**
 - Advanced OAuth 2.0 & OAuth 2.1 support
