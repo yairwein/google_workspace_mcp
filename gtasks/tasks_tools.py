@@ -16,6 +16,22 @@ from core.utils import handle_http_errors
 
 logger = logging.getLogger(__name__)
 
+LIST_TASKS_MAX_RESULTS_DEFAULT = 20
+LIST_TASKS_MAX_RESULTS_MAX = 10_000
+
+
+def docstring_format(**values):
+    """
+    Decorator to format the docstring of a function with given values.
+    """
+
+    def _apply(func):
+        if func.__doc__:
+            func.__doc__ = func.__doc__.format(**values)
+        return func
+
+    return _apply
+
 
 @server.tool()
 @require_google_service("tasks", "tasks_read")
@@ -262,6 +278,10 @@ async def delete_task_list(
 @server.tool()
 @require_google_service("tasks", "tasks_read")
 @handle_http_errors("list_tasks", service_type="tasks")
+@docstring_format(
+    LIST_TASKS_MAX_RESULTS_DEFAULT=LIST_TASKS_MAX_RESULTS_DEFAULT,
+    LIST_TASKS_MAX_RESULTS_MAX=LIST_TASKS_MAX_RESULTS_MAX
+)
 async def list_tasks(
     service,
     user_google_email: str,
@@ -284,7 +304,7 @@ async def list_tasks(
     Args:
         user_google_email (str): The user's Google email address. Required.
         task_list_id (str): The ID of the task list to retrieve tasks from.
-        max_results (Optional[int]): Maximum number of tasks to return (default: 20, max: 10000).
+        max_results (Optional[int]): Maximum number of tasks to return (default: {LIST_TASKS_MAX_RESULTS_DEFAULT:,d}, max: {LIST_TASKS_MAX_RESULTS_MAX:,d}).
         page_token (Optional[str]): Token for pagination.
         show_completed (Optional[bool]): Whether to include completed tasks (default: True).
         show_deleted (Optional[bool]): Whether to include deleted tasks (default: False).
@@ -335,7 +355,9 @@ async def list_tasks(
 
         # In order to return a sorted and organized list of tasks all at once, we support retrieving more than a single
         # page from the Google tasks API.
-        results_remaining = min(max_results, 10000) if max_results else 20
+        results_remaining = (
+            min(max_results, LIST_TASKS_MAX_RESULTS_MAX) if max_results else LIST_TASKS_MAX_RESULTS_DEFAULT
+        )
         results_remaining -= len(tasks)
         while results_remaining > 0 and next_page_token:
             params["pageToken"] = next_page_token
