@@ -193,18 +193,83 @@ Claude Desktop stores these securely in the OS keychain; set them once in the ex
 
 ### Configuration
 
-1. **Google Cloud Setup**:
-   - Create OAuth 2.0 credentials in [Google Cloud Console](https://console.cloud.google.com/)
-   - Create a new project (or use an existing one) for your MCP server.
-   - Navigate to APIs & Services → Credentials.
-   - Click Create Credentials → OAuth Client ID.
-   - **Choose Desktop Application as the application type** (simpler setup, no redirect URIs needed!)
-   - Download your credentials and note the Client ID and Client Secret
+<details open>
+<summary>◆ <b>Google Cloud Setup</b> <sub><sup>← OAuth 2.0 credentials & API enablement</sup></sub></summary>
 
-   - **Enable APIs**:
-   - In the Google Cloud Console, go to APIs & Services → Library.
-   - Search for & enable Calendar, Drive, Gmail, Docs, Sheets, Slides, Forms, Tasks, Chat
-   - Expand the section below marked "API Enablement Links" for direct links to each!
+<table>
+<tr>
+<td width="33%" align="center">
+
+**1. Create Project**
+```text
+console.cloud.google.com
+
+→ Create new project
+→ Note project name
+```
+<sub>[Open Console →](https://console.cloud.google.com/)</sub>
+
+</td>
+<td width="33%" align="center">
+
+**2. OAuth Credentials**
+```text
+APIs & Services → Credentials
+→ Create Credentials
+→ OAuth Client ID
+→ Desktop Application
+```
+<sub>Download & save credentials</sub>
+
+</td>
+<td width="34%" align="center">
+
+**3. Enable APIs**
+```text
+APIs & Services → Library
+
+Search & enable:
+Calendar, Drive, Gmail,
+Docs, Sheets, Slides,
+Forms, Tasks, Chat, Search
+```
+<sub>See quick links below</sub>
+
+</td>
+</tr>
+<tr>
+<td colspan="3">
+
+<details>
+<summary>≡ <b>OAuth Credential Setup Guide</b> <sub><sup>← Step-by-step instructions</sup></sub></summary>
+
+**Complete Setup Process:**
+
+1. **Create OAuth 2.0 Credentials** - Visit [Google Cloud Console](https://console.cloud.google.com/)
+   - Create a new project (or use existing)
+   - Navigate to **APIs & Services → Credentials**
+   - Click **Create Credentials → OAuth Client ID**
+   - Choose **Desktop Application** as the application type (no redirect URIs needed!)
+   - Download credentials and note the Client ID and Client Secret
+
+2. **Enable Required APIs** - In **APIs & Services → Library**
+   - Search for and enable each required API
+   - Or use the quick links below for one-click enabling
+
+3. **Configure Environment** - Set your credentials:
+   ```bash
+   export GOOGLE_OAUTH_CLIENT_ID="your-client-id"
+   export GOOGLE_OAUTH_CLIENT_SECRET="your-secret"
+   ```
+
+≡ [Full Documentation →](https://developers.google.com/workspace/guides/auth-overview)
+
+</details>
+
+</td>
+</tr>
+</table>
+
 <details>
   <summary>⊥ <b>Quick API Enable Links</b> <sub><sup>← One-click enable each Google API</sup></sub></summary>
   You can enable each one by clicking the links below (make sure you're logged into the Google Cloud Console and have the correct project selected):
@@ -219,6 +284,8 @@ Claude Desktop stores these securely in the OS keychain; set them once in the ex
 * [Enable Google Tasks API](https://console.cloud.google.com/flows/enableapi?apiid=tasks.googleapis.com)
 * [Enable Google Chat API](https://console.cloud.google.com/flows/enableapi?apiid=chat.googleapis.com)
 * [Enable Google Custom Search API](https://console.cloud.google.com/flows/enableapi?apiid=customsearch.googleapis.com)
+
+</details>
 
 </details>
 
@@ -487,13 +554,13 @@ The server organizes tools into **three progressive tiers** for simplified deplo
 
 #### <span style="color:#72898f">Available Tiers</span>
 
-**<span style="color:#2d5b69">●</span> Core** (`--tool-tier core`)  
+**<span style="color:#2d5b69">●</span> Core** (`--tool-tier core`)
 Essential tools for everyday tasks. Perfect for light usage with minimal API quotas. Includes search, read, create, and basic modify operations across all services.
 
-**<span style="color:#72898f">●</span> Extended** (`--tool-tier extended`)  
+**<span style="color:#72898f">●</span> Extended** (`--tool-tier extended`)
 Core functionality plus management tools. Adds labels, folders, batch operations, and advanced search. Ideal for regular usage with moderate API needs.
 
-**<span style="color:#adbcbc">●</span> Complete** (`--tool-tier complete`)  
+**<span style="color:#adbcbc">●</span> Complete** (`--tool-tier complete`)
 Full API access including comments, headers/footers, publishing settings, and administrative functions. For power users needing maximum functionality.
 
 </td>
@@ -501,10 +568,10 @@ Full API access including comments, headers/footers, publishing settings, and ad
 
 #### <span style="color:#72898f">Important Notes</span>
 
-<span style="color:#72898f">▶</span> **Start with `core`** and upgrade as needed  
-<span style="color:#72898f">▶</span> **Tiers are cumulative** – each includes all previous  
-<span style="color:#72898f">▶</span> **Mix and match** with `--tools` for specific services  
-<span style="color:#72898f">▶</span> **Configuration** in `core/tool_tiers.yaml`  
+<span style="color:#72898f">▶</span> **Start with `core`** and upgrade as needed
+<span style="color:#72898f">▶</span> **Tiers are cumulative** – each includes all previous
+<span style="color:#72898f">▶</span> **Mix and match** with `--tools` for specific services
+<span style="color:#72898f">▶</span> **Configuration** in `core/tool_tiers.yaml`
 <span style="color:#72898f">▶</span> **Authentication** included in all tiers
 
 </td>
@@ -516,7 +583,7 @@ Full API access including comments, headers/footers, publishing settings, and ad
 ```bash
 # Basic tier selection
 uv run main.py --tool-tier core                            # Start with essential tools only
-uv run main.py --tool-tier extended                        # Expand to include management features  
+uv run main.py --tool-tier extended                        # Expand to include management features
 uv run main.py --tool-tier complete                        # Enable all available functionality
 
 # Selective service loading with tiers
