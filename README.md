@@ -65,7 +65,7 @@ A production-ready MCP server that integrates all major Google Workspace service
 - Full calendar management with advanced capabilities
 - File operations with Office format support
 - Document creation, editing & comment management
-- Deep, exhaustive support for fine grained editing controls
+- Deep, exhaustive support for fine grained editing
 
 ---
 
