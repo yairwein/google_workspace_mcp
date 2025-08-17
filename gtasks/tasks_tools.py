@@ -420,7 +420,7 @@ def sort_tasks_by_position(tasks: List[Dict[str, str]]) -> int:
     2. position: The position field determines the order of tasks at the same level.
 
     Args:
-        tasks (list): List of task dictionaries to sort.
+        tasks (list): List of task dictionaries to sort in place (modified).
 
     Returns:
         int: The number of orphaned subtasks encountered in the list.
