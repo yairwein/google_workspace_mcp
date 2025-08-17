@@ -67,34 +67,27 @@ A production-ready MCP server that integrates all major Google Workspace service
 - Multi-user bearer token authentication
 - Innovative CORS proxy architecture
 
-**<span style="color:#72898f">@</span> Gmail** • **<span style="color:#72898f">≡</span> Drive** • **<span style="color:#72898f">⧖</span> Calendar**
-- Complete email management (search, send, drafts)
+**<span style="color:#72898f">@</span> Gmail** • **<span style="color:#72898f">≡</span> Drive** • **<span style="color:#72898f">⧖</span> Calendar** **<span style="color:#72898f">≡</span> Docs**
+- Complete email management (search, send, draft, label, batch operations)
 - File operations with Office format support
-- Full calendar management with CRUD operations
-
-**<span style="color:#72898f">≡</span> Docs** • **<span style="color:#72898f">≡</span> Sheets** • **<span style="color:#72898f">≡</span> Slides**
+- Full calendar management with advanced capabilities
 - Document creation, editing & comment management
-- Spreadsheet operations with flexible cell management
-- Presentation creation, updates & content manipulation
 
 </td>
 <td width="50%" valign="top">
 
-**<span style="color:#72898f">≡</span> Forms** • **<span style="color:#72898f">✓</span> Tasks** • **<span style="color:#72898f">@</span> Chat**
+**<span style="color:#72898f">≡</span> Forms** • **<span style="color:#72898f">@</span> Chat** • **<span style="color:#72898f">≡</span> Sheets** • **<span style="color:#72898f">≡</span> Slides**
 - Form creation, publish settings & response management
-- Task & task list management with hierarchy
 - Space management & messaging capabilities
+- Spreadsheet operations with flexible cell management
+- Presentation creation, updates & content manipulation
 
-**<span style="color:#72898f">◆</span> Custom Search** • **<span style="color:#72898f">↻</span> Transport Support**
+
+**<span style="color:#72898f">✓</span> Tasks** • **<span style="color:#72898f">◆</span> Custom Search** • **<span style="color:#72898f">↻</span> Transport Support**
+- Full support for all MCP Transports - Stdio, Streamable HTTP & legacy SSE
 - Programmable Search Engine (PSE) integration
-- Stdio, Streamable HTTP & SSE support
 - OpenAPI compatibility via `mcpo`
-
-**<span style="color:#72898f">▶</span> Performance & Developer Experience**
-- Service caching with 30-minute TTL
-- Thread-safe sessions & FastMCP integration
-- Minimal boilerplate & automatic service injection
-- Centralized configuration management
+- Task & task list management with hierarchy
 
 </td>
 </tr>
