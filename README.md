@@ -341,7 +341,7 @@ export GOOGLE_PSE_ENGINE_ID=yyy
 
 **◆ Base Configuration**
 ```bash
-export WORKSPACE_MCP_BASE_URI=\
+export WORKSPACE_MCP_BASE_URI=
   http://localhost
 export WORKSPACE_MCP_PORT=8000
 ```
@@ -352,10 +352,10 @@ export WORKSPACE_MCP_PORT=8000
 
 **↻ Proxy Support**
 ```bash
-export GOOGLE_OAUTH_REDIRECT_URI=\
-  https://your-domain.com/oauth2callback
+export MCP_ENABLE_OAUTH21=
+  true
 ```
-<sub>For nginx/Apache proxies</sub>
+<sub>Leverage multi-user OAuth2.1 clients</sub>
 
 </td>
 <td width="34%" align="center">
@@ -365,7 +365,7 @@ export GOOGLE_OAUTH_REDIRECT_URI=\
 export USER_GOOGLE_EMAIL=\
   your.email@gmail.com
 ```
-<sub>Skip email in auth flows</sub>
+<sub>Skip email in auth flows in single user mode</sub>
 
 </td>
 </tr>
