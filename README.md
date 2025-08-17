@@ -56,7 +56,7 @@ A production-ready MCP server that integrates all major Google Workspace service
 
 ## <span style="color:#adbcbc">Features</span>
 
-<table width="inherit">
+<table align="center" style="width: 100%; max-width: 100%;">
 <tr>
 <td width="50%" valign="top">
 
@@ -176,6 +176,8 @@ uv run main.py --tools gmail drive
 
 Claude Desktop stores these securely in the OS keychain; set them once in the extension pane.
 </details>
+
+---
 
 <div align="center">
   <video width="832" src="https://github.com/user-attachments/assets/83cca4b3-5e94-448b-acb3-6e3a27341d3a"></video>
@@ -590,237 +592,6 @@ uv run main.py --tools gmail --tool-tier extended          # Extended Gmail func
 uv run main.py --tools docs sheets --tool-tier complete    # Full access to Docs and Sheets
 ```
 
-### OAuth 2.1 Support (Multi-User Bearer Token Authentication)
-
-The server includes OAuth 2.1 support for bearer token authentication, enabling multi-user session management. **OAuth 2.1 automatically reuses your existing `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET` credentials** - no additional configuration needed!
-
-**When to use OAuth 2.1:**
-- Multiple users accessing the same MCP server instance
-- Need for bearer token authentication instead of passing user emails
-- Building web applications or APIs on top of the MCP server
-- Production environments requiring secure session management
-- Browser-based clients requiring CORS support
-
-**Enabling OAuth 2.1:**
-To enable OAuth 2.1, set the `MCP_ENABLE_OAUTH21` environment variable to `true`.
-
-```bash
-# OAuth 2.1 requires HTTP transport mode
-export MCP_ENABLE_OAUTH21=true
-uv run main.py --transport streamable-http
-```
-
-If `MCP_ENABLE_OAUTH21` is not set to `true`, the server will use legacy authentication, which is suitable for clients that do not support OAuth 2.1.
-
-<details>
-<summary>🔐 <b>Innovative CORS Proxy Architecture</b> <sub><sup>← Advanced OAuth 2.1 details</sup></sub></summary>
-
-This implementation solves two critical challenges when using Google OAuth in browser environments:
-
-1.  **Dynamic Client Registration**: Google doesn't support OAuth 2.1 dynamic client registration. Our server provides a clever proxy that accepts any client registration request and returns the pre-configured Google OAuth credentials, allowing standards-compliant clients to work seamlessly.
-
-2.  **CORS Issues**: Google's OAuth endpoints don't include CORS headers, blocking browser-based clients. We implement intelligent proxy endpoints that:
-   - Proxy authorization server discovery requests through `/auth/discovery/authorization-server/{server}`
-   - Proxy token exchange requests through `/oauth2/token`
-   - Add proper CORS headers to all responses
-   - Maintain security by only proxying to known Google OAuth endpoints
-
-This architecture enables any OAuth 2.1 compliant client to authenticate users through Google, even from browser environments, without requiring changes to the client implementation.
-
-</details>
-
-**MCP Inspector**: No additional configuration needed with desktop OAuth client.
-
-**Claude Code Inspector**: No additional configuration needed with desktop OAuth client.
-
-### VS Code MCP Client Support
-
-<details>
-<summary>🆚 <b>VS Code Configuration</b> <sub><sup>← Setup for VS Code MCP extension</sup></sub></summary>
-
-```json
-{
-    "servers": {
-        "google-workspace": {
-            "url": "http://localhost:8000/mcp/",
-            "type": "http"
-        }
-    }
-}
-```
-</details>
-
-### Connect to Claude Desktop
-
-The server supports two transport modes:
-
-#### Stdio Mode (Default - Recommended for Claude Desktop)
-
-In general, you should use the one-click DXT installer package for Claude Desktop.
-If you are unable to for some reason, you can configure it manually via `claude_desktop_config.json`
-
-**Manual Claude Configuration (Alternative)**
-
-<details>
-<summary>📝 <b>Claude Desktop JSON Config</b> <sub><sup>← Click for manual setup instructions</sup></sub></summary>
-
-1. Open Claude Desktop Settings → Developer → Edit Config
-   - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-   - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
-
-2. Add the server configuration:
-```json
-{
-  "mcpServers": {
-    "google_workspace": {
-      "command": "uvx",
-      "args": ["workspace-mcp"],
-      "env": {
-        "GOOGLE_OAUTH_CLIENT_ID": "your-client-id",
-        "GOOGLE_OAUTH_CLIENT_SECRET": "your-secret",
-        "OAUTHLIB_INSECURE_TRANSPORT": "1"
-      }
-    }
-  }
-}
-```
-</details>
-
-### 2. Advanced / Cross-Platform Installation
-
-If you’re developing, deploying to servers, or using another MCP-capable client, keep reading.
-
-#### Instant CLI (uvx)
-
-<details open>
-<summary>⚡ <b>Quick Start with uvx</b> <sub><sup>← No installation required!</sup></sub></summary>
-
-```bash
-# Requires Python 3.10+ and uvx
-# First, set credentials (see Credential Configuration above)
-uvx workspace-mcp --tool-tier core  # or --tools gmail drive calendar
-```
-
-> **Note**: Configure [OAuth credentials](#credential-configuration) before running. Supports environment variables, `.env` file, or `client_secret.json`.
-
-</details>
-
-#### Reverse Proxy Setup
-
-If you're running the MCP server behind a reverse proxy (nginx, Apache, Cloudflare, etc.), you'll need to configure `GOOGLE_OAUTH_REDIRECT_URI` to match your external URL:
-
-**Problem**: When behind a reverse proxy, the server constructs redirect URIs using internal ports (e.g., `http://localhost:8000/oauth2callback`) but Google expects the external URL (e.g., `https://your-domain.com/oauth2callback`).
-
-You also have options for:
-| `OAUTH_CUSTOM_REDIRECT_URIS` *(optional)* | Comma-separated list of additional redirect URIs |
-| `OAUTH_ALLOWED_ORIGINS` *(optional)* | Comma-separated list of additional CORS origins |
-
-**Solution**: Set `GOOGLE_OAUTH_REDIRECT_URI` to your external URL:
-
-```bash
-# External URL without port (nginx/Apache handling HTTPS)
-export GOOGLE_OAUTH_REDIRECT_URI="https://your-domain.com/oauth2callback"
-
-# Or with custom port if needed
-export GOOGLE_OAUTH_REDIRECT_URI="https://your-domain.com:8443/oauth2callback"
-```
-
-**Important**:
-- The redirect URI must exactly match what's configured in your Google Cloud Console
-- The server will use this value for all OAuth flows instead of constructing it from `WORKSPACE_MCP_BASE_URI` and `WORKSPACE_MCP_PORT`
-- Your reverse proxy must forward `/oauth2callback` requests to the MCP server
-
-<details>
-<summary>🚀 <b>Advanced uvx Commands</b> <sub><sup>← More startup options</sup></sub></summary>
-
-```bash
-# Configure credentials first (see Credential Configuration section)
-
-# Start with specific tools only
-uvx workspace-mcp --tools gmail drive calendar tasks
-
-# Start with tool tiers (recommended for most users)
-uvx workspace-mcp --tool-tier core      # Essential tools
-uvx workspace-mcp --tool-tier extended  # Core + additional features
-uvx workspace-mcp --tool-tier complete  # All tools
-
-# Start in HTTP mode for debugging
-uvx workspace-mcp --transport streamable-http
-```
-</details>
-
-*Requires Python 3.10+ and [uvx](https://github.com/astral-sh/uv). The package is available on [PyPI](https://pypi.org/project/workspace-mcp).*
-
-### Development Installation
-
-For development or customization:
-
-```bash
-git clone https://github.com/taylorwilsdon/google_workspace_mcp.git
-cd google_workspace_mcp
-uv run main.py
-```
-
-**Development Installation (For Contributors)**:
-
-<details>
-<summary>🔧 <b>Developer Setup JSON</b> <sub><sup>← For contributors & customization</sup></sub></summary>
-
-```json
-{
-  "mcpServers": {
-    "google_workspace": {
-      "command": "uv",
-      "args": [
-        "run",
-        "--directory",
-        "/path/to/repo/google_workspace_mcp",
-        "main.py"
-      ],
-      "env": {
-        "GOOGLE_OAUTH_CLIENT_ID": "your-client-id",
-        "GOOGLE_OAUTH_CLIENT_SECRET": "your-secret",
-        "OAUTHLIB_INSECURE_TRANSPORT": "1"
-      }
-    }
-  }
-}
-```
-</details>
-
-#### HTTP Mode (For debugging or web interfaces)
-If you need to use HTTP mode with Claude Desktop:
-
-```json
-{
-  "mcpServers": {
-    "google_workspace": {
-      "command": "npx",
-      "args": ["mcp-remote", "http://localhost:8000/mcp"]
-    }
-  }
-}
-```
-
-*Note: Make sure to start the server with `--transport streamable-http` when using HTTP mode.*
-
-### First-Time Authentication
-
-The server uses **Google Desktop OAuth** for simplified authentication:
-
-- **No redirect URIs needed**: Desktop OAuth clients handle authentication without complex callback URLs
-- **Automatic flow**: The server manages the entire OAuth process transparently
-- **Transport-agnostic**: Works seamlessly in both stdio and HTTP modes
-
-When calling a tool:
-1. Server returns authorization URL
-2. Open URL in browser and authorize
-3. Google provides an authorization code
-4. Paste the code when prompted (or it's handled automatically)
-5. Server completes authentication and retries your request
-
----
-
 ## 📋 Credential Configuration
 
 <details open>
@@ -927,11 +698,7 @@ cp .env.oauth21 .env
 </td>
 </tr>
 <tr>
-<td width="50%" valign="top">
 
-Here's the corrected version with all missing tools included:
-
-<table width="100%">
 <tr>
 <td width="50%" valign="top">
 
@@ -1074,6 +841,238 @@ Here's the corrected version with all missing tools included:
 
 ---
 
+### Connect to Claude Desktop
+
+The server supports two transport modes:
+
+#### Stdio Mode (Default - Recommended for Claude Desktop)
+
+In general, you should use the one-click DXT installer package for Claude Desktop.
+If you are unable to for some reason, you can configure it manually via `claude_desktop_config.json`
+
+**Manual Claude Configuration (Alternative)**
+
+<details>
+<summary>📝 <b>Claude Desktop JSON Config</b> <sub><sup>← Click for manual setup instructions</sup></sub></summary>
+
+1. Open Claude Desktop Settings → Developer → Edit Config
+   - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+   - **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+
+2. Add the server configuration:
+```json
+{
+  "mcpServers": {
+    "google_workspace": {
+      "command": "uvx",
+      "args": ["workspace-mcp"],
+      "env": {
+        "GOOGLE_OAUTH_CLIENT_ID": "your-client-id",
+        "GOOGLE_OAUTH_CLIENT_SECRET": "your-secret",
+        "OAUTHLIB_INSECURE_TRANSPORT": "1"
+      }
+    }
+  }
+}
+```
+</details>
+
+### 2. Advanced / Cross-Platform Installation
+
+If you’re developing, deploying to servers, or using another MCP-capable client, keep reading.
+
+#### Instant CLI (uvx)
+
+<details open>
+<summary>⚡ <b>Quick Start with uvx</b> <sub><sup>← No installation required!</sup></sub></summary>
+
+```bash
+# Requires Python 3.10+ and uvx
+# First, set credentials (see Credential Configuration above)
+uvx workspace-mcp --tool-tier core  # or --tools gmail drive calendar
+```
+
+> **Note**: Configure [OAuth credentials](#credential-configuration) before running. Supports environment variables, `.env` file, or `client_secret.json`.
+
+</details>
+
+### OAuth 2.1 Support (Multi-User Bearer Token Authentication)
+
+The server includes OAuth 2.1 support for bearer token authentication, enabling multi-user session management. **OAuth 2.1 automatically reuses your existing `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET` credentials** - no additional configuration needed!
+
+**When to use OAuth 2.1:**
+- Multiple users accessing the same MCP server instance
+- Need for bearer token authentication instead of passing user emails
+- Building web applications or APIs on top of the MCP server
+- Production environments requiring secure session management
+- Browser-based clients requiring CORS support
+
+**Enabling OAuth 2.1:**
+To enable OAuth 2.1, set the `MCP_ENABLE_OAUTH21` environment variable to `true`.
+
+```bash
+# OAuth 2.1 requires HTTP transport mode
+export MCP_ENABLE_OAUTH21=true
+uv run main.py --transport streamable-http
+```
+
+If `MCP_ENABLE_OAUTH21` is not set to `true`, the server will use legacy authentication, which is suitable for clients that do not support OAuth 2.1.
+
+<details>
+<summary>🔐 <b>Innovative CORS Proxy Architecture</b> <sub><sup>← Advanced OAuth 2.1 details</sup></sub></summary>
+
+This implementation solves two critical challenges when using Google OAuth in browser environments:
+
+1.  **Dynamic Client Registration**: Google doesn't support OAuth 2.1 dynamic client registration. Our server provides a clever proxy that accepts any client registration request and returns the pre-configured Google OAuth credentials, allowing standards-compliant clients to work seamlessly.
+
+2.  **CORS Issues**: Google's OAuth endpoints don't include CORS headers, blocking browser-based clients. We implement intelligent proxy endpoints that:
+   - Proxy authorization server discovery requests through `/auth/discovery/authorization-server/{server}`
+   - Proxy token exchange requests through `/oauth2/token`
+   - Add proper CORS headers to all responses
+   - Maintain security by only proxying to known Google OAuth endpoints
+
+This architecture enables any OAuth 2.1 compliant client to authenticate users through Google, even from browser environments, without requiring changes to the client implementation.
+
+</details>
+
+**MCP Inspector**: No additional configuration needed with desktop OAuth client.
+
+**Claude Code Inspector**: No additional configuration needed with desktop OAuth client.
+
+### VS Code MCP Client Support
+
+<details>
+<summary>🆚 <b>VS Code Configuration</b> <sub><sup>← Setup for VS Code MCP extension</sup></sub></summary>
+
+```json
+{
+    "servers": {
+        "google-workspace": {
+            "url": "http://localhost:8000/mcp/",
+            "type": "http"
+        }
+    }
+}
+```
+</details>
+
+
+#### Reverse Proxy Setup
+
+If you're running the MCP server behind a reverse proxy (nginx, Apache, Cloudflare, etc.), you'll need to configure `GOOGLE_OAUTH_REDIRECT_URI` to match your external URL:
+
+**Problem**: When behind a reverse proxy, the server constructs redirect URIs using internal ports (e.g., `http://localhost:8000/oauth2callback`) but Google expects the external URL (e.g., `https://your-domain.com/oauth2callback`).
+
+You also have options for:
+| `OAUTH_CUSTOM_REDIRECT_URIS` *(optional)* | Comma-separated list of additional redirect URIs |
+| `OAUTH_ALLOWED_ORIGINS` *(optional)* | Comma-separated list of additional CORS origins |
+
+**Solution**: Set `GOOGLE_OAUTH_REDIRECT_URI` to your external URL:
+
+```bash
+# External URL without port (nginx/Apache handling HTTPS)
+export GOOGLE_OAUTH_REDIRECT_URI="https://your-domain.com/oauth2callback"
+
+# Or with custom port if needed
+export GOOGLE_OAUTH_REDIRECT_URI="https://your-domain.com:8443/oauth2callback"
+```
+
+**Important**:
+- The redirect URI must exactly match what's configured in your Google Cloud Console
+- The server will use this value for all OAuth flows instead of constructing it from `WORKSPACE_MCP_BASE_URI` and `WORKSPACE_MCP_PORT`
+- Your reverse proxy must forward `/oauth2callback` requests to the MCP server
+
+<details>
+<summary>🚀 <b>Advanced uvx Commands</b> <sub><sup>← More startup options</sup></sub></summary>
+
+```bash
+# Configure credentials first (see Credential Configuration section)
+
+# Start with specific tools only
+uvx workspace-mcp --tools gmail drive calendar tasks
+
+# Start with tool tiers (recommended for most users)
+uvx workspace-mcp --tool-tier core      # Essential tools
+uvx workspace-mcp --tool-tier extended  # Core + additional features
+uvx workspace-mcp --tool-tier complete  # All tools
+
+# Start in HTTP mode for debugging
+uvx workspace-mcp --transport streamable-http
+```
+</details>
+
+*Requires Python 3.10+ and [uvx](https://github.com/astral-sh/uv). The package is available on [PyPI](https://pypi.org/project/workspace-mcp).*
+
+### Development Installation
+
+For development or customization:
+
+```bash
+git clone https://github.com/taylorwilsdon/google_workspace_mcp.git
+cd google_workspace_mcp
+uv run main.py
+```
+
+**Development Installation (For Contributors)**:
+
+<details>
+<summary>🔧 <b>Developer Setup JSON</b> <sub><sup>← For contributors & customization</sup></sub></summary>
+
+```json
+{
+  "mcpServers": {
+    "google_workspace": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "/path/to/repo/google_workspace_mcp",
+        "main.py"
+      ],
+      "env": {
+        "GOOGLE_OAUTH_CLIENT_ID": "your-client-id",
+        "GOOGLE_OAUTH_CLIENT_SECRET": "your-secret",
+        "OAUTHLIB_INSECURE_TRANSPORT": "1"
+      }
+    }
+  }
+}
+```
+</details>
+
+#### HTTP Mode (For debugging or web interfaces)
+If you need to use HTTP mode with Claude Desktop:
+
+```json
+{
+  "mcpServers": {
+    "google_workspace": {
+      "command": "npx",
+      "args": ["mcp-remote", "http://localhost:8000/mcp"]
+    }
+  }
+}
+```
+
+*Note: Make sure to start the server with `--transport streamable-http` when using HTTP mode.*
+
+### First-Time Authentication
+
+The server uses **Google Desktop OAuth** for simplified authentication:
+
+- **No redirect URIs needed**: Desktop OAuth clients handle authentication without complex callback URLs
+- **Automatic flow**: The server manages the entire OAuth process transparently
+- **Transport-agnostic**: Works seamlessly in both stdio and HTTP modes
+
+When calling a tool:
+1. Server returns authorization URL
+2. Open URL in browser and authorize
+3. Google provides an authorization code
+4. Paste the code when prompted (or it's handled automatically)
+5. Server completes authentication and retries your request
+
+---
+
 ## <span style="color:#adbcbc">◆ Development</span>
 
 ### <span style="color:#72898f">Project Structure</span>
@@ -1185,7 +1184,5 @@ Validations:
 
 
 <div align="center">
-<img width="810" alt="Gmail Integration" src="https://github.com/user-attachments/assets/656cea40-1f66-40c1-b94c-5a2c900c969d" />
-<img width="810" alt="Calendar Management" src="https://github.com/user-attachments/assets/d3c2a834-fcca-4dc5-8990-6d6dc1d96048" />
 <img width="842" alt="Batch Emails" src="https://github.com/user-attachments/assets/0876c789-7bcc-4414-a144-6c3f0aaffc06" />
 </div>
