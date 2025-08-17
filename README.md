@@ -67,6 +67,10 @@ A production-ready MCP server that integrates all major Google Workspace service
 - Multi-user bearer token authentication
 - Innovative CORS proxy architecture
 
+
+---
+
+
 **<span style="color:#72898f">@</span> Gmail** • **<span style="color:#72898f">≡</span> Drive** • **<span style="color:#72898f">⧖</span> Calendar** **<span style="color:#72898f">≡</span> Docs**
 - Complete email management (search, send, draft, label, batch operations)
 - File operations with Office format support
@@ -82,6 +86,7 @@ A production-ready MCP server that integrates all major Google Workspace service
 - Spreadsheet operations with flexible cell management
 - Presentation creation, updates & content manipulation
 
+---
 
 **<span style="color:#72898f">✓</span> Tasks** • **<span style="color:#72898f">◆</span> Custom Search** • **<span style="color:#72898f">↻</span> Transport Support**
 - Full support for all MCP Transports - Stdio, Streamable HTTP & legacy SSE
@@ -176,6 +181,7 @@ Claude Desktop stores these securely in the OS keychain; set them once in the ex
 <div align="center">
   <video width="832" src="https://github.com/user-attachments/assets/83cca4b3-5e94-448b-acb3-6e3a27341d3a"></video>
 </div>
+
 ---
 
 ### Prerequisites
