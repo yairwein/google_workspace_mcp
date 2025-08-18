@@ -20,9 +20,6 @@ LIST_TASKS_MAX_RESULTS_DEFAULT = 20
 LIST_TASKS_MAX_RESULTS_MAX = 10_000
 LIST_TASKS_MAX_POSITION = "99999999999999999999"
 
-
-
-
 @server.tool()
 @require_google_service("tasks", "tasks_read")
 @handle_http_errors("list_task_lists", service_type="tasks")
@@ -284,13 +281,13 @@ async def list_tasks(
     due_min: Optional[str] = None,
     updated_min: Optional[str] = None
 ) -> str:
-    f"""
+    """
     List all tasks in a specific task list.
 
     Args:
         user_google_email (str): The user's Google email address. Required.
         task_list_id (str): The ID of the task list to retrieve tasks from.
-        max_results (Optional[int]): Maximum number of tasks to return (default: {LIST_TASKS_MAX_RESULTS_DEFAULT:,d}, max: {LIST_TASKS_MAX_RESULTS_MAX:,d}).
+        max_results (Optional[int]): Maximum number of tasks to return (default: 20, max: 10000).
         page_token (Optional[str]): Token for pagination.
         show_completed (Optional[bool]): Whether to include completed tasks (default: True).
         show_deleted (Optional[bool]): Whether to include deleted tasks (default: False).
