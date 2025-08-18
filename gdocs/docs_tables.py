@@ -241,10 +241,6 @@ def create_table_with_data(
         }
     })
     
-    # We need to calculate where cells will be after table creation
-    # This is approximate - better to get actual positions after creation
-    estimated_cells = calculate_cell_positions(index, rows, cols)
-    
     # Build text insertion requests for each cell
     # Note: In practice, we'd need to get the actual document structure
     # after table creation to get accurate indices

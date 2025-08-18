@@ -1,6 +1,7 @@
 import argparse
 import logging
 import os
+import socket
 import sys
 from importlib import metadata
 from dotenv import load_dotenv
@@ -8,6 +9,8 @@ from dotenv import load_dotenv
 from auth.oauth_config import reload_oauth_config
 from core.utils import check_credentials_directory_permissions
 from core.server import server, set_transport_mode, configure_server_for_http
+from core.tool_tier_loader import resolve_tools_from_tier
+from core.tool_registry import set_enabled_tools as set_enabled_tool_names, wrap_server_tool_method, filter_server_tools
 
 dotenv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
 load_dotenv(dotenv_path=dotenv_path)
@@ -67,6 +70,8 @@ def main():
     parser.add_argument('--tools', nargs='*',
                         choices=['gmail', 'drive', 'calendar', 'docs', 'sheets', 'chat', 'forms', 'slides', 'tasks', 'search'],
                         help='Specify which tools to register. If not provided, all tools are registered.')
+    parser.add_argument('--tool-tier', choices=['core', 'extended', 'complete'],
+                        help='Load tools based on tier level. Can be combined with --tools to filter services.')
     parser.add_argument('--transport', choices=['stdio', 'streamable-http'], default='stdio',
                         help='Transport mode: stdio (default) or streamable-http')
     args = parser.parse_args()
@@ -141,10 +146,36 @@ def main():
         'search': '🔍'
     }
 
-    # Import specified tools or all tools if none specified
-    tools_to_import = args.tools if args.tools is not None else tool_imports.keys()
+    # Determine which tools to import based on arguments
+    if args.tool_tier is not None:
+        # Use tier-based tool selection, optionally filtered by services
+        try:
+            tier_tools, suggested_services = resolve_tools_from_tier(args.tool_tier, args.tools)
 
-    # Set enabled tools for scope management
+            # If --tools specified, use those services; otherwise use all services that have tier tools
+            if args.tools is not None:
+                tools_to_import = args.tools
+            else:
+                tools_to_import = suggested_services
+
+            # Set the specific tools that should be registered
+            set_enabled_tool_names(set(tier_tools))
+        except Exception as e:
+            safe_print(f"❌ Error loading tools for tier '{args.tool_tier}': {e}")
+            sys.exit(1)
+    elif args.tools is not None:
+        # Use explicit tool list without tier filtering
+        tools_to_import = args.tools
+        # Don't filter individual tools when using explicit service list only
+        set_enabled_tool_names(None)
+    else:
+        # Default: import all tools
+        tools_to_import = tool_imports.keys()
+        # Don't filter individual tools when importing all
+        set_enabled_tool_names(None)
+
+    wrap_server_tool_method(server)
+
     from auth.scopes import set_enabled_tools
     set_enabled_tools(list(tools_to_import))
 
@@ -154,8 +185,16 @@ def main():
         safe_print(f"   {tool_icons[tool]} {tool.title()} - Google {tool.title()} API integration")
     safe_print("")
 
+    # Filter tools based on tier configuration (if tier-based loading is enabled)
+    filter_server_tools(server)
+
     safe_print("📊 Configuration Summary:")
-    safe_print(f"   🔧 Tools Enabled: {len(tools_to_import)}/{len(tool_imports)}")
+    safe_print(f"   🔧 Services Loaded: {len(tools_to_import)}/{len(tool_imports)}")
+    if args.tool_tier is not None:
+        if args.tools is not None:
+            safe_print(f"   📊 Tool Tier: {args.tool_tier} (filtered to {', '.join(args.tools)})")
+        else:
+            safe_print(f"   📊 Tool Tier: {args.tool_tier}")
     safe_print(f"   📝 Log Level: {logging.getLogger().getEffectiveLevel()}")
     safe_print("")
 
@@ -204,7 +243,15 @@ def main():
         safe_print("")
 
         if args.transport == 'streamable-http':
-            # The server has CORS middleware built-in via CORSEnabledFastMCP
+            # Check port availability before starting HTTP server
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.bind(('', port))
+            except OSError as e:
+                safe_print(f"Socket error: {e}")
+                safe_print(f"❌ Port {port} is already in use. Cannot start HTTP server.")
+                sys.exit(1)
+
             server.run(transport="streamable-http", host="0.0.0.0", port=port)
         else:
             server.run()

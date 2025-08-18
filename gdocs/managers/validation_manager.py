@@ -5,8 +5,7 @@ This module provides centralized validation logic for Google Docs operations,
 extracting validation patterns from individual tool functions.
 """
 import logging
-from typing import Dict, Any, List, Tuple, Optional, Union
-import re
+from typing import Dict, Any, List, Tuple, Optional
 
 logger = logging.getLogger(__name__)
 
