@@ -197,92 +197,155 @@ async def get_events(
     service,
     user_google_email: str,
     calendar_id: str = "primary",
+    event_id: Optional[str] = None,
     time_min: Optional[str] = None,
     time_max: Optional[str] = None,
     max_results: int = 25,
     query: Optional[str] = None,
+    detailed: bool = False,
 ) -> str:
     """
-    Retrieves a list of events from a specified Google Calendar within a given time range.
+    Retrieves events from a specified Google Calendar. Can retrieve a single event by ID or multiple events within a time range.
     You can also search for events by keyword by supplying the optional "query" param.
 
     Args:
         user_google_email (str): The user's Google email address. Required.
         calendar_id (str): The ID of the calendar to query. Use 'primary' for the user's primary calendar. Defaults to 'primary'. Calendar IDs can be obtained using `list_calendars`.
-        time_min (Optional[str]): The start of the time range (inclusive) in RFC3339 format (e.g., '2024-05-12T10:00:00Z' or '2024-05-12'). If omitted, defaults to the current time.
-        time_max (Optional[str]): The end of the time range (exclusive) in RFC3339 format. If omitted, events starting from `time_min` onwards are considered (up to `max_results`).
-        max_results (int): The maximum number of events to return. Defaults to 25.
-        query (Optional[str]): A keyword to search for within event fields (summary, description, location).
+        event_id (Optional[str]): The ID of a specific event to retrieve. If provided, retrieves only this event and ignores time filtering parameters.
+        time_min (Optional[str]): The start of the time range (inclusive) in RFC3339 format (e.g., '2024-05-12T10:00:00Z' or '2024-05-12'). If omitted, defaults to the current time. Ignored if event_id is provided.
+        time_max (Optional[str]): The end of the time range (exclusive) in RFC3339 format. If omitted, events starting from `time_min` onwards are considered (up to `max_results`). Ignored if event_id is provided.
+        max_results (int): The maximum number of events to return. Defaults to 25. Ignored if event_id is provided.
+        query (Optional[str]): A keyword to search for within event fields (summary, description, location). Ignored if event_id is provided.
+        detailed (bool): Whether to return detailed event information including description, location, and attendees. Defaults to False.
 
     Returns:
-        str: A formatted list of events (summary, start and end times, link) within the specified range.
+        str: A formatted list of events (summary, start and end times, link) within the specified range, or detailed information for a single event if event_id is provided.
     """
     logger.info(
-        f"[get_events] Raw time parameters - time_min: '{time_min}', time_max: '{time_max}', query: '{query}'"
+        f"[get_events] Raw parameters - event_id: '{event_id}', time_min: '{time_min}', time_max: '{time_max}', query: '{query}', detailed: {detailed}"
     )
 
-    # Ensure time_min and time_max are correctly formatted for the API
-    formatted_time_min = _correct_time_format_for_api(time_min, "time_min")
-    effective_time_min = formatted_time_min or (
-        datetime.datetime.utcnow().isoformat() + "Z"
-    )
-    if time_min is None:
-        logger.info(
-            f"time_min not provided, defaulting to current UTC time: {effective_time_min}"
+    # Handle single event retrieval
+    if event_id:
+        logger.info(f"[get_events] Retrieving single event with ID: {event_id}")
+        event = await asyncio.to_thread(
+            lambda: service.events().get(calendarId=calendar_id, eventId=event_id).execute()
         )
+        items = [event]
     else:
+        # Handle multiple events retrieval with time filtering
+        # Ensure time_min and time_max are correctly formatted for the API
+        formatted_time_min = _correct_time_format_for_api(time_min, "time_min")
+        effective_time_min = formatted_time_min or (
+            datetime.datetime.utcnow().isoformat() + "Z"
+        )
+        if time_min is None:
+            logger.info(
+                f"time_min not provided, defaulting to current UTC time: {effective_time_min}"
+            )
+        else:
+            logger.info(
+                f"time_min processing: original='{time_min}', formatted='{formatted_time_min}', effective='{effective_time_min}'"
+            )
+
+        effective_time_max = _correct_time_format_for_api(time_max, "time_max")
+        if time_max:
+            logger.info(
+                f"time_max processing: original='{time_max}', formatted='{effective_time_max}'"
+            )
+
         logger.info(
-            f"time_min processing: original='{time_min}', formatted='{formatted_time_min}', effective='{effective_time_min}'"
+            f"[get_events] Final API parameters - calendarId: '{calendar_id}', timeMin: '{effective_time_min}', timeMax: '{effective_time_max}', maxResults: {max_results}, query: '{query}'"
         )
 
-    effective_time_max = _correct_time_format_for_api(time_max, "time_max")
-    if time_max:
-        logger.info(
-            f"time_max processing: original='{time_max}', formatted='{effective_time_max}'"
+        # Build the request parameters dynamically
+        request_params = {
+            "calendarId": calendar_id,
+            "timeMin": effective_time_min,
+            "timeMax": effective_time_max,
+            "maxResults": max_results,
+            "singleEvents": True,
+            "orderBy": "startTime",
+        }
+
+        if query:
+            request_params["q"] = query
+
+        events_result = await asyncio.to_thread(
+            lambda: service.events()
+            .list(**request_params)
+            .execute()
         )
-
-    logger.info(
-        f"[get_events] Final API parameters - calendarId: '{calendar_id}', timeMin: '{effective_time_min}', timeMax: '{effective_time_max}', maxResults: {max_results}, query: '{query}'"
-    )
-
-    # Build the request parameters dynamically
-    request_params = {
-        "calendarId": calendar_id,
-        "timeMin": effective_time_min,
-        "timeMax": effective_time_max,
-        "maxResults": max_results,
-        "singleEvents": True,
-        "orderBy": "startTime",
-    }
-
-    if query:
-        request_params["q"] = query
-
-    events_result = await asyncio.to_thread(
-        lambda: service.events()
-        .list(**request_params)
-        .execute()
-    )
-    items = events_result.get("items", [])
+        items = events_result.get("items", [])
     if not items:
-        return f"No events found in calendar '{calendar_id}' for {user_google_email} for the specified time range."
+        if event_id:
+            return f"Event with ID '{event_id}' not found in calendar '{calendar_id}' for {user_google_email}."
+        else:
+            return f"No events found in calendar '{calendar_id}' for {user_google_email} for the specified time range."
 
+    # Handle returning detailed output for a single event when requested
+    if event_id and detailed:
+        item = items[0]
+        summary = item.get("summary", "No Title")
+        start = item["start"].get("dateTime", item["start"].get("date"))
+        end = item["end"].get("dateTime", item["end"].get("date"))
+        link = item.get("htmlLink", "No Link")
+        description = item.get("description", "No Description")
+        location = item.get("location", "No Location")
+        attendees = item.get("attendees", [])
+        attendee_emails = ", ".join([a.get("email", "") for a in attendees]) if attendees else "None"
+        event_details = (
+            f'Event Details:\n'
+            f'- Title: {summary}\n'
+            f'- Starts: {start}\n'
+            f'- Ends: {end}\n'
+            f'- Description: {description}\n'
+            f'- Location: {location}\n'
+            f'- Attendees: {attendee_emails}\n'
+            f'- Event ID: {event_id}\n'
+            f'- Link: {link}'
+        )
+        logger.info(f"[get_events] Successfully retrieved detailed event {event_id} for {user_google_email}.")
+        return event_details
+
+    # Handle multiple events or single event with basic output
     event_details_list = []
     for item in items:
         summary = item.get("summary", "No Title")
         start_time = item["start"].get("dateTime", item["start"].get("date"))
         end_time = item["end"].get("dateTime", item["end"].get("date"))
         link = item.get("htmlLink", "No Link")
-        event_id = item.get("id", "No ID")
-        # Include the start/end date, and event ID in the output so users can copy it for modify/delete operations
-        event_details_list.append(
-            f'- "{summary}" (Starts: {start_time}, Ends: {end_time}) ID: {event_id} | Link: {link}'
-        )
+        item_event_id = item.get("id", "No ID")
+        
+        if detailed:
+            # Add detailed information for multiple events
+            description = item.get("description", "No Description")
+            location = item.get("location", "No Location")
+            attendees = item.get("attendees", [])
+            attendee_emails = ", ".join([a.get("email", "") for a in attendees]) if attendees else "None"
+            event_details_list.append(
+                f'- "{summary}" (Starts: {start_time}, Ends: {end_time})\n'
+                f'  Description: {description}\n'
+                f'  Location: {location}\n'
+                f'  Attendees: {attendee_emails}\n'
+                f'  ID: {item_event_id} | Link: {link}'
+            )
+        else:
+            # Basic output format
+            event_details_list.append(
+                f'- "{summary}" (Starts: {start_time}, Ends: {end_time}) ID: {item_event_id} | Link: {link}'
+            )
 
-    text_output = (
-        f"Successfully retrieved {len(items)} events from calendar '{calendar_id}' for {user_google_email}:\n"
-        + "\n".join(event_details_list)
-    )
+    if event_id:
+        # Single event basic output
+        text_output = f"Successfully retrieved event from calendar '{calendar_id}' for {user_google_email}:\n" + "\n".join(event_details_list)
+    else:
+        # Multiple events output
+        text_output = (
+            f"Successfully retrieved {len(items)} events from calendar '{calendar_id}' for {user_google_email}:\n"
+            + "\n".join(event_details_list)
+        )
+    
     logger.info(f"Successfully retrieved {len(items)} events for {user_google_email}.")
     return text_output
 
@@ -719,48 +782,3 @@ async def delete_event(service, user_google_email: str, event_id: str, calendar_
     return confirmation_message
 
 
-@server.tool()
-@handle_http_errors("get_event", is_read_only=True, service_type="calendar")
-@require_google_service("calendar", "calendar_read")
-async def get_event(
-    service,
-    user_google_email: str,
-    event_id: str,
-    calendar_id: str = "primary"
-) -> str:
-    """
-    Retrieves the details of a single event by its ID from a specified Google Calendar.
-
-    Args:
-        user_google_email (str): The user's Google email address. Required.
-        event_id (str): The ID of the event to retrieve. Required.
-        calendar_id (str): The ID of the calendar to query. Defaults to 'primary'.
-
-    Returns:
-        str: A formatted string with the event's details.
-    """
-    logger.info(f"[get_event] Invoked. Email: '{user_google_email}', Event ID: {event_id}")
-    event = await asyncio.to_thread(
-        lambda: service.events().get(calendarId=calendar_id, eventId=event_id).execute()
-    )
-    summary = event.get("summary", "No Title")
-    start = event["start"].get("dateTime", event["start"].get("date"))
-    end = event["end"].get("dateTime", event["end"].get("date"))
-    link = event.get("htmlLink", "No Link")
-    description = event.get("description", "No Description")
-    location = event.get("location", "No Location")
-    attendees = event.get("attendees", [])
-    attendee_emails = ", ".join([a.get("email", "") for a in attendees]) if attendees else "None"
-    event_details = (
-        f'Event Details:\n'
-        f'- Title: {summary}\n'
-        f'- Starts: {start}\n'
-        f'- Ends: {end}\n'
-        f'- Description: {description}\n'
-        f'- Location: {location}\n'
-        f'- Attendees: {attendee_emails}\n'
-        f'- Event ID: {event_id}\n'
-        f'- Link: {link}'
-    )
-    logger.info(f"[get_event] Successfully retrieved event {event_id} for {user_google_email}.")
-    return event_details
