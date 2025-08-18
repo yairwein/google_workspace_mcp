@@ -622,7 +622,7 @@ async def your_new_tool(service, param1: str, param2: int = 10):
 
 ### Credential Store System
 
-The server includes an abstract credential store api and a default backend for managing Google OAuth
+The server includes an abstract credential store API and a default backend for managing Google OAuth
 credentials with support for multiple storage backends:
 
 **Features:**
