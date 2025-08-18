@@ -21,17 +21,6 @@ LIST_TASKS_MAX_RESULTS_MAX = 10_000
 LIST_TASKS_MAX_POSITION = "99999999999999999999"
 
 
-def docstring_format(**values):
-    """
-    Decorator to format the docstring of a function with given values.
-    """
-
-    def _apply(func):
-        if func.__doc__:
-            func.__doc__ = func.__doc__.format(**values)
-        return func
-
-    return _apply
 
 
 @server.tool()
@@ -279,10 +268,6 @@ async def delete_task_list(
 @server.tool()
 @require_google_service("tasks", "tasks_read")
 @handle_http_errors("list_tasks", service_type="tasks")
-@docstring_format(
-    LIST_TASKS_MAX_RESULTS_DEFAULT=LIST_TASKS_MAX_RESULTS_DEFAULT,
-    LIST_TASKS_MAX_RESULTS_MAX=LIST_TASKS_MAX_RESULTS_MAX
-)
 async def list_tasks(
     service,
     user_google_email: str,
@@ -299,7 +284,7 @@ async def list_tasks(
     due_min: Optional[str] = None,
     updated_min: Optional[str] = None
 ) -> str:
-    """
+    f"""
     List all tasks in a specific task list.
 
     Args:
