@@ -69,3 +69,6 @@ dev = [
 [tool.setuptools]
 packages = [ "auth", "gcalendar", "core", "gdocs", "gdocs.managers", "gdrive", "gmail", "gchat", "gsheets", "gforms", "gslides", "gtasks", "gsearch"]
 py-modules = [ "main"]
+
+[tool.setuptools.package-data]
+core = ["tool_tiers.yaml"]
