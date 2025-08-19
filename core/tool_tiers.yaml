@@ -24,7 +24,9 @@ drive:
     - create_drive_file
   extended:
     - list_drive_items
-  complete: []
+  complete:
+    - get_drive_file_permissions
+    - check_drive_file_public_access
 
 calendar:
   core:

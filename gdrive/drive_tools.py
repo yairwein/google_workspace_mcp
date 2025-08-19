@@ -5,8 +5,7 @@ This module provides MCP tools for interacting with Google Drive API.
 """
 import logging
 import asyncio
-import re
-from typing import Optional, Dict, Any
+from typing import Optional
 
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 import io
@@ -15,63 +14,9 @@ import httpx
 from auth.service_decorator import require_google_service
 from core.utils import extract_office_xml_text, handle_http_errors
 from core.server import server
+from gdrive.drive_helpers import DRIVE_QUERY_PATTERNS, build_drive_list_params
 
 logger = logging.getLogger(__name__)
-
-# Precompiled regex patterns for Drive query detection
-DRIVE_QUERY_PATTERNS = [
-    re.compile(r'\b\w+\s*(=|!=|>|<)\s*[\'"].*?[\'"]', re.IGNORECASE),  # field = 'value'
-    re.compile(r'\b\w+\s*(=|!=|>|<)\s*\d+', re.IGNORECASE),            # field = number
-    re.compile(r'\bcontains\b', re.IGNORECASE),                         # contains operator
-    re.compile(r'\bin\s+parents\b', re.IGNORECASE),                     # in parents
-    re.compile(r'\bhas\s*\{', re.IGNORECASE),                          # has {properties}
-    re.compile(r'\btrashed\s*=\s*(true|false)\b', re.IGNORECASE),      # trashed=true/false
-    re.compile(r'\bstarred\s*=\s*(true|false)\b', re.IGNORECASE),      # starred=true/false
-    re.compile(r'[\'"][^\'"]+[\'"]\s+in\s+parents', re.IGNORECASE),    # 'parentId' in parents
-    re.compile(r'\bfullText\s+contains\b', re.IGNORECASE),             # fullText contains
-    re.compile(r'\bname\s*(=|contains)\b', re.IGNORECASE),             # name = or name contains
-    re.compile(r'\bmimeType\s*(=|!=)\b', re.IGNORECASE),               # mimeType operators
-]
-
-
-def _build_drive_list_params(
-    query: str,
-    page_size: int,
-    drive_id: Optional[str] = None,
-    include_items_from_all_drives: bool = True,
-    corpora: Optional[str] = None,
-) -> Dict[str, Any]:
-    """
-    Helper function to build common list parameters for Drive API calls.
-
-    Args:
-        query: The search query string
-        page_size: Maximum number of items to return
-        drive_id: Optional shared drive ID
-        include_items_from_all_drives: Whether to include items from all drives
-        corpora: Optional corpus specification
-
-    Returns:
-        Dictionary of parameters for Drive API list calls
-    """
-    list_params = {
-        "q": query,
-        "pageSize": page_size,
-        "fields": "nextPageToken, files(id, name, mimeType, webViewLink, iconLink, modifiedTime, size)",
-        "supportsAllDrives": True,
-        "includeItemsFromAllDrives": include_items_from_all_drives,
-    }
-
-    if drive_id:
-        list_params["driveId"] = drive_id
-        if corpora:
-            list_params["corpora"] = corpora
-        else:
-            list_params["corpora"] = "drive"
-    elif corpora:
-        list_params["corpora"] = corpora
-
-    return list_params
 
 @server.tool()
 @handle_http_errors("search_drive_files", is_read_only=True, service_type="drive")
@@ -116,7 +61,7 @@ async def search_drive_files(
         final_query = f"fullText contains '{escaped_query}'"
         logger.info(f"[search_drive_files] Reformatting free text query '{query}' to '{final_query}'")
 
-    list_params = _build_drive_list_params(
+    list_params = build_drive_list_params(
         query=final_query,
         page_size=page_size,
         drive_id=drive_id,
@@ -262,7 +207,7 @@ async def list_drive_items(
 
     final_query = f"'{folder_id}' in parents and trashed=false"
 
-    list_params = _build_drive_list_params(
+    list_params = build_drive_list_params(
         query=final_query,
         page_size=page_size,
         drive_id=drive_id,
@@ -355,3 +300,197 @@ async def create_drive_file(
     confirmation_message = f"Successfully created file '{created_file.get('name', file_name)}' (ID: {created_file.get('id', 'N/A')}) in folder '{folder_id}' for {user_google_email}. Link: {link}"
     logger.info(f"Successfully created file. Link: {link}")
     return confirmation_message
+
+@server.tool()
+@handle_http_errors("get_drive_file_permissions", is_read_only=True, service_type="drive")
+@require_google_service("drive", "drive_read")
+async def get_drive_file_permissions(
+    service,
+    user_google_email: str,
+    file_id: str,
+) -> str:
+    """
+    Gets detailed metadata about a Google Drive file including sharing permissions.
+    
+    Args:
+        user_google_email (str): The user's Google email address. Required.
+        file_id (str): The ID of the file to check permissions for.
+    
+    Returns:
+        str: Detailed file metadata including sharing status and URLs.
+    """
+    logger.info(f"[get_drive_file_permissions] Checking file {file_id} for {user_google_email}")
+    
+    try:
+        # Get comprehensive file metadata including permissions
+        file_metadata = await asyncio.to_thread(
+            service.files().get(
+                fileId=file_id,
+                fields="id, name, mimeType, size, modifiedTime, owners, permissions, "
+                       "webViewLink, webContentLink, shared, sharingUser, viewersCanCopyContent",
+                supportsAllDrives=True
+            ).execute
+        )
+        
+        # Format the response
+        output_parts = [
+            f"File: {file_metadata.get('name', 'Unknown')}",
+            f"ID: {file_id}",
+            f"Type: {file_metadata.get('mimeType', 'Unknown')}",
+            f"Size: {file_metadata.get('size', 'N/A')} bytes",
+            f"Modified: {file_metadata.get('modifiedTime', 'N/A')}",
+            "",
+            "Sharing Status:",
+            f"  Shared: {file_metadata.get('shared', False)}",
+        ]
+        
+        # Add sharing user if available
+        sharing_user = file_metadata.get('sharingUser')
+        if sharing_user:
+            output_parts.append(f"  Shared by: {sharing_user.get('displayName', 'Unknown')} ({sharing_user.get('emailAddress', 'Unknown')})")
+        
+        # Process permissions
+        permissions = file_metadata.get('permissions', [])
+        if permissions:
+            output_parts.append(f"  Number of permissions: {len(permissions)}")
+            output_parts.append("  Permissions:")
+            for perm in permissions:
+                perm_type = perm.get('type', 'unknown')
+                role = perm.get('role', 'unknown')
+                
+                if perm_type == 'anyone':
+                    output_parts.append(f"    - Anyone with the link ({role})")
+                elif perm_type == 'user':
+                    email = perm.get('emailAddress', 'unknown')
+                    output_parts.append(f"    - User: {email} ({role})")
+                elif perm_type == 'domain':
+                    domain = perm.get('domain', 'unknown')
+                    output_parts.append(f"    - Domain: {domain} ({role})")
+                elif perm_type == 'group':
+                    email = perm.get('emailAddress', 'unknown')
+                    output_parts.append(f"    - Group: {email} ({role})")
+                else:
+                    output_parts.append(f"    - {perm_type} ({role})")
+        else:
+            output_parts.append("  No additional permissions (private file)")
+        
+        # Add URLs
+        output_parts.extend([
+            "",
+            "URLs:",
+            f"  View Link: {file_metadata.get('webViewLink', 'N/A')}",
+        ])
+        
+        # webContentLink is only available for files that can be downloaded
+        web_content_link = file_metadata.get('webContentLink')
+        if web_content_link:
+            output_parts.append(f"  Direct Download Link: {web_content_link}")
+        
+        # Check if file has "anyone with link" permission
+        from gdrive.drive_helpers import check_public_link_permission
+        has_public_link = check_public_link_permission(permissions)
+        
+        if has_public_link:
+            output_parts.extend([
+                "",
+                "✅ This file is shared with 'Anyone with the link' - it can be inserted into Google Docs"
+            ])
+        else:
+            output_parts.extend([
+                "",
+                "❌ This file is NOT shared with 'Anyone with the link' - it cannot be inserted into Google Docs",
+                "   To fix: Right-click the file in Google Drive → Share → Anyone with the link → Viewer"
+            ])
+        
+        return "\n".join(output_parts)
+        
+    except Exception as e:
+        logger.error(f"Error getting file permissions: {e}")
+        return f"Error getting file permissions: {e}"
+
+
+@server.tool()
+@handle_http_errors("check_drive_file_public_access", is_read_only=True, service_type="drive")
+@require_google_service("drive", "drive_read")
+async def check_drive_file_public_access(
+    service,
+    user_google_email: str,
+    file_name: str,
+) -> str:
+    """
+    Searches for a file by name and checks if it has public link sharing enabled.
+    
+    Args:
+        user_google_email (str): The user's Google email address. Required.
+        file_name (str): The name of the file to check.
+    
+    Returns:
+        str: Information about the file's sharing status and whether it can be used in Google Docs.
+    """
+    logger.info(f"[check_drive_file_public_access] Searching for {file_name}")
+    
+    # Search for the file
+    escaped_name = file_name.replace("'", "\\'")
+    query = f"name = '{escaped_name}'"
+    
+    list_params = {
+        "q": query,
+        "pageSize": 10,
+        "fields": "files(id, name, mimeType, webViewLink)",
+        "supportsAllDrives": True,
+        "includeItemsFromAllDrives": True,
+    }
+    
+    results = await asyncio.to_thread(
+        service.files().list(**list_params).execute
+    )
+    
+    files = results.get('files', [])
+    if not files:
+        return f"No file found with name '{file_name}'"
+    
+    if len(files) > 1:
+        output_parts = [f"Found {len(files)} files with name '{file_name}':"]
+        for f in files:
+            output_parts.append(f"  - {f['name']} (ID: {f['id']})")
+        output_parts.append("\nChecking the first file...")
+        output_parts.append("")
+    else:
+        output_parts = []
+    
+    # Check permissions for the first file
+    file_id = files[0]['id']
+    
+    # Get detailed permissions
+    file_metadata = await asyncio.to_thread(
+        service.files().get(
+            fileId=file_id,
+            fields="id, name, mimeType, permissions, webViewLink, webContentLink, shared",
+            supportsAllDrives=True
+        ).execute
+    )
+    
+    permissions = file_metadata.get('permissions', [])
+    from gdrive.drive_helpers import check_public_link_permission, get_drive_image_url
+    has_public_link = check_public_link_permission(permissions)
+    
+    output_parts.extend([
+        f"File: {file_metadata['name']}",
+        f"ID: {file_id}",
+        f"Type: {file_metadata['mimeType']}",
+        f"Shared: {file_metadata.get('shared', False)}",
+        ""
+    ])
+    
+    if has_public_link:
+        output_parts.extend([
+            "✅ PUBLIC ACCESS ENABLED - This file can be inserted into Google Docs",
+            f"Use with insert_doc_image_url: {get_drive_image_url(file_id)}"
+        ])
+    else:
+        output_parts.extend([
+            "❌ NO PUBLIC ACCESS - Cannot insert into Google Docs",
+            "Fix: Drive → Share → 'Anyone with the link' → 'Viewer'"
+        ])
+    
+    return "\n".join(output_parts)
