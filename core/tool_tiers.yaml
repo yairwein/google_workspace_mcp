@@ -24,7 +24,9 @@ drive:
     - create_drive_file
   extended:
     - list_drive_items
-  complete: []
+  complete:
+    - get_drive_file_permissions
+    - check_drive_file_public_access
 
 calendar:
   core:
@@ -47,7 +49,6 @@ docs:
     - list_docs_in_folder
     - insert_doc_elements
   complete:
-    - insert_doc_image
     - update_doc_headers_footers
     - batch_update_doc
     - inspect_doc_structure
