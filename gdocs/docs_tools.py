@@ -23,7 +23,6 @@ from gdocs.docs_helpers import (
     create_find_replace_request,
     create_insert_table_request,
     create_insert_page_break_request,
-    create_insert_image_request,
     create_bullet_list_request
 )
 
