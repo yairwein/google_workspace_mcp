@@ -532,6 +532,10 @@ uv run main.py --tool-tier complete  # ○ All available tools
 docker build -t workspace-mcp .
 docker run -p 8000:8000 -v $(pwd):/app \
   workspace-mcp --transport streamable-http
+
+# With tool selection via environment variables
+docker run -e TOOL_TIER=core workspace-mcp
+docker run -e TOOLS="gmail drive calendar" workspace-mcp
 ```
 
 **Available Services**: `gmail` • `drive` • `calendar` • `docs` • `sheets` • `forms` • `tasks` • `chat` • `search`
