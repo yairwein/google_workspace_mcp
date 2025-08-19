@@ -23,6 +23,7 @@ from gdocs.docs_helpers import (
     create_find_replace_request,
     create_insert_table_request,
     create_insert_page_break_request,
+    create_insert_image_request,
     create_bullet_list_request
 )
 
@@ -563,6 +564,85 @@ async def insert_doc_elements(
 
     link = f"https://docs.google.com/document/d/{document_id}/edit"
     return f"Inserted {description} at index {index} in document {document_id}. Link: {link}"
+
+@server.tool()
+@handle_http_errors("insert_doc_image", service_type="docs")
+@require_multiple_services([
+    {"service_type": "docs", "scopes": "docs_write", "param_name": "docs_service"},
+    {"service_type": "drive", "scopes": "drive_read", "param_name": "drive_service"}
+])
+async def insert_doc_image(
+    docs_service,
+    drive_service,
+    user_google_email: str,
+    document_id: str,
+    image_source: str,
+    index: int,
+    width: int = None,
+    height: int = None,
+) -> str:
+    """
+    Inserts an image into a Google Doc from Drive or a URL.
+
+    Args:
+        user_google_email: User's Google email address
+        document_id: ID of the document to update
+        image_source: Drive file ID or public image URL
+        index: Position to insert image (0-based)
+        width: Image width in points (optional)
+        height: Image height in points (optional)
+
+    Returns:
+        str: Confirmation message with insertion details
+    """
+    logger.info(f"[insert_doc_image] Doc={document_id}, source={image_source}, index={index}")
+
+    # Handle the special case where we can't insert at the first section break
+    # If index is 0, bump it to 1 to avoid the section break
+    if index == 0:
+        logger.debug("Adjusting index from 0 to 1 to avoid first section break")
+        index = 1
+
+    # Determine if source is a Drive file ID or URL
+    is_drive_file = not (image_source.startswith('http://') or image_source.startswith('https://'))
+
+    if is_drive_file:
+        # Verify Drive file exists and get metadata
+        try:
+            file_metadata = await asyncio.to_thread(
+                drive_service.files().get(
+                    fileId=image_source,
+                    fields="id, name, mimeType"
+                ).execute
+            )
+            mime_type = file_metadata.get('mimeType', '')
+            if not mime_type.startswith('image/'):
+                return f"Error: File {image_source} is not an image (MIME type: {mime_type})."
+
+            image_uri = f"https://drive.google.com/uc?id={image_source}"
+            source_description = f"Drive file {file_metadata.get('name', image_source)}"
+        except Exception as e:
+            return f"Error: Could not access Drive file {image_source}: {str(e)}"
+    else:
+        image_uri = image_source
+        source_description = "URL image"
+
+    # Use helper to create image request
+    requests = [create_insert_image_request(index, image_uri, width, height)]
+
+    await asyncio.to_thread(
+        docs_service.documents().batchUpdate(
+            documentId=document_id,
+            body={'requests': requests}
+        ).execute
+    )
+
+    size_info = ""
+    if width or height:
+        size_info = f" (size: {width or 'auto'}x{height or 'auto'} points)"
+
+    link = f"https://docs.google.com/document/d/{document_id}/edit"
+    return f"Inserted {source_description}{size_info} at index {index} in document {document_id}. Link: {link}"
 
 @server.tool()
 @handle_http_errors("update_doc_headers_footers", service_type="docs")
