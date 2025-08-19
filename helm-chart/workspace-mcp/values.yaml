@@ -107,8 +107,20 @@ tools:
   # Example: ["gmail", "drive", "calendar"]
   # Leave empty to enable all tools
 
+# Tool tier selection - alternative to specifying individual tools
+# Options: core, extended, complete
+# Leave empty to use default or tools.enabled configuration
+toolTier: ""
+
 # Single-user mode configuration
 singleUserMode: false
+
+# Command configuration
+command:
+  # Set disableArgs to true to remove the args section entirely (uses Dockerfile defaults)
+  disableArgs: false
+  # Override the entire command if needed
+  override: []
 
 # Health check configuration
 healthCheck:

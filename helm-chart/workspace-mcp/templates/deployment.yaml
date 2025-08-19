@@ -81,23 +81,27 @@ spec:
             - name: MCP_SINGLE_USER_MODE
               value: "1"
             {{- end }}
+            # Tool configuration
+            {{- if .Values.toolTier }}
+            - name: TOOL_TIER
+              value: {{ .Values.toolTier | quote }}
+            {{- end }}
+            {{- if .Values.tools.enabled }}
+            - name: TOOLS
+              value: {{ .Values.tools.enabled | join " " | quote }}
+            {{- end }}
             # Environment variables from values
             {{- range $key, $value := .Values.env }}
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
+          {{- if .Values.command.override }}
+          command: {{ .Values.command.override }}
+          {{- end }}
+          {{- if not .Values.command.disableArgs }}
           args:
-            - "--transport"
-            - "streamable-http"
-            {{- if .Values.singleUserMode }}
-            - "--single-user"
-            {{- end }}
-            {{- if .Values.tools.enabled }}
-            - "--tools"
-            {{- range .Values.tools.enabled }}
-            - {{ . }}
-            {{- end }}
-            {{- end }}
+            - "uv run main.py --transport streamable-http {{- if .Values.singleUserMode }} --single-user{{- end }} ${TOOL_TIER:+--tool-tier \"$TOOL_TIER\"} ${TOOLS:+--tools $TOOLS}"
+          {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:

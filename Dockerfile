@@ -34,5 +34,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
 ENV TOOL_TIER=""
 ENV TOOLS=""
 
-# Use shell form to expand environment variables
-CMD uv run main.py --transport streamable-http ${TOOL_TIER:+--tool-tier "$TOOL_TIER"} ${TOOLS:+--tools $TOOLS}
+# Use entrypoint for the base command and CMD for args
+ENTRYPOINT ["/bin/sh", "-c"]
+CMD ["uv run main.py --transport streamable-http ${TOOL_TIER:+--tool-tier \"$TOOL_TIER\"} ${TOOLS:+--tools $TOOLS}"]
