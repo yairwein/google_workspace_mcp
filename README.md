@@ -62,9 +62,9 @@ A production-ready MCP server that integrates all major Google Workspace service
 
 **<span style="color:#72898f">@</span> Gmail** • **<span style="color:#72898f">≡</span> Drive** • **<span style="color:#72898f">⧖</span> Calendar** **<span style="color:#72898f">≡</span> Docs**
 - Complete Gmail management, end to end coverage
-- Full calendar management with advanced capabilities
+- Full calendar management with advanced features
 - File operations with Office format support
-- Document creation, editing & comment management
+- Document creation, editing & comments
 - Deep, exhaustive support for fine grained editing
 
 ---
@@ -1106,6 +1106,47 @@ async def your_new_tool(service, param1: str, param2: int = 10):
 - **Scope Management**: Centralized in `SCOPE_GROUPS` for easy maintenance
 - **Error Handling**: Native exceptions instead of manual error construction
 - **Multi-Service Support**: `@require_multiple_services()` for complex tools
+
+### Credential Store System
+
+The server includes an abstract credential store API and a default backend for managing Google OAuth
+credentials with support for multiple storage backends:
+
+**Features:**
+- **Abstract Interface**: `CredentialStore` base class defines standard operations (get, store, delete, list users)
+- **Local File Storage**: `LocalDirectoryCredentialStore` implementation stores credentials as JSON files
+- **Configurable Storage**: Environment variable `GOOGLE_MCP_CREDENTIALS_DIR` sets storage location
+- **Multi-User Support**: Store and manage credentials for multiple Google accounts
+- **Automatic Directory Creation**: Storage directory is created automatically if it doesn't exist
+
+**Configuration:**
+```bash
+# Optional: Set custom credentials directory
+export GOOGLE_MCP_CREDENTIALS_DIR="/path/to/credentials"
+
+# Default locations (if GOOGLE_MCP_CREDENTIALS_DIR not set):
+# - ~/.google_workspace_mcp/credentials (if home directory accessible)
+# - ./.credentials (fallback)
+```
+
+**Usage Example:**
+```python
+from auth.credential_store import get_credential_store
+
+# Get the global credential store instance
+store = get_credential_store()
+
+# Store credentials for a user
+store.store_credential("user@example.com", credentials)
+
+# Retrieve credentials
+creds = store.get_credential("user@example.com")
+
+# List all users with stored credentials
+users = store.list_users()
+```
+
+The credential store automatically handles credential serialization, expiry parsing, and provides error handling for storage operations.
 
 ---
 

@@ -14,7 +14,7 @@ from starlette.responses import JSONResponse, RedirectResponse
 from google.oauth2.credentials import Credentials
 
 from auth.oauth21_session_store import store_token_session
-from auth.google_auth import save_credentials_to_file
+from auth.google_auth import get_credential_store
 from auth.scopes import get_current_scopes
 from auth.oauth_config import get_oauth_config
 from auth.oauth_error_handling import (
@@ -181,8 +181,11 @@ async def handle_proxy_token_exchange(request: Request):
                                         )
 
                                         # Save credentials to file for legacy auth
-                                        save_credentials_to_file(user_email, credentials)
-                                        logger.info(f"Saved Google credentials for {user_email}")
+                                        store = get_credential_store()
+                                        if not store.store_credential(user_email, credentials):
+                                            logger.error(f"Failed to save Google credentials for {user_email}")
+                                        else:
+                                            logger.info(f"Saved Google credentials for {user_email}")
                                 except jwt.ExpiredSignatureError:
                                     logger.error("ID token has expired - cannot extract user email")
                                 except jwt.InvalidTokenError as e:
