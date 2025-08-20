@@ -34,7 +34,7 @@ async def list_task_lists(
 
     Args:
         user_google_email (str): The user's Google email address. Required.
-        max_results (Optional[int]): Maximum number of task lists to return (default: 1000, max: 1000).
+        max_results (Optional[str]): Maximum number of task lists to return (default: 1000, max: 1000).
         page_token (Optional[str]): Token for pagination.
 
     Returns:
@@ -289,7 +289,7 @@ async def list_tasks(
     Args:
         user_google_email (str): The user's Google email address. Required.
         task_list_id (str): The ID of the task list to retrieve tasks from.
-        max_results (Optional[int]): Maximum number of tasks to return. (default: 20, max: 10000).
+        max_results (Optional[str]): Maximum number of tasks to return. (default: 20, max: 10000).
         page_token (Optional[str]): Token for pagination.
         show_completed (Optional[bool]): Whether to include completed tasks (default: True).
         show_deleted (Optional[bool]): Whether to include deleted tasks (default: False).
