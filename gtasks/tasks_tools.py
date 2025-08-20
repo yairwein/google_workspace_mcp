@@ -45,8 +45,6 @@ async def list_task_lists(
     try:
         params = {}
         if max_results is not None:
-            if isinstance(max_results, str):
-                max_results = int(max_results)
             params["maxResults"] = max_results
         if page_token:
             params["pageToken"] = page_token
@@ -309,8 +307,6 @@ async def list_tasks(
     try:
         params = {"tasklist": task_list_id}
         if max_results is not None:
-            if isinstance(max_results, str):
-                max_results = int(max_results)
             params["maxResults"] = max_results
         if page_token:
             params["pageToken"] = page_token
