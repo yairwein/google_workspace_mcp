@@ -58,11 +58,37 @@ def safe_print(text):
     except UnicodeEncodeError:
         print(text.encode('ascii', errors='replace').decode(), file=sys.stderr)
 
+def configure_safe_logging():
+    """Configure logging to handle Unicode safely on Windows."""
+    class SafeFormatter(logging.Formatter):
+        def format(self, record):
+            try:
+                return super().format(record)
+            except UnicodeEncodeError:
+                # Replace the message with ASCII-safe version
+                record.msg = str(record.msg).encode('ascii', errors='replace').decode('ascii')
+                return super().format(record)
+    
+    # Replace all handlers' formatters with safe ones
+    for handler in logging.root.handlers:
+        original_formatter = handler.formatter
+        if original_formatter:
+            safe_formatter = SafeFormatter(
+                fmt=original_formatter._fmt if hasattr(original_formatter, '_fmt') else '%(message)s',
+                datefmt=original_formatter.datefmt
+            )
+        else:
+            safe_formatter = SafeFormatter()
+        handler.setFormatter(safe_formatter)
+
 def main():
     """
     Main entry point for the Google Workspace MCP server.
     Uses FastMCP's native streamable-http transport.
     """
+    # Configure safe logging for Windows Unicode handling
+    configure_safe_logging()
+    
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Google Workspace MCP Server')
     parser.add_argument('--single-user', action='store_true',
