@@ -26,7 +26,7 @@ LIST_TASKS_MAX_POSITION = "99999999999999999999"
 async def list_task_lists(
     service,
     user_google_email: str,
-    max_results: Optional[int] = None,
+    max_results: Optional[str] = None,
     page_token: Optional[str] = None
 ) -> str:
     """
@@ -45,6 +45,8 @@ async def list_task_lists(
     try:
         params = {}
         if max_results is not None:
+            if isinstance(max_results, str):
+                max_results = int(max_results)
             params["maxResults"] = max_results
         if page_token:
             params["pageToken"] = page_token
