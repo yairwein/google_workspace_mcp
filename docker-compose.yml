@@ -1,0 +1,10 @@
+services:
+  gws_mcp:
+    build: .
+    container_name: gws_mcp
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./client_secret.json:/app/client_secret.json:ro
+    env_file:
+      - .env
