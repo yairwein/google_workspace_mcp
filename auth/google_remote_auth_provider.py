@@ -86,8 +86,8 @@ class GoogleRemoteAuthProvider(RemoteAuthProvider):
         # The /mcp/ resource URL is handled in the protected resource metadata endpoint
         super().__init__(
             token_verifier=token_verifier,
-            authorization_servers=[AnyHttpUrl(f"{self.base_url}:{self.port}")],
-            resource_server_url=f"{self.base_url}:{self.port}",
+            authorization_servers=[AnyHttpUrl(f"{self.base_url}")],
+            resource_server_url=f"{self.base_url}",
         )
 
         logger.debug("GoogleRemoteAuthProvider")
