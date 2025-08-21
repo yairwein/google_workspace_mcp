@@ -89,6 +89,7 @@ class GoogleRemoteAuthProvider(RemoteAuthProvider):
             authorization_servers=[AnyHttpUrl(f"{self.base_url}")],
             resource_server_url=f"{self.base_url}",
         )
+        
 
         logger.debug("GoogleRemoteAuthProvider")
 
