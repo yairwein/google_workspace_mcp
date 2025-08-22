@@ -380,6 +380,7 @@ export USER_GOOGLE_EMAIL=\
 |----------|-------------|---------|
 | `WORKSPACE_MCP_BASE_URI` | Base server URI (no port) | `http://localhost` |
 | `WORKSPACE_MCP_PORT` | Server listening port | `8000` |
+| `WORKSPACE_EXTERNAL_URL` | External URL for reverse proxy setups | None |
 | `GOOGLE_OAUTH_REDIRECT_URI` | Override OAuth callback URL | Auto-constructed |
 | `USER_GOOGLE_EMAIL` | Default auth email | None |
 
@@ -963,28 +964,31 @@ This architecture enables any OAuth 2.1 compliant client to authenticate users t
 
 #### Reverse Proxy Setup
 
-If you're running the MCP server behind a reverse proxy (nginx, Apache, Cloudflare, etc.), you'll need to configure `GOOGLE_OAUTH_REDIRECT_URI` to match your external URL:
+If you're running the MCP server behind a reverse proxy (nginx, Apache, Cloudflare, etc.), you have two configuration options:
 
-**Problem**: When behind a reverse proxy, the server constructs redirect URIs using internal ports (e.g., `http://localhost:8000/oauth2callback`) but Google expects the external URL (e.g., `https://your-domain.com/oauth2callback`).
+**Problem**: When behind a reverse proxy, the server constructs OAuth URLs using internal ports (e.g., `http://localhost:8000`) but external clients need the public URL (e.g., `https://your-domain.com`).
+
+**Solution 1**: Set `WORKSPACE_EXTERNAL_URL` for all OAuth endpoints:
+```bash
+# This configures all OAuth endpoints to use your external URL
+export WORKSPACE_EXTERNAL_URL="https://your-domain.com"
+```
+
+**Solution 2**: Set `GOOGLE_OAUTH_REDIRECT_URI` for just the callback:
+```bash
+# This only overrides the OAuth callback URL
+export GOOGLE_OAUTH_REDIRECT_URI="https://your-domain.com/oauth2callback"
+```
 
 You also have options for:
 | `OAUTH_CUSTOM_REDIRECT_URIS` *(optional)* | Comma-separated list of additional redirect URIs |
 | `OAUTH_ALLOWED_ORIGINS` *(optional)* | Comma-separated list of additional CORS origins |
 
-**Solution**: Set `GOOGLE_OAUTH_REDIRECT_URI` to your external URL:
-
-```bash
-# External URL without port (nginx/Apache handling HTTPS)
-export GOOGLE_OAUTH_REDIRECT_URI="https://your-domain.com/oauth2callback"
-
-# Or with custom port if needed
-export GOOGLE_OAUTH_REDIRECT_URI="https://your-domain.com:8443/oauth2callback"
-```
-
 **Important**:
+- Use `WORKSPACE_EXTERNAL_URL` when all OAuth endpoints should use the external URL (recommended for reverse proxy setups)
+- Use `GOOGLE_OAUTH_REDIRECT_URI` when you only need to override the callback URL
 - The redirect URI must exactly match what's configured in your Google Cloud Console
-- The server will use this value for all OAuth flows instead of constructing it from `WORKSPACE_MCP_BASE_URI` and `WORKSPACE_MCP_PORT`
-- Your reverse proxy must forward `/oauth2callback` requests to the MCP server
+- Your reverse proxy must forward OAuth-related requests (`/oauth2callback`, `/oauth2/*`, `/.well-known/*`) to the MCP server
 
 <details>
 <summary>🚀 <b>Advanced uvx Commands</b> <sub><sup>← More startup options</sup></sub></summary>

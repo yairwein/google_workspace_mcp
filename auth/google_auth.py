@@ -17,9 +17,8 @@ from googleapiclient.errors import HttpError
 from auth.scopes import SCOPES
 from auth.oauth21_session_store import get_oauth21_session_store
 from auth.credential_store import get_credential_store
+from auth.oauth_config import get_oauth_config
 from core.config import (
-    WORKSPACE_MCP_PORT,
-    WORKSPACE_MCP_BASE_URI,
     get_transport_mode,
     get_oauth_redirect_uri,
 )
@@ -818,8 +817,9 @@ async def get_authenticated_google_service(
         from auth.oauth_callback_server import ensure_oauth_callback_available
 
         redirect_uri = get_oauth_redirect_uri()
+        config = get_oauth_config()
         success, error_msg = ensure_oauth_callback_available(
-            get_transport_mode(), WORKSPACE_MCP_PORT, WORKSPACE_MCP_BASE_URI
+            get_transport_mode(), config.port, config.base_uri
         )
         if not success:
             error_detail = f" ({error_msg})" if error_msg else ""
