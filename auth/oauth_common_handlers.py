@@ -254,7 +254,6 @@ async def handle_oauth_protected_resource(request: Request):
         "client_registration_required": True,
         "client_configuration_endpoint": f"{base_url}/.well-known/oauth-client",
     }
-
     # Log the response for debugging
     logger.debug(f"Returning protected resource metadata: {metadata}")
 
