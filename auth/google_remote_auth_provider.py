@@ -91,7 +91,9 @@ class GoogleRemoteAuthProvider(RemoteAuthProvider):
         )
         
 
-        logger.debug("GoogleRemoteAuthProvider")
+        logger.debug(
+            f"Initialized GoogleRemoteAuthProvider with base_url={self.base_url}, port={self.port}"
+        )
 
     def get_routes(self) -> List[Route]:
         """
