@@ -7,6 +7,7 @@ from importlib import metadata
 from dotenv import load_dotenv
 
 from auth.oauth_config import reload_oauth_config
+from core.log_formatter import EnhancedLogFormatter
 from core.utils import check_credentials_directory_permissions
 from core.server import server, set_transport_mode, configure_server_for_http
 from core.tool_tier_loader import resolve_tools_from_tier
@@ -58,11 +59,33 @@ def safe_print(text):
     except UnicodeEncodeError:
         print(text.encode('ascii', errors='replace').decode(), file=sys.stderr)
 
+def configure_safe_logging():
+    class SafeEnhancedFormatter(EnhancedLogFormatter):
+        """Enhanced ASCII formatter with additional Windows safety."""
+        def format(self, record):
+            try:
+                return super().format(record)
+            except UnicodeEncodeError:
+                # Fallback to ASCII-safe formatting
+                service_prefix = self._get_ascii_prefix(record.name, record.levelname)
+                safe_msg = str(record.getMessage()).encode('ascii', errors='replace').decode('ascii')
+                return f"{service_prefix} {safe_msg}"
+
+    # Replace all console handlers' formatters with safe enhanced ones
+    for handler in logging.root.handlers:
+        # Only apply to console/stream handlers, keep file handlers as-is
+        if isinstance(handler, logging.StreamHandler) and handler.stream.name in ['<stderr>', '<stdout>']:
+            safe_formatter = SafeEnhancedFormatter(use_colors=True)
+            handler.setFormatter(safe_formatter)
+
 def main():
     """
     Main entry point for the Google Workspace MCP server.
     Uses FastMCP's native streamable-http transport.
     """
+    # Configure safe logging for Windows Unicode handling
+    configure_safe_logging()
+
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Google Workspace MCP Server')
     parser.add_argument('--single-user', action='store_true',
