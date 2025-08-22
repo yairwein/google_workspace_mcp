@@ -241,7 +241,8 @@ async def handle_oauth_protected_resource(request: Request):
 
     # For streamable-http transport, the MCP server runs at /mcp
     # This is the actual resource being protected
-    resource_url = f"{base_url}/mcp/"
+    # As of August, /mcp is now the proper base - prior was /mcp/
+    resource_url = f"{base_url}/mcp"
 
     # Build metadata response per RFC 9449
     metadata = {
