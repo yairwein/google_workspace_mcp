@@ -18,10 +18,11 @@ RUN uv sync --frozen --no-dev
 # Create non-root user for security
 RUN useradd --create-home --shell /bin/bash app \
     && chown -R app:app /app
-USER app
 
 # Give read access to the store_creds volume
 RUN chmod -R 755 /app/store_creds
+
+USER app
 
 # Expose port (use default of 8000 if PORT not set)
 EXPOSE 8000
