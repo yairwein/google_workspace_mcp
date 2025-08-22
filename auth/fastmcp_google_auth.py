@@ -12,7 +12,6 @@ Key features:
 - Session bridging to Google credentials for API access
 """
 
-import os
 import logging
 from typing import Dict, Any, Optional, List
 

@@ -13,7 +13,6 @@ This provider is used only in streamable-http transport mode with FastMCP v2.11.
 For earlier versions or other transport modes, the legacy GoogleWorkspaceAuthProvider is used.
 """
 
-import os
 import logging
 import aiohttp
 from typing import Optional, List
