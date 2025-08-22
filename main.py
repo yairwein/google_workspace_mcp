@@ -102,6 +102,8 @@ def main():
     # Set port and base URI once for reuse throughout the function
     port = int(os.getenv("PORT", os.getenv("WORKSPACE_MCP_PORT", 8000)))
     base_uri = os.getenv("WORKSPACE_MCP_BASE_URI", "http://localhost")
+    external_url = os.getenv("WORKSPACE_EXTERNAL_URL")
+    display_url = external_url if external_url else f"{base_uri}:{port}"
 
     safe_print("🔧 Google Workspace MCP Server")
     safe_print("=" * 35)
@@ -113,8 +115,8 @@ def main():
     safe_print(f"   📦 Version: {version}")
     safe_print(f"   🌐 Transport: {args.transport}")
     if args.transport == 'streamable-http':
-        safe_print(f"   🔗 URL: {base_uri}:{port}")
-        safe_print(f"   🔐 OAuth Callback: {base_uri}:{port}/oauth2callback")
+        safe_print(f"   🔗 URL: {display_url}")
+        safe_print(f"   🔐 OAuth Callback: {display_url}/oauth2callback")
     safe_print(f"   👤 Mode: {'Single-user' if args.single_user else 'Multi-user'}")
     safe_print(f"   🐍 Python: {sys.version.split()[0]}")
     safe_print("")
@@ -248,6 +250,8 @@ def main():
             configure_server_for_http()
             safe_print("")
             safe_print(f"🚀 Starting HTTP server on {base_uri}:{port}")
+            if external_url:
+                safe_print(f"   External URL: {external_url}")
         else:
             safe_print("")
             safe_print("🚀 Starting STDIO server")
@@ -255,7 +259,7 @@ def main():
             from auth.oauth_callback_server import ensure_oauth_callback_available
             success, error_msg = ensure_oauth_callback_available('stdio', port, base_uri)
             if success:
-                safe_print(f"   OAuth callback server started on {base_uri}:{port}/oauth2callback")
+                safe_print(f"   OAuth callback server started on {display_url}/oauth2callback")
             else:
                 warning_msg = "   ⚠️  Warning: Failed to start OAuth callback server"
                 if error_msg:

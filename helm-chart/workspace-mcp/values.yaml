@@ -80,6 +80,10 @@ env:
   # For external access: "https://your-domain.com" or "http://your-ingress-host"
   WORKSPACE_MCP_BASE_URI: ""
   
+  # External URL for reverse proxy setups (e.g., "https://your-domain.com")
+  # If set, this overrides the base_uri:port combination for OAuth endpoints
+  WORKSPACE_EXTERNAL_URL: ""
+  
   # OAuth 2.1 support
   MCP_ENABLE_OAUTH21: "false"
   

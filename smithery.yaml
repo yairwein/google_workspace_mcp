@@ -85,6 +85,7 @@ startCommand:
           WORKSPACE_MCP_BASE_URI: config.workspaceMcpBaseUri,
           WORKSPACE_MCP_PORT: String(config.workspaceMcpPort),
           PORT: String(config.workspaceMcpPort),
+          ...(config.workspaceExternalUrl && { WORKSPACE_EXTERNAL_URL: config.workspaceExternalUrl }),
           ...(config.mcpSingleUserMode && { MCP_SINGLE_USER_MODE: '1' }),
           ...(config.mcpEnableOauth21 && { MCP_ENABLE_OAUTH21: 'true' }),
           ...(config.oauthlibInsecureTransport && { OAUTHLIB_INSECURE_TRANSPORT: '1' }),
