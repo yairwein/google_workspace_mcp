@@ -1123,9 +1123,11 @@ async def export_doc_to_pdf(
 
     # Upload PDF to Drive
     try:
+        # Reuse the existing BytesIO object by resetting to the beginning
+        fh.seek(0)
         # Create media upload object
         media = MediaIoBaseUpload(
-            io.BytesIO(pdf_content),
+            fh,
             mimetype='application/pdf',
             resumable=True
         )
