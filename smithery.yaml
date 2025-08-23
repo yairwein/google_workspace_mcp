@@ -39,7 +39,7 @@ startCommand:
         description: "Enable single-user mode - bypasses session mapping"
       mcpEnableOauth21:
         type: boolean
-        default: false
+        default: true
         description: "Enable OAuth 2.1 multi-user support (requires streamable-http)"
       oauthlibInsecureTransport:
         type: boolean
@@ -57,6 +57,10 @@ startCommand:
         type: string
         default: ""
         description: "Comma-separated list of tools to enable (gmail,drive,calendar,docs,sheets,chat,forms,slides,tasks,search). Leave empty for all tools."
+      workspaceMcpStatelessMode:
+        type: boolean
+        default: true
+        description: "Enable stateless mode - no session persistence"
   commandFunction:
     |-
     (config) => {
@@ -88,6 +92,7 @@ startCommand:
           ...(config.workspaceExternalUrl && { WORKSPACE_EXTERNAL_URL: config.workspaceExternalUrl }),
           ...(config.mcpSingleUserMode && { MCP_SINGLE_USER_MODE: '1' }),
           ...(config.mcpEnableOauth21 && { MCP_ENABLE_OAUTH21: 'true' }),
+          ...(config.workspaceMcpStatelessMode && { WORKSPACE_MCP_STATELESS_MODE: 'true' }),
           ...(config.oauthlibInsecureTransport && { OAUTHLIB_INSECURE_TRANSPORT: '1' }),
           ...(config.googlePseApiKey && { GOOGLE_PSE_API_KEY: config.googlePseApiKey }),
           ...(config.googlePseEngineId && { GOOGLE_PSE_ENGINE_ID: config.googlePseEngineId })
