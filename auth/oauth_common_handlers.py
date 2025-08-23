@@ -180,12 +180,16 @@ async def handle_proxy_token_exchange(request: Request):
                                             expiry=expiry
                                         )
 
-                                        # Save credentials to file for legacy auth
-                                        store = get_credential_store()
-                                        if not store.store_credential(user_email, credentials):
-                                            logger.error(f"Failed to save Google credentials for {user_email}")
+                                        # Save credentials to file for legacy auth (skip in stateless mode)
+                                        from auth.oauth_config import is_stateless_mode
+                                        if not is_stateless_mode():
+                                            store = get_credential_store()
+                                            if not store.store_credential(user_email, credentials):
+                                                logger.error(f"Failed to save Google credentials for {user_email}")
+                                            else:
+                                                logger.info(f"Saved Google credentials for {user_email}")
                                         else:
-                                            logger.info(f"Saved Google credentials for {user_email}")
+                                            logger.info(f"Skipping credential file save in stateless mode for {user_email}")
                                 except jwt.ExpiredSignatureError:
                                     logger.error("ID token has expired - cannot extract user email")
                                 except jwt.InvalidTokenError as e:

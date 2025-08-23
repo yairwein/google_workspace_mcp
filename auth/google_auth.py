@@ -603,11 +603,17 @@ def get_credentials(
                 )
 
         if not credentials and user_google_email:
-            logger.debug(
-                f"[get_credentials] No session credentials, trying credential store for user_google_email '{user_google_email}'."
-            )
-            store = get_credential_store()
-            credentials = store.get_credential(user_google_email)
+            from auth.oauth_config import is_stateless_mode
+            if not is_stateless_mode():
+                logger.debug(
+                    f"[get_credentials] No session credentials, trying credential store for user_google_email '{user_google_email}'."
+                )
+                store = get_credential_store()
+                credentials = store.get_credential(user_google_email)
+            else:
+                logger.debug(
+                    f"[get_credentials] No session credentials, skipping file store in stateless mode for user_google_email '{user_google_email}'."
+                )
 
             if credentials and session_id:
                 logger.debug(
@@ -661,10 +667,14 @@ def get_credentials(
                 f"[get_credentials] Credentials refreshed successfully. User: '{user_google_email}', Session: '{session_id}'"
             )
 
-            # Save refreshed credentials
+            # Save refreshed credentials (skip file save in stateless mode)
             if user_google_email:  # Always save to credential store if email is known
-                credential_store = get_credential_store()
-                credential_store.store_credential(user_google_email, credentials)
+                from auth.oauth_config import is_stateless_mode
+                if not is_stateless_mode():
+                    credential_store = get_credential_store()
+                    credential_store.store_credential(user_google_email, credentials)
+                else:
+                    logger.info(f"Skipping credential file save in stateless mode for {user_google_email}")
 
                 # Also update OAuth21SessionStore
                 store = get_oauth21_session_store()

@@ -27,24 +27,29 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-try:
-    root_logger = logging.getLogger()
-    log_file_dir = os.path.dirname(os.path.abspath(__file__))
-    log_file_path = os.path.join(log_file_dir, 'mcp_server_debug.log')
+# Skip file logging in stateless mode
+stateless_mode = os.getenv("WORKSPACE_MCP_STATELESS_MODE", "false").lower() == "true"
+if not stateless_mode:
+    try:
+        root_logger = logging.getLogger()
+        log_file_dir = os.path.dirname(os.path.abspath(__file__))
+        log_file_path = os.path.join(log_file_dir, 'mcp_server_debug.log')
 
-    file_handler = logging.FileHandler(log_file_path, mode='a')
-    file_handler.setLevel(logging.DEBUG)
+        file_handler = logging.FileHandler(log_file_path, mode='a')
+        file_handler.setLevel(logging.DEBUG)
 
-    file_formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(process)d - %(threadName)s '
-        '[%(module)s.%(funcName)s:%(lineno)d] - %(message)s'
-    )
-    file_handler.setFormatter(file_formatter)
-    root_logger.addHandler(file_handler)
+        file_formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(process)d - %(threadName)s '
+            '[%(module)s.%(funcName)s:%(lineno)d] - %(message)s'
+        )
+        file_handler.setFormatter(file_formatter)
+        root_logger.addHandler(file_handler)
 
-    logger.debug(f"Detailed file logging configured to: {log_file_path}")
-except Exception as e:
-    sys.stderr.write(f"CRITICAL: Failed to set up file logging to '{log_file_path}': {e}\n")
+        logger.debug(f"Detailed file logging configured to: {log_file_path}")
+    except Exception as e:
+        sys.stderr.write(f"CRITICAL: Failed to set up file logging to '{log_file_path}': {e}\n")
+else:
+    logger.debug("File logging disabled in stateless mode")
 
 def safe_print(text):
     # Don't print to stderr when running as MCP server via uvx to avoid JSON parsing errors
@@ -135,6 +140,7 @@ def main():
         "USER_GOOGLE_EMAIL": os.getenv('USER_GOOGLE_EMAIL', 'Not Set'),
         "MCP_SINGLE_USER_MODE": os.getenv('MCP_SINGLE_USER_MODE', 'false'),
         "MCP_ENABLE_OAUTH21": os.getenv('MCP_ENABLE_OAUTH21', 'false'),
+        "WORKSPACE_MCP_STATELESS_MODE": os.getenv('WORKSPACE_MCP_STATELESS_MODE', 'false'),
         "OAUTHLIB_INSECURE_TRANSPORT": os.getenv('OAUTHLIB_INSECURE_TRANSPORT', 'false'),
         "GOOGLE_CLIENT_SECRET_PATH": os.getenv('GOOGLE_CLIENT_SECRET_PATH', 'Not Set'),
     }
@@ -225,21 +231,29 @@ def main():
 
     # Set global single-user mode flag
     if args.single_user:
+        if stateless_mode:
+            safe_print("❌ Single-user mode is incompatible with stateless mode")
+            safe_print("   Stateless mode requires OAuth 2.1 which is multi-user")
+            sys.exit(1)
         os.environ['MCP_SINGLE_USER_MODE'] = '1'
         safe_print("🔐 Single-user mode enabled")
         safe_print("")
 
-    # Check credentials directory permissions before starting
-    try:
-        safe_print("🔍 Checking credentials directory permissions...")
-        check_credentials_directory_permissions()
-        safe_print("✅ Credentials directory permissions verified")
+    # Check credentials directory permissions before starting (skip in stateless mode)
+    if not stateless_mode:
+        try:
+            safe_print("🔍 Checking credentials directory permissions...")
+            check_credentials_directory_permissions()
+            safe_print("✅ Credentials directory permissions verified")
+            safe_print("")
+        except (PermissionError, OSError) as e:
+            safe_print(f"❌ Credentials directory permission check failed: {e}")
+            safe_print("   Please ensure the service has write permissions to create/access the credentials directory")
+            logger.error(f"Failed credentials directory permission check: {e}")
+            sys.exit(1)
+    else:
+        safe_print("🔍 Skipping credentials directory check (stateless mode)")
         safe_print("")
-    except (PermissionError, OSError) as e:
-        safe_print(f"❌ Credentials directory permission check failed: {e}")
-        safe_print("   Please ensure the service has write permissions to create/access the credentials directory")
-        logger.error(f"Failed credentials directory permission check: {e}")
-        sys.exit(1)
 
     try:
         # Set transport mode for OAuth callback handling

@@ -38,6 +38,11 @@ class OAuthConfig:
         self.oauth21_enabled = os.getenv("MCP_ENABLE_OAUTH21", "false").lower() == "true"
         self.pkce_required = self.oauth21_enabled  # PKCE is mandatory in OAuth 2.1
         self.supported_code_challenge_methods = ["S256", "plain"] if not self.oauth21_enabled else ["S256"]
+        
+        # Stateless mode configuration
+        self.stateless_mode = os.getenv("WORKSPACE_MCP_STATELESS_MODE", "false").lower() == "true"
+        if self.stateless_mode and not self.oauth21_enabled:
+            raise ValueError("WORKSPACE_MCP_STATELESS_MODE requires MCP_ENABLE_OAUTH21=true")
 
         # Transport mode (will be set at runtime)
         self._transport_mode = "stdio"  # Default
@@ -340,3 +345,8 @@ def is_oauth21_enabled() -> bool:
 def get_oauth_redirect_uri() -> str:
     """Get the primary OAuth redirect URI."""
     return get_oauth_config().redirect_uri
+
+
+def is_stateless_mode() -> bool:
+    """Check if stateless mode is enabled."""
+    return get_oauth_config().stateless_mode
