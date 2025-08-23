@@ -7,7 +7,7 @@ from importlib import metadata
 from dotenv import load_dotenv
 
 from auth.oauth_config import reload_oauth_config
-from core.log_formatter import EnhancedLogFormatter
+from core.log_formatter import EnhancedLogFormatter, configure_file_logging
 from core.utils import check_credentials_directory_permissions
 from core.server import server, set_transport_mode, configure_server_for_http
 from core.tool_tier_loader import resolve_tools_from_tier
@@ -27,8 +27,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Configure file logging based on stateless mode  
-from core.log_formatter import configure_file_logging
 configure_file_logging()
 
 # Define stateless_mode for use in main() function
