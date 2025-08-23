@@ -6,7 +6,7 @@ import sys
 from importlib import metadata
 from dotenv import load_dotenv
 
-from auth.oauth_config import reload_oauth_config
+from auth.oauth_config import reload_oauth_config, is_stateless_mode
 from core.log_formatter import EnhancedLogFormatter, configure_file_logging
 from core.utils import check_credentials_directory_permissions
 from core.server import server, set_transport_mode, configure_server_for_http
@@ -29,8 +29,6 @@ logger = logging.getLogger(__name__)
 
 configure_file_logging()
 
-# Define stateless_mode for use in main() function
-stateless_mode = os.getenv("WORKSPACE_MCP_STATELESS_MODE", "false").lower() == "true"
 
 def safe_print(text):
     # Don't print to stderr when running as MCP server via uvx to avoid JSON parsing errors
@@ -212,7 +210,7 @@ def main():
 
     # Set global single-user mode flag
     if args.single_user:
-        if stateless_mode:
+        if is_stateless_mode():
             safe_print("❌ Single-user mode is incompatible with stateless mode")
             safe_print("   Stateless mode requires OAuth 2.1 which is multi-user")
             sys.exit(1)
@@ -221,7 +219,7 @@ def main():
         safe_print("")
 
     # Check credentials directory permissions before starting (skip in stateless mode)
-    if not stateless_mode:
+    if not is_stateless_mode():
         try:
             safe_print("🔍 Checking credentials directory permissions...")
             check_credentials_directory_permissions()
