@@ -9,7 +9,7 @@ import os
 import sys
 from dotenv import load_dotenv
 
-from auth.oauth_config import reload_oauth_config
+from auth.oauth_config import reload_oauth_config, is_stateless_mode
 from core.log_formatter import EnhancedLogFormatter
 from core.utils import check_credentials_directory_permissions
 from core.server import server, set_transport_mode, configure_server_for_http
@@ -61,7 +61,7 @@ def configure_safe_logging():
 configure_safe_logging()
 
 # Check credentials directory permissions (skip in stateless mode)
-if not stateless_mode:
+if not is_stateless_mode():
     try:
         logger.info("🔍 Checking credentials directory permissions...")
         check_credentials_directory_permissions()
