@@ -16,7 +16,7 @@ from google.oauth2.credentials import Credentials
 from auth.oauth21_session_store import store_token_session
 from auth.google_auth import get_credential_store
 from auth.scopes import get_current_scopes
-from auth.oauth_config import get_oauth_config
+from auth.oauth_config import get_oauth_config, is_stateless_mode
 from auth.oauth_error_handling import (
     OAuthError, OAuthValidationError, OAuthConfigurationError,
     create_oauth_error_response, validate_token_request,
@@ -180,12 +180,15 @@ async def handle_proxy_token_exchange(request: Request):
                                             expiry=expiry
                                         )
 
-                                        # Save credentials to file for legacy auth
-                                        store = get_credential_store()
-                                        if not store.store_credential(user_email, credentials):
-                                            logger.error(f"Failed to save Google credentials for {user_email}")
+                                        # Save credentials to file for legacy auth (skip in stateless mode)
+                                        if not is_stateless_mode():
+                                            store = get_credential_store()
+                                            if not store.store_credential(user_email, credentials):
+                                                logger.error(f"Failed to save Google credentials for {user_email}")
+                                            else:
+                                                logger.info(f"Saved Google credentials for {user_email}")
                                         else:
-                                            logger.info(f"Saved Google credentials for {user_email}")
+                                            logger.info(f"Skipping credential file save in stateless mode for {user_email}")
                                 except jwt.ExpiredSignatureError:
                                     logger.error("ID token has expired - cannot extract user email")
                                 except jwt.InvalidTokenError as e:

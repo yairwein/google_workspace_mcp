@@ -170,6 +170,7 @@ uv run main.py --tools gmail drive
 | `GOOGLE_PSE_API_KEY` | API key for Custom Search |
 | `GOOGLE_PSE_ENGINE_ID` | Search Engine ID for Custom Search |
 | `MCP_ENABLE_OAUTH21` | Set to `true` for OAuth 2.1 support |
+| `WORKSPACE_MCP_STATELESS_MODE` | Set to `true` for stateless operation (requires OAuth 2.1) |
 
 </td></tr>
 </table>
@@ -939,6 +940,36 @@ This implementation solves two critical challenges when using Google OAuth in br
 This architecture enables any OAuth 2.1 compliant client to authenticate users through Google, even from browser environments, without requiring changes to the client implementation.
 
 </details>
+
+### Stateless Mode (Container-Friendly)
+
+The server supports a stateless mode designed for containerized environments where file system writes should be avoided:
+
+**Enabling Stateless Mode:**
+```bash
+# Stateless mode requires OAuth 2.1 to be enabled
+export MCP_ENABLE_OAUTH21=true
+export WORKSPACE_MCP_STATELESS_MODE=true
+uv run main.py --transport streamable-http
+```
+
+**Key Features:**
+- **No file system writes**: Credentials are never written to disk
+- **No debug logs**: File-based logging is completely disabled
+- **Memory-only sessions**: All tokens stored in memory via OAuth 2.1 session store
+- **Container-ready**: Perfect for Docker, Kubernetes, and serverless deployments
+- **Token per request**: Each request must include a valid Bearer token
+
+**Requirements:**
+- Must be used with `MCP_ENABLE_OAUTH21=true`
+- Incompatible with single-user mode
+- Clients must handle OAuth flow and send valid tokens with each request
+
+This mode is ideal for:
+- Cloud deployments where persistent storage is unavailable
+- Multi-tenant environments requiring strict isolation
+- Containerized applications with read-only filesystems
+- Serverless functions and ephemeral compute environments
 
 **MCP Inspector**: No additional configuration needed with desktop OAuth client.
 
