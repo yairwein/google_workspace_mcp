@@ -43,7 +43,6 @@ docs:
     - get_doc_content
     - create_doc
     - modify_doc_text
-    - export_doc_to_pdf
   extended:
     - search_docs
     - find_and_replace_doc
