@@ -1,5 +1,6 @@
 import inspect
 import logging
+
 import re
 from functools import wraps
 from typing import Dict, List, Optional, Any, Callable, Union, Tuple
@@ -38,9 +39,7 @@ from auth.scopes import (
     CUSTOM_SEARCH_SCOPE,
 )
 
-# OAuth 2.1 integration is now handled by FastMCP auth
-OAUTH21_INTEGRATION_AVAILABLE = True
-
+logger = logging.getLogger(__name__)
 
 # Authentication helper functions
 def _get_auth_context(
@@ -234,9 +233,6 @@ async def get_authenticated_google_service_oauth21(
     logger.info(f"[{tool_name}] Authenticated {service_name} for {user_google_email}")
 
     return service, user_google_email
-
-
-logger = logging.getLogger(__name__)
 
 
 def _remove_user_email_arg_from_docstring(docstring: str) -> str:
