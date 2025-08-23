@@ -235,6 +235,95 @@ async def get_authenticated_google_service_oauth21(
     return service, user_google_email
 
 
+def _extract_oauth21_user_email(authenticated_user: Optional[str], func_name: str) -> str:
+    """
+    Extract user email for OAuth 2.1 mode.
+    
+    Args:
+        authenticated_user: The authenticated user from context
+        func_name: Name of the function being decorated (for error messages)
+        
+    Returns:
+        User email string
+        
+    Raises:
+        Exception: If no authenticated user found in OAuth 2.1 mode
+    """
+    if not authenticated_user:
+        raise Exception(
+            f"OAuth 2.1 mode requires an authenticated user for {func_name}, but none was found."
+        )
+    return authenticated_user
+
+
+def _extract_oauth20_user_email(
+    args: tuple, 
+    kwargs: dict, 
+    wrapper_sig: inspect.Signature
+) -> str:
+    """
+    Extract user email for OAuth 2.0 mode from function arguments.
+    
+    Args:
+        args: Positional arguments passed to wrapper
+        kwargs: Keyword arguments passed to wrapper
+        wrapper_sig: Function signature for parameter binding
+        
+    Returns:
+        User email string
+        
+    Raises:
+        Exception: If user_google_email parameter not found
+    """
+    bound_args = wrapper_sig.bind(*args, **kwargs)
+    bound_args.apply_defaults()
+    
+    user_google_email = bound_args.arguments.get("user_google_email")
+    if not user_google_email:
+        raise Exception(
+            "'user_google_email' parameter is required but was not found."
+        )
+    return user_google_email
+
+
+def _extract_oauth20_user_email_multiple_services(
+    args: tuple, 
+    kwargs: dict, 
+    original_sig: inspect.Signature
+) -> str:
+    """
+    Extract user email for OAuth 2.0 mode from function arguments (multiple services version).
+    
+    Args:
+        args: Positional arguments passed to wrapper
+        kwargs: Keyword arguments passed to wrapper  
+        original_sig: Original function signature for parameter extraction
+        
+    Returns:
+        User email string
+        
+    Raises:
+        Exception: If user_google_email parameter not found
+    """
+    param_names = list(original_sig.parameters.keys())
+    user_google_email = None
+    
+    if "user_google_email" in kwargs:
+        user_google_email = kwargs["user_google_email"]
+    else:
+        try:
+            user_email_index = param_names.index("user_google_email")
+            if user_email_index < len(args):
+                user_google_email = args[user_email_index]
+        except ValueError:
+            pass
+
+    if not user_google_email:
+        raise Exception("user_google_email parameter is required but not found")
+    
+    return user_google_email
+
+
 def _remove_user_email_arg_from_docstring(docstring: str) -> str:
     """
     Remove user_google_email parameter documentation from docstring.
@@ -437,30 +526,16 @@ def require_google_service(
             # Note: `args` and `kwargs` are now the arguments for the *wrapper*,
             # which does not include 'service'.
 
-            # Extract user_google_email from the arguments passed to the wrapper
-            bound_args = wrapper_sig.bind(*args, **kwargs)
-            bound_args.apply_defaults()
-            
             # Get authentication context early to determine OAuth mode
             authenticated_user, auth_method, mcp_session_id = _get_auth_context(
                 func.__name__
             )
             
-            # In OAuth 2.1 mode, user_google_email is not in the signature
-            # and we use the authenticated user directly
+            # Extract user_google_email based on OAuth mode
             if is_oauth21_enabled():
-                if not authenticated_user:
-                    raise Exception(
-                        "OAuth 2.1 mode requires an authenticated user, but none was found."
-                    )
-                user_google_email = authenticated_user
+                user_google_email = _extract_oauth21_user_email(authenticated_user, func.__name__)
             else:
-                # OAuth 2.0 mode: extract from arguments
-                user_google_email = bound_args.arguments.get("user_google_email")
-                if not user_google_email:
-                    raise Exception(
-                        "'user_google_email' parameter is required but was not found."
-                    )
+                user_google_email = _extract_oauth20_user_email(args, kwargs, wrapper_sig)
 
             # Get service configuration from the decorator's arguments
             if service_type not in SERVICE_CONFIGS:
@@ -589,27 +664,9 @@ def require_multiple_services(service_configs: List[Dict[str, Any]]):
             
             # Extract user_google_email based on OAuth mode
             if is_oauth21_enabled():
-                if not authenticated_user:
-                    raise Exception(
-                        "OAuth 2.1 mode requires an authenticated user, but none was found."
-                    )
-                user_google_email = authenticated_user
+                user_google_email = _extract_oauth21_user_email(authenticated_user, tool_name)
             else:
-                # OAuth 2.0 mode: extract from arguments
-                param_names = list(original_sig.parameters.keys())
-                user_google_email = None
-                if "user_google_email" in kwargs:
-                    user_google_email = kwargs["user_google_email"]
-                else:
-                    try:
-                        user_email_index = param_names.index("user_google_email")
-                        if user_email_index < len(args):
-                            user_google_email = args[user_email_index]
-                    except ValueError:
-                        pass
-
-                if not user_google_email:
-                    raise Exception("user_google_email parameter is required but not found")
+                user_google_email = _extract_oauth20_user_email_multiple_services(args, kwargs, original_sig)
 
             # Authenticate all services
             for config in service_configs:

@@ -17,7 +17,7 @@ from googleapiclient.errors import HttpError
 from auth.scopes import SCOPES
 from auth.oauth21_session_store import get_oauth21_session_store
 from auth.credential_store import get_credential_store
-from auth.oauth_config import get_oauth_config
+from auth.oauth_config import get_oauth_config, is_stateless_mode
 from core.config import (
     get_transport_mode,
     get_oauth_redirect_uri,
@@ -603,7 +603,6 @@ def get_credentials(
                 )
 
         if not credentials and user_google_email:
-            from auth.oauth_config import is_stateless_mode
             if not is_stateless_mode():
                 logger.debug(
                     f"[get_credentials] No session credentials, trying credential store for user_google_email '{user_google_email}'."
@@ -669,7 +668,6 @@ def get_credentials(
 
             # Save refreshed credentials (skip file save in stateless mode)
             if user_google_email:  # Always save to credential store if email is known
-                from auth.oauth_config import is_stateless_mode
                 if not is_stateless_mode():
                     credential_store = get_credential_store()
                     credential_store.store_credential(user_google_email, credentials)

@@ -33,30 +33,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Skip file logging in stateless mode
-stateless_mode = os.getenv("WORKSPACE_MCP_STATELESS_MODE", "false").lower() == "true"
-if not stateless_mode:
-    # Configure file logging
-    try:
-        root_logger = logging.getLogger()
-        log_file_dir = os.path.dirname(os.path.abspath(__file__))
-        log_file_path = os.path.join(log_file_dir, 'mcp_server_debug.log')
-
-        file_handler = logging.FileHandler(log_file_path, mode='a')
-        file_handler.setLevel(logging.DEBUG)
-
-        file_formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(process)d - %(threadName)s '
-            '[%(module)s.%(funcName)s:%(lineno)d] - %(message)s'
-        )
-        file_handler.setFormatter(file_formatter)
-        root_logger.addHandler(file_handler)
-
-        logger.debug(f"Detailed file logging configured to: {log_file_path}")
-    except Exception as e:
-        sys.stderr.write(f"CRITICAL: Failed to set up file logging to '{log_file_path}': {e}\n")
-else:
-    logger.debug("File logging disabled in stateless mode")
+# Configure file logging based on stateless mode
+from core.log_formatter import configure_file_logging
+configure_file_logging()
 
 def configure_safe_logging():
     """Configure safe Unicode handling for logging."""

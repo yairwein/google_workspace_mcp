@@ -5,7 +5,9 @@ Provides visually appealing log formatting with emojis and consistent styling
 to match the safe_print output format.
 """
 import logging
+import os
 import re
+import sys
 
 
 class EnhancedLogFormatter(logging.Formatter):
@@ -140,3 +142,51 @@ def setup_enhanced_logging(log_level: int = logging.INFO, use_colors: bool = Tru
         console_handler.setFormatter(formatter)
         console_handler.setLevel(log_level)
         root_logger.addHandler(console_handler)
+
+
+def configure_file_logging(logger_name: str = None) -> bool:
+    """
+    Configure file logging based on stateless mode setting.
+    
+    In stateless mode, file logging is completely disabled to avoid filesystem writes.
+    In normal mode, sets up detailed file logging to 'mcp_server_debug.log'.
+    
+    Args:
+        logger_name: Optional name for the logger (defaults to root logger)
+        
+    Returns:
+        bool: True if file logging was configured, False if skipped (stateless mode)
+    """
+    # Check if stateless mode is enabled
+    stateless_mode = os.getenv("WORKSPACE_MCP_STATELESS_MODE", "false").lower() == "true"
+    
+    if stateless_mode:
+        logger = logging.getLogger(logger_name)
+        logger.debug("File logging disabled in stateless mode")
+        return False
+    
+    # Configure file logging for normal mode
+    try:
+        target_logger = logging.getLogger(logger_name)
+        log_file_dir = os.path.dirname(os.path.abspath(__file__))
+        # Go up one level since we're in core/ subdirectory
+        log_file_dir = os.path.dirname(log_file_dir)
+        log_file_path = os.path.join(log_file_dir, 'mcp_server_debug.log')
+
+        file_handler = logging.FileHandler(log_file_path, mode='a')
+        file_handler.setLevel(logging.DEBUG)
+
+        file_formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(process)d - %(threadName)s '
+            '[%(module)s.%(funcName)s:%(lineno)d] - %(message)s'
+        )
+        file_handler.setFormatter(file_formatter)
+        target_logger.addHandler(file_handler)
+
+        logger = logging.getLogger(logger_name)
+        logger.debug(f"Detailed file logging configured to: {log_file_path}")
+        return True
+        
+    except Exception as e:
+        sys.stderr.write(f"CRITICAL: Failed to set up file logging to '{log_file_path}': {e}\n")
+        return False

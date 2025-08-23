@@ -16,7 +16,7 @@ from google.oauth2.credentials import Credentials
 from auth.oauth21_session_store import store_token_session
 from auth.google_auth import get_credential_store
 from auth.scopes import get_current_scopes
-from auth.oauth_config import get_oauth_config
+from auth.oauth_config import get_oauth_config, is_stateless_mode
 from auth.oauth_error_handling import (
     OAuthError, OAuthValidationError, OAuthConfigurationError,
     create_oauth_error_response, validate_token_request,
@@ -181,7 +181,6 @@ async def handle_proxy_token_exchange(request: Request):
                                         )
 
                                         # Save credentials to file for legacy auth (skip in stateless mode)
-                                        from auth.oauth_config import is_stateless_mode
                                         if not is_stateless_mode():
                                             store = get_credential_store()
                                             if not store.store_credential(user_email, credentials):
