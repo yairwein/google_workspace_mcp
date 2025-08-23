@@ -1,3 +1,4 @@
+# ruff: noqa
 """
 FastMCP CLI entrypoint for Google Workspace MCP Server.
 This file imports all tool modules to register them with the server instance.
