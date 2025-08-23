@@ -7,6 +7,7 @@ from importlib import metadata
 from dotenv import load_dotenv
 
 from auth.oauth_config import reload_oauth_config
+from core.log_formatter import EnhancedLogFormatter
 from core.utils import check_credentials_directory_permissions
 from core.server import server, set_transport_mode, configure_server_for_http
 from core.tool_tier_loader import resolve_tools_from_tier
@@ -58,11 +59,33 @@ def safe_print(text):
     except UnicodeEncodeError:
         print(text.encode('ascii', errors='replace').decode(), file=sys.stderr)
 
+def configure_safe_logging():
+    class SafeEnhancedFormatter(EnhancedLogFormatter):
+        """Enhanced ASCII formatter with additional Windows safety."""
+        def format(self, record):
+            try:
+                return super().format(record)
+            except UnicodeEncodeError:
+                # Fallback to ASCII-safe formatting
+                service_prefix = self._get_ascii_prefix(record.name, record.levelname)
+                safe_msg = str(record.getMessage()).encode('ascii', errors='replace').decode('ascii')
+                return f"{service_prefix} {safe_msg}"
+
+    # Replace all console handlers' formatters with safe enhanced ones
+    for handler in logging.root.handlers:
+        # Only apply to console/stream handlers, keep file handlers as-is
+        if isinstance(handler, logging.StreamHandler) and handler.stream.name in ['<stderr>', '<stdout>']:
+            safe_formatter = SafeEnhancedFormatter(use_colors=True)
+            handler.setFormatter(safe_formatter)
+
 def main():
     """
     Main entry point for the Google Workspace MCP server.
     Uses FastMCP's native streamable-http transport.
     """
+    # Configure safe logging for Windows Unicode handling
+    configure_safe_logging()
+
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Google Workspace MCP Server')
     parser.add_argument('--single-user', action='store_true',
@@ -79,6 +102,8 @@ def main():
     # Set port and base URI once for reuse throughout the function
     port = int(os.getenv("PORT", os.getenv("WORKSPACE_MCP_PORT", 8000)))
     base_uri = os.getenv("WORKSPACE_MCP_BASE_URI", "http://localhost")
+    external_url = os.getenv("WORKSPACE_EXTERNAL_URL")
+    display_url = external_url if external_url else f"{base_uri}:{port}"
 
     safe_print("🔧 Google Workspace MCP Server")
     safe_print("=" * 35)
@@ -90,8 +115,8 @@ def main():
     safe_print(f"   📦 Version: {version}")
     safe_print(f"   🌐 Transport: {args.transport}")
     if args.transport == 'streamable-http':
-        safe_print(f"   🔗 URL: {base_uri}:{port}")
-        safe_print(f"   🔐 OAuth Callback: {base_uri}:{port}/oauth2callback")
+        safe_print(f"   🔗 URL: {display_url}")
+        safe_print(f"   🔐 OAuth Callback: {display_url}/oauth2callback")
     safe_print(f"   👤 Mode: {'Single-user' if args.single_user else 'Multi-user'}")
     safe_print(f"   🐍 Python: {sys.version.split()[0]}")
     safe_print("")
@@ -225,6 +250,8 @@ def main():
             configure_server_for_http()
             safe_print("")
             safe_print(f"🚀 Starting HTTP server on {base_uri}:{port}")
+            if external_url:
+                safe_print(f"   External URL: {external_url}")
         else:
             safe_print("")
             safe_print("🚀 Starting STDIO server")
@@ -232,7 +259,7 @@ def main():
             from auth.oauth_callback_server import ensure_oauth_callback_available
             success, error_msg = ensure_oauth_callback_available('stdio', port, base_uri)
             if success:
-                safe_print(f"   OAuth callback server started on {base_uri}:{port}/oauth2callback")
+                safe_print(f"   OAuth callback server started on {display_url}/oauth2callback")
             else:
                 warning_msg = "   ⚠️  Warning: Failed to start OAuth callback server"
                 if error_msg:

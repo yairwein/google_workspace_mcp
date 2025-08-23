@@ -26,7 +26,7 @@ LIST_TASKS_MAX_POSITION = "99999999999999999999"
 async def list_task_lists(
     service,
     user_google_email: str,
-    max_results: Optional[int] = None,
+    max_results: Optional[str] = None,
     page_token: Optional[str] = None
 ) -> str:
     """
@@ -34,7 +34,7 @@ async def list_task_lists(
 
     Args:
         user_google_email (str): The user's Google email address. Required.
-        max_results (Optional[int]): Maximum number of task lists to return (default: 1000, max: 1000).
+        max_results (Optional[str]): Maximum number of task lists to return (default: 1000, max: 1000).
         page_token (Optional[str]): Token for pagination.
 
     Returns:
@@ -269,12 +269,12 @@ async def list_tasks(
     service,
     user_google_email: str,
     task_list_id: str,
-    max_results: Optional[int] = None,
+    max_results: int = None,
     page_token: Optional[str] = None,
-    show_completed: Optional[bool] = None,
-    show_deleted: Optional[bool] = None,
-    show_hidden: Optional[bool] = None,
-    show_assigned: Optional[bool] = None,
+    show_completed: bool = None,
+    show_deleted: bool = None,
+    show_hidden: bool = None,
+    show_assigned: bool = None,
     completed_max: Optional[str] = None,
     completed_min: Optional[str] = None,
     due_max: Optional[str] = None,
@@ -287,12 +287,12 @@ async def list_tasks(
     Args:
         user_google_email (str): The user's Google email address. Required.
         task_list_id (str): The ID of the task list to retrieve tasks from.
-        max_results (Optional[int]): Maximum number of tasks to return (default: 20, max: 10000).
+        max_results (Optional[int]): Maximum number of tasks to return. (default: 20, max: 10000).
         page_token (Optional[str]): Token for pagination.
-        show_completed (Optional[bool]): Whether to include completed tasks (default: True).
-        show_deleted (Optional[bool]): Whether to include deleted tasks (default: False).
-        show_hidden (Optional[bool]): Whether to include hidden tasks (default: False).
-        show_assigned (Optional[bool]): Whether to include assigned tasks (default: False).
+        show_completed (bool): Whether to include completed tasks (default: True).
+        show_deleted (bool): Whether to include deleted tasks (default: False).
+        show_hidden (bool): Whether to include hidden tasks (default: False).
+        show_assigned (bool): Whether to include assigned tasks (default: False).
         completed_max (Optional[str]): Upper bound for completion date (RFC 3339 timestamp).
         completed_min (Optional[str]): Lower bound for completion date (RFC 3339 timestamp).
         due_max (Optional[str]): Upper bound for due date (RFC 3339 timestamp).

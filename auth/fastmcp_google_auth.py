@@ -12,7 +12,6 @@ Key features:
 - Session bridging to Google credentials for API access
 """
 
-import os
 import logging
 from typing import Dict, Any, Optional, List
 
@@ -39,11 +38,14 @@ class GoogleWorkspaceAuthProvider(AuthProvider):
         """Initialize the Google Workspace auth provider."""
         super().__init__()
         
-        # Get configuration from environment
-        self.client_id = os.getenv("GOOGLE_OAUTH_CLIENT_ID")
-        self.client_secret = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET")
-        self.base_url = os.getenv("WORKSPACE_MCP_BASE_URI", "http://localhost")
-        self.port = int(os.getenv("PORT", os.getenv("WORKSPACE_MCP_PORT", 8000)))
+        # Get configuration from OAuth config
+        from auth.oauth_config import get_oauth_config
+        config = get_oauth_config()
+        
+        self.client_id = config.client_id
+        self.client_secret = config.client_secret
+        self.base_url = config.get_oauth_base_url()
+        self.port = config.port
         
         if not self.client_id:
             logger.warning("GOOGLE_OAUTH_CLIENT_ID not set - OAuth 2.1 authentication will not work")

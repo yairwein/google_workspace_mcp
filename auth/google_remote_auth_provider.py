@@ -13,7 +13,6 @@ This provider is used only in streamable-http transport mode with FastMCP v2.11.
 For earlier versions or other transport modes, the legacy GoogleWorkspaceAuthProvider is used.
 """
 
-import os
 import logging
 import aiohttp
 from typing import Optional, List
@@ -60,11 +59,14 @@ class GoogleRemoteAuthProvider(RemoteAuthProvider):
         if not REMOTEAUTHPROVIDER_AVAILABLE:
             raise ImportError("FastMCP v2.11.1+ required for RemoteAuthProvider")
 
-        # Get configuration from environment
-        self.client_id = os.getenv("GOOGLE_OAUTH_CLIENT_ID")
-        self.client_secret = os.getenv("GOOGLE_OAUTH_CLIENT_SECRET")
-        self.base_url = os.getenv("WORKSPACE_MCP_BASE_URI", "http://localhost")
-        self.port = int(os.getenv("PORT", os.getenv("WORKSPACE_MCP_PORT", 8000)))
+        # Get configuration from OAuth config
+        from auth.oauth_config import get_oauth_config
+        config = get_oauth_config()
+        
+        self.client_id = config.client_id
+        self.client_secret = config.client_secret
+        self.base_url = config.get_oauth_base_url()
+        self.port = config.port
 
         if not self.client_id:
             logger.error(
@@ -86,11 +88,13 @@ class GoogleRemoteAuthProvider(RemoteAuthProvider):
         # The /mcp/ resource URL is handled in the protected resource metadata endpoint
         super().__init__(
             token_verifier=token_verifier,
-            authorization_servers=[AnyHttpUrl(f"{self.base_url}:{self.port}")],
-            resource_server_url=f"{self.base_url}:{self.port}",
+            authorization_servers=[AnyHttpUrl(self.base_url)],
+            resource_server_url=self.base_url,
         )
 
-        logger.debug("GoogleRemoteAuthProvider")
+        logger.debug(
+            f"Initialized GoogleRemoteAuthProvider with base_url={self.base_url}"
+        )
 
     def get_routes(self) -> List[Route]:
         """

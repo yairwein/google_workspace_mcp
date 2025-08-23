@@ -34,6 +34,7 @@
         "GOOGLE_CLIENT_SECRETS": "${user_config.GOOGLE_CLIENT_SECRETS}",
         "WORKSPACE_MCP_BASE_URI": "${user_config.WORKSPACE_MCP_BASE_URI}",
         "WORKSPACE_MCP_PORT": "${user_config.WORKSPACE_MCP_PORT}",
+        "WORKSPACE_EXTERNAL_URL": "${user_config.WORKSPACE_EXTERNAL_URL}",
         "OAUTHLIB_INSECURE_TRANSPORT": "${user_config.OAUTHLIB_INSECURE_TRANSPORT}",
         "GOOGLE_PSE_API_KEY": "${user_config.GOOGLE_PSE_API_KEY}",
         "GOOGLE_PSE_ENGINE_ID": "${user_config.GOOGLE_PSE_ENGINE_ID}"
@@ -184,6 +185,16 @@
       "validation": {
         "min": 1024,
         "max": 65535
+      }
+    },
+    "WORKSPACE_EXTERNAL_URL": {
+      "type": "string",
+      "title": "External URL",
+      "description": "External URL for reverse proxy setups (e.g., https://your-domain.com). Overrides base_uri:port for OAuth endpoints",
+      "required": false,
+      "sensitive": false,
+      "validation": {
+        "pattern": "^https?://[a-zA-Z0-9.-]+(:[0-9]+)?$"
       }
     },
     "OAUTHLIB_INSECURE_TRANSPORT": {
