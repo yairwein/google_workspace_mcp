@@ -14,7 +14,7 @@ from google.auth.transport.requests import Request
 from google.auth.exceptions import RefreshError
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-from auth.scopes import SCOPES
+from auth.scopes import SCOPES, get_current_scopes
 from auth.oauth21_session_store import get_oauth21_session_store
 from auth.credential_store import get_credential_store
 from auth.oauth_config import get_oauth_config, is_stateless_mode
@@ -330,7 +330,7 @@ async def start_auth_flow(
     )
 
     logger.info(
-        f"[start_auth_flow] Initiating auth for {user_display_name} with global SCOPES."
+        f"[start_auth_flow] Initiating auth for {user_display_name} with scopes for enabled tools."
     )
 
     # Note: Caller should ensure OAuth callback is available before calling this function
@@ -347,7 +347,7 @@ async def start_auth_flow(
         oauth_state = os.urandom(16).hex()
 
         flow = create_oauth_flow(
-            scopes=SCOPES,  # Use global SCOPES
+            scopes=get_current_scopes(),  # Use scopes for enabled tools only
             redirect_uri=redirect_uri,  # Use passed redirect_uri
             state=oauth_state,
         )
