@@ -79,7 +79,7 @@ startCommand:
       
       return {
         command: 'uv',
-        args: args,
+        args: ['run', 'main.py'],
         env: {
           GOOGLE_OAUTH_CLIENT_ID: config.googleOauthClientId,
           GOOGLE_OAUTH_CLIENT_SECRET: config.googleOauthClientSecret,

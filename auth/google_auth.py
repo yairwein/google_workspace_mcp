@@ -14,7 +14,7 @@ from google.auth.transport.requests import Request
 from google.auth.exceptions import RefreshError
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-from auth.scopes import SCOPES, get_current_scopes
+from auth.scopes import SCOPES, get_current_scopes # noqa
 from auth.oauth21_session_store import get_oauth21_session_store
 from auth.credential_store import get_credential_store
 from auth.oauth_config import get_oauth_config, is_stateless_mode
