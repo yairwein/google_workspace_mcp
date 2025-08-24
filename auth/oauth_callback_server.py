@@ -16,7 +16,7 @@ from fastapi import FastAPI, Request
 from typing import Optional
 from urllib.parse import urlparse
 
-from auth.scopes import SCOPES
+from auth.scopes import SCOPES, get_current_scopes
 from auth.oauth_responses import create_error_response, create_success_response, create_server_error_response
 from auth.google_auth import handle_auth_callback, check_client_secrets
 from auth.oauth_config import get_oauth_redirect_uri
@@ -73,7 +73,7 @@ class MinimalOAuthServer:
                 # Exchange code for credentials
                 redirect_uri = get_oauth_redirect_uri()
                 verified_user_id, credentials = handle_auth_callback(
-                    scopes=SCOPES,
+                    scopes=get_current_scopes(),
                     authorization_response=str(request.url),
                     redirect_uri=redirect_uri,
                     session_id=None

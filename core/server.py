@@ -15,7 +15,7 @@ from auth.mcp_session_middleware import MCPSessionMiddleware
 from auth.oauth_responses import create_error_response, create_success_response, create_server_error_response
 from auth.auth_info_middleware import AuthInfoMiddleware
 from auth.fastmcp_google_auth import GoogleWorkspaceAuthProvider
-from auth.scopes import SCOPES
+from auth.scopes import SCOPES, get_current_scopes
 from core.config import (
     USER_GOOGLE_EMAIL,
     get_transport_mode,
@@ -153,7 +153,7 @@ async def oauth2_callback(request: Request) -> HTMLResponse:
         logger.info(f"OAuth callback: Received code (state: {state}).")
 
         verified_user_id, credentials = handle_auth_callback(
-            scopes=SCOPES,
+            scopes=get_current_scopes(),
             authorization_response=str(request.url),
             redirect_uri=get_oauth_redirect_uri_for_current_mode(),
             session_id=None
