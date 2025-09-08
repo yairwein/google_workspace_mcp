@@ -743,6 +743,7 @@ cp .env.oauth21 .env
 | `update_doc_headers_footers` | Complete | Modify headers and footers |
 | `batch_update_doc` | Complete | Execute multiple operations |
 | `inspect_doc_structure` | Complete | Analyze document structure |
+| `export_doc_to_pdf` | Extended | Export document to PDF |
 | `create_table_with_data` | Complete | Create data tables |
 | `debug_table_structure` | Complete | Debug table issues |
 | `*_document_comments` | Complete | Read, Reply, Create, Resolve |
