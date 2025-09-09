@@ -74,11 +74,11 @@ configure_safe_logging()
 # Check credentials directory permissions (skip in stateless mode)
 if not is_stateless_mode():
     try:
-        logger.info("🔍 Checking credentials directory permissions...")
+        logger.info("Checking credentials directory permissions...")
         check_credentials_directory_permissions()
-        logger.info("✅ Credentials directory permissions verified")
+        logger.info("Credentials directory permissions verified")
     except (PermissionError, OSError) as e:
-        logger.error(f"❌ Credentials directory permission check failed: {e}")
+        logger.error(f"Credentials directory permission check failed: {e}")
         logger.error("   Please ensure the service has write permissions to create/access the credentials directory")
         sys.exit(1)
 else:

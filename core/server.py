@@ -65,7 +65,7 @@ server.add_middleware(auth_info_middleware)
 def set_transport_mode(mode: str):
     """Sets the transport mode for the server."""
     _set_transport_mode(mode)
-    logger.info(f"🔌 Transport: {mode}")
+    logger.info(f"Transport: {mode}")
 
 def configure_server_for_http():
     """
