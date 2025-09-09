@@ -88,7 +88,7 @@ def configure_server_for_http():
 
     if oauth21_enabled:
         if not config.is_configured():
-            logger.warning("⚠️  OAuth 2.1 enabled but OAuth credentials not configured")
+            logger.warning("OAuth 2.1 enabled but OAuth credentials not configured")
             return
 
         if not GOOGLE_REMOTE_AUTH_AVAILABLE:
@@ -99,7 +99,7 @@ def configure_server_for_http():
                 "Please reinstall dependencies using 'uv sync --frozen'."
             )
         
-        logger.info("🔐 OAuth 2.1 enabled with automatic OAuth 2.0 fallback for legacy clients")
+        logger.info("OAuth 2.1 enabled with automatic OAuth 2.0 fallback for legacy clients")
         try:
             _auth_provider = GoogleRemoteAuthProvider()
             server.auth = _auth_provider
