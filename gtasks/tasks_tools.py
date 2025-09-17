@@ -269,17 +269,17 @@ async def list_tasks(
     service,
     user_google_email: str,
     task_list_id: str,
-    max_results: int = None,
+    max_results: int = LIST_TASKS_MAX_RESULTS_DEFAULT,
     page_token: Optional[str] = None,
-    show_completed: bool = None,
-    show_deleted: bool = None,
-    show_hidden: bool = None,
-    show_assigned: bool = None,
+    show_completed: bool = True,
+    show_deleted: bool = False,
+    show_hidden: bool = False,
+    show_assigned: bool = False,
     completed_max: Optional[str] = None,
     completed_min: Optional[str] = None,
     due_max: Optional[str] = None,
     due_min: Optional[str] = None,
-    updated_min: Optional[str] = None
+    updated_min: Optional[str] = None,
 ) -> str:
     """
     List all tasks in a specific task list.
@@ -287,7 +287,7 @@ async def list_tasks(
     Args:
         user_google_email (str): The user's Google email address. Required.
         task_list_id (str): The ID of the task list to retrieve tasks from.
-        max_results (Optional[int]): Maximum number of tasks to return. (default: 20, max: 10000).
+        max_results (int): Maximum number of tasks to return. (default: 20, max: 10000).
         page_token (Optional[str]): Token for pagination.
         show_completed (bool): Whether to include completed tasks (default: True).
         show_deleted (bool): Whether to include deleted tasks (default: False).
