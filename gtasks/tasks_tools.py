@@ -26,7 +26,7 @@ LIST_TASKS_MAX_POSITION = "99999999999999999999"
 async def list_task_lists(
     service,
     user_google_email: str,
-    max_results: Optional[str] = None,
+    max_results: int = 1000,
     page_token: Optional[str] = None
 ) -> str:
     """
@@ -34,7 +34,7 @@ async def list_task_lists(
 
     Args:
         user_google_email (str): The user's Google email address. Required.
-        max_results (Optional[str]): Maximum number of task lists to return (default: 1000, max: 1000).
+        max_results (int): Maximum number of task lists to return (default: 1000, max: 1000).
         page_token (Optional[str]): Token for pagination.
 
     Returns:
