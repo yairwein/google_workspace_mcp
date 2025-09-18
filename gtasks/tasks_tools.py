@@ -289,7 +289,7 @@ async def list_tasks(
         task_list_id (str): The ID of the task list to retrieve tasks from.
         max_results (int): Maximum number of tasks to return. (default: 20, max: 10000).
         page_token (Optional[str]): Token for pagination.
-        show_completed (bool): Whether to include completed tasks (default: True).
+        show_completed (bool): Whether to include completed tasks (default: True). Note that show_hidden must also be true to show tasks completed in first party clients, such as the web UI and Google's mobile apps.
         show_deleted (bool): Whether to include deleted tasks (default: False).
         show_hidden (bool): Whether to include hidden tasks (default: False).
         show_assigned (bool): Whether to include assigned tasks (default: False).
