@@ -650,7 +650,7 @@ cp .env.oauth21 .env
 
 **Loading Priority**
 1. Environment variables (`export VAR=value`)
-2. `.env` file in project root
+2. `.env` file in project root (warning - if you run via `uvx` rather than `uv run` from the repo directory, you are spawning a standalone process not associated with your clone of the repo and it will not find your .env file without specifying it directly) 
 3. `client_secret.json` via `GOOGLE_CLIENT_SECRET_PATH`
 4. Default `client_secret.json` in project root
 
