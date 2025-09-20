@@ -6,9 +6,10 @@ This module provides MCP tools for interacting with Google Tasks API.
 
 import logging
 import asyncio
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
-from googleapiclient.errors import HttpError
+from googleapiclient.errors import HttpError  # type: ignore
+from mcp import Resource
 
 from auth.service_decorator import require_google_service
 from core.server import server
@@ -20,11 +21,31 @@ LIST_TASKS_MAX_RESULTS_DEFAULT = 20
 LIST_TASKS_MAX_RESULTS_MAX = 10_000
 LIST_TASKS_MAX_POSITION = "99999999999999999999"
 
-@server.tool()
-@require_google_service("tasks", "tasks_read")
-@handle_http_errors("list_task_lists", service_type="tasks")
+
+class StructuredTask:
+    def __init__(self, task: Dict[str, str], is_placeholder_parent: bool) -> None:
+        self.id = task["id"]
+        self.title = task.get("title", None)
+        self.status = task.get("status", None)
+        self.due = task.get("due", None)
+        self.notes = task.get("notes", None)
+        self.updated = task.get("updated", None)
+        self.completed = task.get("completed", None)
+        self.is_placeholder_parent = is_placeholder_parent
+        self.subtasks: List["StructuredTask"] = []
+
+    def add_subtask(self, subtask: "StructuredTask") -> None:
+        self.subtasks.append(subtask)
+
+    def __repr__(self) -> str:
+        return f"StructuredTask(title={self.title}, {len(self.subtasks)} subtasks)"
+
+
+@server.tool()  # type: ignore
+@require_google_service("tasks", "tasks_read")  # type: ignore
+@handle_http_errors("list_task_lists", service_type="tasks")  # type: ignore
 async def list_task_lists(
-    service,
+    service: Resource,
     user_google_email: str,
     max_results: int = 1000,
     page_token: Optional[str] = None
@@ -43,7 +64,7 @@ async def list_task_lists(
     logger.info(f"[list_task_lists] Invoked. Email: '{user_google_email}'")
 
     try:
-        params = {}
+        params: Dict[str, Any] = {}
         if max_results is not None:
             params["maxResults"] = max_results
         if page_token:
@@ -80,11 +101,11 @@ async def list_task_lists(
         raise Exception(message)
 
 
-@server.tool()
-@require_google_service("tasks", "tasks_read")
-@handle_http_errors("get_task_list", service_type="tasks")
+@server.tool()  # type: ignore
+@require_google_service("tasks", "tasks_read")  # type: ignore
+@handle_http_errors("get_task_list", service_type="tasks")  # type: ignore
 async def get_task_list(
-    service,
+    service: Resource,
     user_google_email: str,
     task_list_id: str
 ) -> str:
@@ -124,11 +145,11 @@ async def get_task_list(
         raise Exception(message)
 
 
-@server.tool()
-@require_google_service("tasks", "tasks")
-@handle_http_errors("create_task_list", service_type="tasks")
+@server.tool()  # type: ignore
+@require_google_service("tasks", "tasks")  # type: ignore
+@handle_http_errors("create_task_list", service_type="tasks")  # type: ignore
 async def create_task_list(
-    service,
+    service: Resource,
     user_google_email: str,
     title: str
 ) -> str:
@@ -172,11 +193,11 @@ async def create_task_list(
         raise Exception(message)
 
 
-@server.tool()
-@require_google_service("tasks", "tasks")
-@handle_http_errors("update_task_list", service_type="tasks")
+@server.tool()  # type: ignore
+@require_google_service("tasks", "tasks")  # type: ignore
+@handle_http_errors("update_task_list", service_type="tasks")  # type: ignore
 async def update_task_list(
-    service,
+    service: Resource,
     user_google_email: str,
     task_list_id: str,
     title: str
@@ -222,11 +243,11 @@ async def update_task_list(
         raise Exception(message)
 
 
-@server.tool()
-@require_google_service("tasks", "tasks")
-@handle_http_errors("delete_task_list", service_type="tasks")
+@server.tool()  # type: ignore
+@require_google_service("tasks", "tasks")  # type: ignore
+@handle_http_errors("delete_task_list", service_type="tasks")  # type: ignore
 async def delete_task_list(
-    service,
+    service: Resource,
     user_google_email: str,
     task_list_id: str
 ) -> str:
@@ -262,11 +283,11 @@ async def delete_task_list(
         raise Exception(message)
 
 
-@server.tool()
-@require_google_service("tasks", "tasks_read")
-@handle_http_errors("list_tasks", service_type="tasks")
+@server.tool()  # type: ignore
+@require_google_service("tasks", "tasks_read")  # type: ignore
+@handle_http_errors("list_tasks", service_type="tasks")  # type: ignore
 async def list_tasks(
-    service,
+    service: Resource,
     user_google_email: str,
     task_list_id: str,
     max_results: int = LIST_TASKS_MAX_RESULTS_DEFAULT,
@@ -305,7 +326,7 @@ async def list_tasks(
     logger.info(f"[list_tasks] Invoked. Email: '{user_google_email}', Task List ID: {task_list_id}")
 
     try:
-        params = {"tasklist": task_list_id}
+        params: Dict[str, Any] = {"tasklist": task_list_id}
         if max_results is not None:
             params["maxResults"] = max_results
         if page_token:
@@ -359,28 +380,13 @@ async def list_tasks(
         if not tasks:
             return f"No tasks found in task list {task_list_id} for {user_google_email}."
 
-        orphaned_subtasks = sort_tasks_by_position(tasks)
+        structured_tasks = get_structured_tasks(tasks)
 
         response = f"Tasks in list {task_list_id} for {user_google_email}:\n"
-        for task in tasks:
-            response += f"- {task.get('title', 'Untitled')} (ID: {task['id']})\n"
-            response += f"  Status: {task.get('status', 'N/A')}\n"
-            if task.get('due'):
-                response += f"  Due: {task['due']}\n"
-            if task.get('notes'):
-                response += f"  Notes: {task['notes'][:100]}{'...' if len(task['notes']) > 100 else ''}\n"
-            if task.get('completed'):
-                response += f"  Completed: {task['completed']}\n"
-            response += f"  Updated: {task.get('updated', 'N/A')}\n"
-            response += "\n"
+        response += serialize_tasks(structured_tasks, 0)
 
         if next_page_token:
             response += f"Next page token: {next_page_token}\n"
-        if orphaned_subtasks > 0:
-            response += "\n"
-            response += f"{orphaned_subtasks} orphaned subtasks could not be placed in order due to missing parent information. They were listed at the end of the task list.\n"
-            response += "This can occur due to pagination. Callers can often avoid this problem if max_results is large enough to contain all tasks (subtasks and their parents) without paging.\n"
-            response += "This can also occur due to filtering that excludes parent tasks while including their subtasks or due to deleted or hidden parent tasks.\n"
 
         logger.info(f"Found {len(tasks)} tasks in list {task_list_id} for {user_google_email}")
         return response
@@ -395,50 +401,126 @@ async def list_tasks(
         raise Exception(message)
 
 
-def sort_tasks_by_position(tasks: List[Dict[str, str]]) -> int:
+def get_structured_tasks(tasks: List[Dict[str, str]]) -> List[StructuredTask]:
     """
-    Sort tasks to match the order in which they are displayed in the Google Tasks UI according to:
-    1. parent: Subtasks should be listed immediately following their parent task.
-    2. position: The position field determines the order of tasks at the same level.
+    Convert a flat list of task dictionaries into StructuredTask objects based on parent-child relationships sorted by position.
 
     Args:
-        tasks (list): List of task dictionaries to sort in place (modified).
+        tasks: List of task dictionaries.
 
     Returns:
-        int: The number of orphaned subtasks encountered in the list.
+        list: Sorted list of top-level StructuredTask objects with nested subtasks.
     """
-    parent_positions = {
-        task["id"]: task["position"] for task in tasks if task.get("parent") is None
+    tasks_by_id = {
+        task["id"]: StructuredTask(task, is_placeholder_parent=False) for task in tasks
+    }
+    positions_by_id = {
+        task["id"]: int(task["position"]) for task in tasks if "position" in task
     }
 
-    orphaned_subtasks = 0
+    # Placeholder virtual root as parent for top-level tasks
+    root_task = StructuredTask(
+        {"id": "root", "title": "Root"}, is_placeholder_parent=False
+    )
 
-    def get_sort_key(task: Dict[str, str]) -> Tuple[str, str, str]:
-        nonlocal orphaned_subtasks
+    for task in tasks:
+        structured_task = tasks_by_id[task["id"]]
+        parent_id = task.get("parent")
+        parent = None
 
-        parent = task.get("parent")
-        position = task["position"]
-        if parent is None:
-            return (task["position"], "", "")
+        if not parent_id:
+            # Task without parent: parent to the virtual root
+            parent = root_task
+        elif parent_id in tasks_by_id:
+            # Subtask: parent to its actual parent
+            parent = tasks_by_id[parent_id]
         else:
-            # Note that, due to paging or filtering, a subtask may have a parent that is not present in the list of tasks.
-            # We will return these orphaned subtasks at the end of the list, grouped by their parent task IDs.
-            parent_position = parent_positions.get(parent)
-            if parent_position is None:
-                orphaned_subtasks += 1
-                logger.debug(f"Orphaned task: {task['title']}, id = {task['id']}, parent = {parent}")
-                return (f"{LIST_TASKS_MAX_POSITION}", parent, position)
-            return (parent_position, position, "")
+            # Orphaned subtask: create placeholder parent
+            # Due to paging or filtering, a subtask may have a parent that is not present in the list of tasks.
+            # We will create placeholder StructuredTask objects for these missing parents to maintain the hierarchy.
+            parent = StructuredTask({"id": parent_id}, is_placeholder_parent=True)
+            tasks_by_id[parent_id] = parent
+            root_task.add_subtask(parent)
 
-    tasks.sort(key=get_sort_key)
-    return orphaned_subtasks
+        parent.add_subtask(structured_task)
+
+    sort_structured_tasks(root_task, positions_by_id)
+    return root_task.subtasks
 
 
-@server.tool()
-@require_google_service("tasks", "tasks_read")
-@handle_http_errors("get_task", service_type="tasks")
+def sort_structured_tasks(
+    root_task: StructuredTask, positions_by_id: Dict[str, int]
+) -> None:
+    """
+    Recursively sort--in place--StructuredTask objects and their subtasks based on position.
+
+    Args:
+        root_task: The root StructuredTask object.
+        positions_by_id: Dictionary mapping task IDs to their positions.
+    """
+
+    def get_position(task: StructuredTask) -> int | float:
+        # Tasks without position go to the end (infinity)
+        result = positions_by_id.get(task.id, float("inf"))
+        return result
+
+    root_task.subtasks.sort(key=get_position)
+    for subtask in root_task.subtasks:
+        sort_structured_tasks(subtask, positions_by_id)
+
+
+def serialize_tasks(structured_tasks: List[StructuredTask], subtask_level: int) -> str:
+    """
+    Serialize a list of StructuredTask objects into a formatted string with indentation for subtasks.
+    Args:
+        structured_tasks (list): List of StructuredTask objects.
+        subtask_level (int): Current level of indentation for subtasks.
+
+    Returns:
+        str: Formatted string representation of the tasks.
+    """
+    response = ""
+    placeholder_parent_count = 0
+    placeholder_parent_title = "Unknown parent"
+    for task in structured_tasks:
+        indent = "  " * subtask_level
+        bullet = "-" if subtask_level == 0 else "*"
+        if task.title is not None:
+            title = task.title
+        elif task.is_placeholder_parent:
+            title = placeholder_parent_title
+            placeholder_parent_count += 1
+        else:
+            title = "Untitled"
+        response += f"{indent}{bullet} {title} (ID: {task.id})\n"
+        response += f"{indent}  Status: {task.status or 'N/A'}\n"
+        response += f"{indent}  Due: {task.due}\n" if task.due else ""
+        if task.notes:
+            response += f"{indent}  Notes: {task.notes[:100]}{'...' if len(task.notes) > 100 else ''}\n"
+        response += f"{indent}  Completed: {task.completed}\n" if task.completed else ""
+        response += f"{indent}  Updated: {task.updated or 'N/A'}\n"
+        response += "\n"
+
+        response += serialize_tasks(task.subtasks, subtask_level + 1)
+
+    if placeholder_parent_count > 0:
+        # Placeholder parents should only appear at the top level
+        assert subtask_level == 0
+        response += f"""
+{placeholder_parent_count} tasks with title {placeholder_parent_title} are included as placeholders.
+These placeholders contain subtasks whose parents were not present in the task list.
+This can occur due to pagination. Callers can often avoid this problem if max_results is large enough to contain all tasks (subtasks and their parents) without paging.
+This can also occur due to filtering that excludes parent tasks while including their subtasks or due to deleted or hidden parent tasks.
+"""
+
+    return response
+
+
+@server.tool()  # type: ignore
+@require_google_service("tasks", "tasks_read")  # type: ignore
+@handle_http_errors("get_task", service_type="tasks")  # type: ignore
 async def get_task(
-    service,
+    service: Resource,
     user_google_email: str,
     task_list_id: str,
     task_id: str
@@ -495,11 +577,11 @@ async def get_task(
         raise Exception(message)
 
 
-@server.tool()
-@require_google_service("tasks", "tasks")
-@handle_http_errors("create_task", service_type="tasks")
+@server.tool()  # type: ignore
+@require_google_service("tasks", "tasks")  # type: ignore
+@handle_http_errors("create_task", service_type="tasks")  # type: ignore
 async def create_task(
-    service,
+    service: Resource,
     user_google_email: str,
     task_list_id: str,
     title: str,
@@ -570,11 +652,11 @@ async def create_task(
         raise Exception(message)
 
 
-@server.tool()
-@require_google_service("tasks", "tasks")
-@handle_http_errors("update_task", service_type="tasks")
+@server.tool()  # type: ignore
+@require_google_service("tasks", "tasks")  # type: ignore
+@handle_http_errors("update_task", service_type="tasks")  # type: ignore
 async def update_task(
-    service,
+    service: Resource,
     user_google_email: str,
     task_list_id: str,
     task_id: str,
@@ -652,11 +734,11 @@ async def update_task(
         raise Exception(message)
 
 
-@server.tool()
-@require_google_service("tasks", "tasks")
-@handle_http_errors("delete_task", service_type="tasks")
+@server.tool()  # type: ignore
+@require_google_service("tasks", "tasks")  # type: ignore
+@handle_http_errors("delete_task", service_type="tasks")  # type: ignore
 async def delete_task(
-    service,
+    service: Resource,
     user_google_email: str,
     task_list_id: str,
     task_id: str
@@ -694,11 +776,11 @@ async def delete_task(
         raise Exception(message)
 
 
-@server.tool()
-@require_google_service("tasks", "tasks")
-@handle_http_errors("move_task", service_type="tasks")
+@server.tool()  # type: ignore
+@require_google_service("tasks", "tasks")  # type: ignore
+@handle_http_errors("move_task", service_type="tasks")  # type: ignore
 async def move_task(
-    service,
+    service: Resource,
     user_google_email: str,
     task_list_id: str,
     task_id: str,
@@ -773,11 +855,11 @@ async def move_task(
         raise Exception(message)
 
 
-@server.tool()
-@require_google_service("tasks", "tasks")
-@handle_http_errors("clear_completed_tasks", service_type="tasks")
+@server.tool()  # type: ignore
+@require_google_service("tasks", "tasks")  # type: ignore
+@handle_http_errors("clear_completed_tasks", service_type="tasks")  # type: ignore
 async def clear_completed_tasks(
-    service,
+    service: Resource,
     user_google_email: str,
     task_list_id: str
 ) -> str:
