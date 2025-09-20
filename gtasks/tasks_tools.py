@@ -6,7 +6,7 @@ This module provides MCP tools for interacting with Google Tasks API.
 
 import logging
 import asyncio
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from googleapiclient.errors import HttpError  # type: ignore
 from mcp import Resource
