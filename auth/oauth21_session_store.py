@@ -10,7 +10,7 @@ import contextvars
 import logging
 from typing import Dict, Optional, Any
 from threading import RLock
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass
 
 from google.oauth2.credentials import Credentials
@@ -159,7 +159,7 @@ class OAuth21SessionStore:
 
     def _cleanup_expired_oauth_states_locked(self):
         """Remove expired OAuth state entries. Caller must hold lock."""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         expired_states = [
             state
             for state, data in self._oauth_states.items()
@@ -186,7 +186,7 @@ class OAuth21SessionStore:
 
         with self._lock:
             self._cleanup_expired_oauth_states_locked()
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             expiry = now + timedelta(seconds=expires_in_seconds)
             self._oauth_states[state] = {
                 "session_id": session_id,
@@ -592,7 +592,7 @@ def get_credentials_from_token(access_token: str, user_email: Optional[str] = No
 
         # Otherwise, create minimal credentials with just the access token
         # Assume token is valid for 1 hour (typical for Google tokens)
-        expiry = datetime.utcnow() + timedelta(hours=1)
+        expiry = datetime.now(timezone.utc) + timedelta(hours=1)
 
         credentials = Credentials(
             token=access_token,
@@ -651,7 +651,7 @@ def store_token_session(token_response: dict, user_email: str, mcp_session_id: O
             client_id=_auth_provider.client_id,
             client_secret=_auth_provider.client_secret,
             scopes=token_response.get("scope", "").split() if token_response.get("scope") else None,
-            expiry=datetime.utcnow() + timedelta(seconds=token_response.get("expires_in", 3600)),
+            expiry=datetime.now(timezone.utc) + timedelta(seconds=token_response.get("expires_in", 3600)),
             session_id=session_id,
             mcp_session_id=mcp_session_id,
             issuer="https://accounts.google.com",  # Add issuer for Google tokens
