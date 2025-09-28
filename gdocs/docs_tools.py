@@ -6,7 +6,7 @@ This module provides MCP tools for interacting with Google Docs API and managing
 import logging
 import asyncio
 import io
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 
@@ -579,8 +579,8 @@ async def insert_doc_image(
     document_id: str,
     image_source: str,
     index: int,
-    width: Optional[int] = None,
-    height: Optional[int] = None,
+    width: int = 0,
+    height: int = 0,
 ) -> str:
     """
     Inserts an image into a Google Doc from Drive or a URL.
