@@ -152,20 +152,21 @@ async def oauth2_callback(request: Request) -> HTMLResponse:
 
         logger.info(f"OAuth callback: Received code (state: {state}).")
 
+        mcp_session_id = None
+        if hasattr(request, 'state') and hasattr(request.state, 'session_id'):
+            mcp_session_id = request.state.session_id
+
         verified_user_id, credentials = handle_auth_callback(
             scopes=get_current_scopes(),
             authorization_response=str(request.url),
             redirect_uri=get_oauth_redirect_uri_for_current_mode(),
-            session_id=None
+            session_id=mcp_session_id
         )
 
         logger.info(f"OAuth callback: Successfully authenticated user: {verified_user_id}.")
 
         try:
             store = get_oauth21_session_store()
-            mcp_session_id = None
-            if hasattr(request, 'state') and hasattr(request.state, 'session_id'):
-                mcp_session_id = request.state.session_id
 
             store.store_session(
                 user_email=verified_user_id,
@@ -220,4 +221,3 @@ async def start_google_auth(service_name: str, user_google_email: str = USER_GOO
     except Exception as e:
         logger.error(f"Failed to start Google authentication flow: {e}", exc_info=True)
         return f"**Error:** An unexpected error occurred: {e}"
-

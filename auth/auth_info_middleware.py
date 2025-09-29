@@ -216,6 +216,24 @@ class AuthInfoMiddleware(Middleware):
                             context.fastmcp_context.set_state("auth_provider_type", "oauth21_stdio")
                     except Exception as e:
                         logger.debug(f"Error checking stdio session: {e}")
+
+                # If no requested user was provided but exactly one session exists, assume it in stdio mode
+                if not context.fastmcp_context.get_state("authenticated_user_email"):
+                    try:
+                        from auth.oauth21_session_store import get_oauth21_session_store
+                        store = get_oauth21_session_store()
+                        single_user = store.get_single_user_email()
+                        if single_user:
+                            logger.debug(
+                                f"Defaulting to single stdio OAuth session for {single_user}"
+                            )
+                            context.fastmcp_context.set_state("authenticated_user_email", single_user)
+                            context.fastmcp_context.set_state("authenticated_via", "stdio_single_session")
+                            context.fastmcp_context.set_state("auth_provider_type", "oauth21_stdio")
+                            context.fastmcp_context.set_state("user_email", single_user)
+                            context.fastmcp_context.set_state("username", single_user)
+                    except Exception as e:
+                        logger.debug(f"Error determining stdio single-user session: {e}")
             
             # Check for MCP session binding
             if not context.fastmcp_context.get_state("authenticated_user_email") and hasattr(context.fastmcp_context, 'session_id'):
