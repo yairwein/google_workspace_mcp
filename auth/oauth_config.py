@@ -129,8 +129,6 @@ class OAuthConfig:
         """
         if self.external_url:
             return self.external_url
-        if self.stateless_mode:
-            return "https://accounts.google.com"
         return self.base_url
 
     def validate_redirect_uri(self, uri: str) -> bool:
@@ -251,7 +249,7 @@ class OAuthConfig:
         """
         oauth_base = self.get_oauth_base_url()
         metadata = {
-            "issuer": oauth_base,
+            "issuer": "https://accounts.google.com",
             "authorization_endpoint": f"{oauth_base}/oauth2/authorize",
             "token_endpoint": f"{oauth_base}/oauth2/token",
             "registration_endpoint": f"{oauth_base}/oauth2/register",
