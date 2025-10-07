@@ -84,6 +84,32 @@ def _parse_reminders_json(reminders_input: Optional[Union[str, List[Dict[str, An
     return validated_reminders
 
 
+def _apply_transparency_if_valid(
+    event_body: Dict[str, Any],
+    transparency: Optional[str],
+    function_name: str,
+) -> None:
+    """
+    Apply transparency to the event body if the provided value is valid.
+
+    Args:
+        event_body: Event payload being constructed.
+        transparency: Provided transparency value.
+        function_name: Name of the calling function for logging context.
+    """
+    if transparency is None:
+        return
+
+    valid_transparency_values = ["opaque", "transparent"]
+    if transparency in valid_transparency_values:
+        event_body["transparency"] = transparency
+        logger.info(f"[{function_name}] Set transparency to '{transparency}'")
+    else:
+        logger.warning(
+            f"[{function_name}] Invalid transparency value '{transparency}', must be 'opaque' or 'transparent', skipping"
+        )
+
+
 def _preserve_existing_fields(event_body: Dict[str, Any], existing_event: Dict[str, Any], field_mappings: Dict[str, Any]) -> None:
     """
     Helper function to preserve existing event fields when not explicitly provided.
@@ -368,6 +394,7 @@ async def create_event(
     add_google_meet: bool = False,
     reminders: Optional[Union[str, List[Dict[str, Any]]]] = None,
     use_default_reminders: bool = True,
+    transparency: Optional[str] = None,
 ) -> str:
     """
     Creates a new event.
@@ -386,6 +413,7 @@ async def create_event(
         add_google_meet (bool): Whether to add a Google Meet video conference to the event. Defaults to False.
         reminders (Optional[Union[str, List[Dict[str, Any]]]]): JSON string or list of reminder objects. Each should have 'method' ("popup" or "email") and 'minutes' (0-40320). Max 5 reminders. Example: '[{"method": "popup", "minutes": 15}]' or [{"method": "popup", "minutes": 15}]
         use_default_reminders (bool): Whether to use calendar's default reminders. If False, uses custom reminders. Defaults to True.
+        transparency (Optional[str]): Event transparency for busy/free status. "opaque" shows as Busy (default), "transparent" shows as Available/Free. Defaults to None (uses Google Calendar default).
 
     Returns:
         str: Confirmation message of the successful event creation with event link.
@@ -438,6 +466,9 @@ async def create_event(
                     logger.info("[create_event] Custom reminders provided - disabling default reminders")
         
         event_body["reminders"] = reminder_data
+
+    # Handle transparency validation
+    _apply_transparency_if_valid(event_body, transparency, "create_event")
 
     if add_google_meet:
         request_id = str(uuid.uuid4())
@@ -544,6 +575,7 @@ async def modify_event(
     add_google_meet: Optional[bool] = None,
     reminders: Optional[Union[str, List[Dict[str, Any]]]] = None,
     use_default_reminders: Optional[bool] = None,
+    transparency: Optional[str] = None,
 ) -> str:
     """
     Modifies an existing event.
@@ -562,6 +594,7 @@ async def modify_event(
         add_google_meet (Optional[bool]): Whether to add or remove Google Meet video conference. If True, adds Google Meet; if False, removes it; if None, leaves unchanged.
         reminders (Optional[Union[str, List[Dict[str, Any]]]]): JSON string or list of reminder objects to replace existing reminders. Each should have 'method' ("popup" or "email") and 'minutes' (0-40320). Max 5 reminders. Example: '[{"method": "popup", "minutes": 15}]' or [{"method": "popup", "minutes": 15}]
         use_default_reminders (Optional[bool]): Whether to use calendar's default reminders. If specified, overrides current reminder settings.
+        transparency (Optional[str]): Event transparency for busy/free status. "opaque" shows as Busy, "transparent" shows as Available/Free. If None, preserves existing transparency setting.
 
     Returns:
         str: Confirmation message of the successful event modification with event link.
@@ -623,6 +656,9 @@ async def modify_event(
                 logger.info(f"[modify_event] Updated reminders with {len(validated_reminders)} custom reminders")
         
         event_body["reminders"] = reminder_data
+
+    # Handle transparency validation
+    _apply_transparency_if_valid(event_body, transparency, "modify_event")
 
     if (
         timezone is not None
@@ -780,5 +816,3 @@ async def delete_event(service, user_google_email: str, event_id: str, calendar_
     confirmation_message = f"Successfully deleted event (ID: {event_id}) from calendar '{calendar_id}' for {user_google_email}."
     logger.info(f"Event deleted successfully for {user_google_email}. ID: {event_id}")
     return confirmation_message
-
-
