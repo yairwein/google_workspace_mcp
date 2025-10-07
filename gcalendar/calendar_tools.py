@@ -101,6 +101,43 @@ def _preserve_existing_fields(event_body: Dict[str, Any], existing_event: Dict[s
             event_body[field_name] = new_value
 
 
+def _format_attendee_details(attendees: List[Dict[str, Any]], indent: str = "  ") -> str:
+    """
+    Format attendee details including response status, organizer, and optional flags.
+
+    Example output format:
+    "  user@example.com: accepted
+  manager@example.com: declined (organizer)
+  optional-person@example.com: tentative (optional)"
+
+    Args:
+        attendees: List of attendee dictionaries from Google Calendar API
+        indent: Indentation to use for newline-separated attendees (default: "  ")
+
+    Returns:
+        Formatted string with attendee details, or "None" if no attendees
+    """
+    if not attendees:
+        return "None"
+
+    attendee_details_list = []
+    for a in attendees:
+        email = a.get("email", "unknown")
+        response_status = a.get("responseStatus", "unknown")
+        optional = a.get("optional", False)
+        organizer = a.get("organizer", False)
+
+        detail_parts = [f"{email}: {response_status}"]
+        if organizer:
+            detail_parts.append("(organizer)")
+        if optional:
+            detail_parts.append("(optional)")
+
+        attendee_details_list.append(" ".join(detail_parts))
+
+    return f"\n{indent}".join(attendee_details_list)
+
+
 # Helper function to ensure time strings for API calls are correctly formatted
 def _correct_time_format_for_api(
     time_str: Optional[str], param_name: str
@@ -216,7 +253,7 @@ async def get_events(
         time_max (Optional[str]): The end of the time range (exclusive) in RFC3339 format. If omitted, events starting from `time_min` onwards are considered (up to `max_results`). Ignored if event_id is provided.
         max_results (int): The maximum number of events to return. Defaults to 25. Ignored if event_id is provided.
         query (Optional[str]): A keyword to search for within event fields (summary, description, location). Ignored if event_id is provided.
-        detailed (bool): Whether to return detailed event information including description, location, and attendees. Defaults to False.
+        detailed (bool): Whether to return detailed event information including description, location, attendees, and attendee details (response status, organizer, optional flags). Defaults to False.
 
     Returns:
         str: A formatted list of events (summary, start and end times, link) within the specified range, or detailed information for a single event if event_id is provided.
@@ -294,6 +331,8 @@ async def get_events(
         location = item.get("location", "No Location")
         attendees = item.get("attendees", [])
         attendee_emails = ", ".join([a.get("email", "") for a in attendees]) if attendees else "None"
+        attendee_details_str = _format_attendee_details(attendees, indent="  ")
+
         event_details = (
             f'Event Details:\n'
             f'- Title: {summary}\n'
@@ -302,6 +341,7 @@ async def get_events(
             f'- Description: {description}\n'
             f'- Location: {location}\n'
             f'- Attendees: {attendee_emails}\n'
+            f'- Attendee Details: {attendee_details_str}\n'
             f'- Event ID: {event_id}\n'
             f'- Link: {link}'
         )
@@ -323,11 +363,13 @@ async def get_events(
             location = item.get("location", "No Location")
             attendees = item.get("attendees", [])
             attendee_emails = ", ".join([a.get("email", "") for a in attendees]) if attendees else "None"
+            attendee_details_str = _format_attendee_details(attendees, indent="    ")
             event_details_list.append(
                 f'- "{summary}" (Starts: {start_time}, Ends: {end_time})\n'
                 f'  Description: {description}\n'
                 f'  Location: {location}\n'
                 f'  Attendees: {attendee_emails}\n'
+                f'  Attendee Details: {attendee_details_str}\n'
                 f'  ID: {item_event_id} | Link: {link}'
             )
         else:
