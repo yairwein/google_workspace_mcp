@@ -76,6 +76,25 @@ dev = [
     "twine>=5.0.0",
 ]
 
+[dependency-groups]
+test = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.23.0",
+    "requests>=2.32.3",
+]
+release = [
+    "tomlkit>=0.13.3",
+    "twine>=5.0.0",
+]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.23.0",
+    "requests>=2.32.3",
+    "ruff>=0.12.4",
+    "tomlkit>=0.13.3",
+    "twine>=5.0.0",
+]
+
 [tool.setuptools]
 py-modules = [ "fastmcp_server", "main"]
 
