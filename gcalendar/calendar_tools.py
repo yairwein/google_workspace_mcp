@@ -84,6 +84,32 @@ def _parse_reminders_json(reminders_input: Optional[Union[str, List[Dict[str, An
     return validated_reminders
 
 
+def _apply_transparency_if_valid(
+    event_body: Dict[str, Any],
+    transparency: Optional[str],
+    function_name: str,
+) -> None:
+    """
+    Apply transparency to the event body if the provided value is valid.
+
+    Args:
+        event_body: Event payload being constructed.
+        transparency: Provided transparency value.
+        function_name: Name of the calling function for logging context.
+    """
+    if transparency is None:
+        return
+
+    valid_transparency_values = ["opaque", "transparent"]
+    if transparency in valid_transparency_values:
+        event_body["transparency"] = transparency
+        logger.info(f"[{function_name}] Set transparency to '{transparency}'")
+    else:
+        logger.warning(
+            f"[{function_name}] Invalid transparency value '{transparency}', must be 'opaque' or 'transparent', skipping"
+        )
+
+
 def _preserve_existing_fields(event_body: Dict[str, Any], existing_event: Dict[str, Any], field_mappings: Dict[str, Any]) -> None:
     """
     Helper function to preserve existing event fields when not explicitly provided.
@@ -442,13 +468,7 @@ async def create_event(
         event_body["reminders"] = reminder_data
 
     # Handle transparency validation
-    if transparency is not None:
-        valid_transparency_values = ["opaque", "transparent"]
-        if transparency in valid_transparency_values:
-            event_body["transparency"] = transparency
-            logger.info(f"[create_event] Set transparency to '{transparency}'")
-        else:
-            logger.warning(f"[create_event] Invalid transparency value '{transparency}', must be 'opaque' or 'transparent', skipping")
+    _apply_transparency_if_valid(event_body, transparency, "create_event")
 
     if add_google_meet:
         request_id = str(uuid.uuid4())
@@ -638,13 +658,7 @@ async def modify_event(
         event_body["reminders"] = reminder_data
 
     # Handle transparency validation
-    if transparency is not None:
-        valid_transparency_values = ["opaque", "transparent"]
-        if transparency in valid_transparency_values:
-            event_body["transparency"] = transparency
-            logger.info(f"[modify_event] Set transparency to '{transparency}'")
-        else:
-            logger.warning(f"[modify_event] Invalid transparency value '{transparency}', must be 'opaque' or 'transparent', skipping")
+    _apply_transparency_if_valid(event_body, transparency, "modify_event")
 
     if (
         timezone is not None
@@ -802,5 +816,3 @@ async def delete_event(service, user_google_email: str, event_id: str, calendar_
     confirmation_message = f"Successfully deleted event (ID: {event_id}) from calendar '{calendar_id}' for {user_google_email}."
     logger.info(f"Event deleted successfully for {user_google_email}. ID: {event_id}")
     return confirmation_message
-
-
