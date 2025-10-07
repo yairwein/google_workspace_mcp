@@ -9,6 +9,8 @@ from types import SimpleNamespace
 from fastmcp.server.middleware import Middleware, MiddlewareContext
 from fastmcp.server.dependencies import get_http_headers
 
+from auth.oauth21_session_store import ensure_session_from_access_token
+
 # Configure logging
 logger = logging.getLogger(__name__)
 
@@ -21,7 +23,7 @@ class AuthInfoMiddleware(Middleware):
     
     def __init__(self):
         super().__init__()
-        self.auth_provider_type = "Unknown"
+        self.auth_provider_type = "GoogleProvider"
     
     async def _process_request_for_auth(self, context: MiddlewareContext):
         """Helper to extract, verify, and store auth info from a request."""
@@ -87,6 +89,13 @@ class AuthInfoMiddleware(Middleware):
                                     
                                     # Store in context state - this is the authoritative authentication state
                                     context.fastmcp_context.set_state("access_token", access_token)
+                                    mcp_session_id = getattr(context.fastmcp_context, "session_id", None)
+                                    ensure_session_from_access_token(
+                                        verified_auth,
+                                        user_email,
+                                        mcp_session_id,
+                                    )
+                                    context.fastmcp_context.set_state("access_token_obj", verified_auth)
                                     context.fastmcp_context.set_state("auth_provider_type", self.auth_provider_type)
                                     context.fastmcp_context.set_state("token_type", "google_oauth")
                                     context.fastmcp_context.set_state("user_email", user_email)
