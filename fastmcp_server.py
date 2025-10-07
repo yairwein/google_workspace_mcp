@@ -10,7 +10,6 @@ import sys
 from dotenv import load_dotenv
 
 from auth.oauth_config import reload_oauth_config, is_stateless_mode
-from core.compat import ensure_gtasks_module
 from core.log_formatter import EnhancedLogFormatter, configure_file_logging
 from core.utils import check_credentials_directory_permissions
 from core.server import server, set_transport_mode, configure_server_for_http
@@ -77,7 +76,6 @@ else:
 set_transport_mode('streamable-http')
 
 # Import all tool modules to register their @server.tool() decorators
-ensure_gtasks_module()
 import gmail.gmail_tools
 import gdrive.drive_tools
 import gcalendar.calendar_tools

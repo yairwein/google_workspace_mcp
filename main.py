@@ -7,7 +7,6 @@ from importlib import metadata, import_module
 from dotenv import load_dotenv
 
 from auth.oauth_config import reload_oauth_config, is_stateless_mode
-from core.compat import ensure_gtasks_module
 from core.log_formatter import EnhancedLogFormatter, configure_file_logging
 from core.utils import check_credentials_directory_permissions
 from core.server import server, set_transport_mode, configure_server_for_http
@@ -132,7 +131,6 @@ def main():
 
 
     # Import tool modules to register them with the MCP server via decorators
-    ensure_gtasks_module()
     tool_imports = {
         'gmail': lambda: import_module('gmail.gmail_tools'),
         'drive': lambda: import_module('gdrive.drive_tools'),
