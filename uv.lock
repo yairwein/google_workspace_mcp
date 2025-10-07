@@ -1789,25 +1789,6 @@ test = [
     { name = "requests" },
 ]
 
-[package.dev-dependencies]
-dev = [
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "requests" },
-    { name = "ruff" },
-    { name = "tomlkit" },
-    { name = "twine" },
-]
-release = [
-    { name = "tomlkit" },
-    { name = "twine" },
-]
-test = [
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "requests" },
-]
-
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115.12" },
@@ -1832,25 +1813,6 @@ requires-dist = [
     { name = "twine", marker = "extra == 'release'", specifier = ">=5.0.0" },
 ]
 provides-extras = ["test", "release", "dev"]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "pytest", specifier = ">=8.3.0" },
-    { name = "pytest-asyncio", specifier = ">=0.23.0" },
-    { name = "requests", specifier = ">=2.32.3" },
-    { name = "ruff", specifier = ">=0.12.4" },
-    { name = "tomlkit", specifier = ">=0.13.3" },
-    { name = "twine", specifier = ">=5.0.0" },
-]
-release = [
-    { name = "tomlkit", specifier = ">=0.13.3" },
-    { name = "twine", specifier = ">=5.0.0" },
-]
-test = [
-    { name = "pytest", specifier = ">=8.3.0" },
-    { name = "pytest-asyncio", specifier = ">=0.23.0" },
-    { name = "requests", specifier = ">=2.32.3" },
-]
 
 [[package]]
 name = "zipp"
