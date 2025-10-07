@@ -3,10 +3,11 @@ import logging
 import os
 import socket
 import sys
-from importlib import metadata
+from importlib import metadata, import_module
 from dotenv import load_dotenv
 
 from auth.oauth_config import reload_oauth_config, is_stateless_mode
+from core.compat import ensure_gtasks_module
 from core.log_formatter import EnhancedLogFormatter, configure_file_logging
 from core.utils import check_credentials_directory_permissions
 from core.server import server, set_transport_mode, configure_server_for_http
@@ -61,6 +62,7 @@ def configure_safe_logging():
         if isinstance(handler, logging.StreamHandler) and handler.stream.name in ['<stderr>', '<stdout>']:
             safe_formatter = SafeEnhancedFormatter(use_colors=True)
             handler.setFormatter(safe_formatter)
+
 
 def main():
     """
@@ -130,17 +132,18 @@ def main():
 
 
     # Import tool modules to register them with the MCP server via decorators
+    ensure_gtasks_module()
     tool_imports = {
-        'gmail': lambda: __import__('gmail.gmail_tools'),
-        'drive': lambda: __import__('gdrive.drive_tools'),
-        'calendar': lambda: __import__('gcalendar.calendar_tools'),
-        'docs': lambda: __import__('gdocs.docs_tools'),
-        'sheets': lambda: __import__('gsheets.sheets_tools'),
-        'chat': lambda: __import__('gchat.chat_tools'),
-        'forms': lambda: __import__('gforms.forms_tools'),
-        'slides': lambda: __import__('gslides.slides_tools'),
-        'tasks': lambda: __import__('gtasks.tasks_tools'),
-        'search': lambda: __import__('gsearch.search_tools')
+        'gmail': lambda: import_module('gmail.gmail_tools'),
+        'drive': lambda: import_module('gdrive.drive_tools'),
+        'calendar': lambda: import_module('gcalendar.calendar_tools'),
+        'docs': lambda: import_module('gdocs.docs_tools'),
+        'sheets': lambda: import_module('gsheets.sheets_tools'),
+        'chat': lambda: import_module('gchat.chat_tools'),
+        'forms': lambda: import_module('gforms.forms_tools'),
+        'slides': lambda: import_module('gslides.slides_tools'),
+        'tasks': lambda: import_module('gtasks.tasks_tools'),
+        'search': lambda: import_module('gsearch.search_tools')
     }
 
     tool_icons = {
@@ -191,8 +194,12 @@ def main():
 
     safe_print(f"🛠️  Loading {len(tools_to_import)} tool module{'s' if len(tools_to_import) != 1 else ''}:")
     for tool in tools_to_import:
-        tool_imports[tool]()
-        safe_print(f"   {tool_icons[tool]} {tool.title()} - Google {tool.title()} API integration")
+        try:
+            tool_imports[tool]()
+            safe_print(f"   {tool_icons[tool]} {tool.title()} - Google {tool.title()} API integration")
+        except ModuleNotFoundError as exc:
+            logger.error("Failed to import tool '%s': %s", tool, exc, exc_info=True)
+            safe_print(f"   ⚠️ Failed to load {tool.title()} tool module ({exc}).")
     safe_print("")
 
     # Filter tools based on tier configuration (if tier-based loading is enabled)
