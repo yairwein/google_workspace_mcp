@@ -903,6 +903,28 @@ uvx workspace-mcp --tool-tier core  # or --tools gmail drive calendar
 
 </details>
 
+### Local Development Setup
+
+<details open>
+<summary>🛠️ <b>Developer Workflow</b> <sub><sup>← Install deps, lint, and test</sup></sub></summary>
+
+```bash
+# Install everything needed for linting, tests, and release tooling
+uv sync --group dev
+
+# Run the same linter that git hooks invoke automatically
+uv run ruff check .
+
+# Execute the full test suite (async fixtures require pytest-asyncio)
+uv run pytest
+```
+
+- `uv sync --group test` installs only the testing stack if you need a slimmer environment.
+- `uv run main.py --transport streamable-http` launches the server with your checked-out code for manual verification.
+- Ruff is part of the `dev` group because pre-push hooks call `ruff check` automatically—run it locally before committing to avoid hook failures.
+
+</details>
+
 ### OAuth 2.1 Support (Multi-User Bearer Token Authentication)
 
 The server includes OAuth 2.1 support for bearer token authentication, enabling multi-user session management. **OAuth 2.1 automatically reuses your existing `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET` credentials** - no additional configuration needed!
