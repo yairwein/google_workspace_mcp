@@ -677,6 +677,9 @@ async def draft_gmail_message(
     user_google_email: str,
     subject: str = Body(..., description="Email subject."),
     body: str = Body(..., description="Email body (plain text)."),
+    body_format: Literal["plain", "html"] = Body(
+        "plain", description="Email body format. Use 'plain' for plaintext or 'html' for HTML content."
+    ),
     to: Optional[str] = Body(None, description="Optional recipient email address."),
     cc: Optional[str] = Body(None, description="Optional CC email address."),
     bcc: Optional[str] = Body(None, description="Optional BCC email address."),
@@ -691,6 +694,7 @@ async def draft_gmail_message(
         user_google_email (str): The user's Google email address. Required.
         subject (str): Email subject.
         body (str): Email body (plain text).
+        body_format (Literal['plain', 'html']): Email body format. Defaults to 'plain'.
         to (Optional[str]): Optional recipient email address. Can be left empty for drafts.
         cc (Optional[str]): Optional CC email address.
         bcc (Optional[str]): Optional BCC email address.
@@ -705,7 +709,7 @@ async def draft_gmail_message(
         # Create a new draft
         draft_gmail_message(subject="Hello", body="Hi there!", to="user@example.com")
 
-        # Create a draft with CC and BCC
+        # Create a plaintext draft with CC and BCC
         draft_gmail_message(
             subject="Project Update",
             body="Here's the latest update...",
@@ -714,10 +718,31 @@ async def draft_gmail_message(
             bcc="archive@example.com"
         )
 
-        # Create a reply draft
+        # Create a HTML draft with CC and BCC
+        draft_gmail_message(
+            subject="Project Update",
+            body="<strong>Hi there!</strong>",
+            body_format="html",
+            to="user@example.com",
+            cc="manager@example.com",
+            bcc="archive@example.com"
+        )
+
+        # Create a reply draft in plaintext
         draft_gmail_message(
             subject="Re: Meeting tomorrow",
             body="Thanks for the update!",
+            to="user@example.com",
+            thread_id="thread_123",
+            in_reply_to="<message123@gmail.com>",
+            references="<original@gmail.com> <message123@gmail.com>"
+        )
+
+        # Create a reply draft in HTML
+        draft_gmail_message(
+            subject="Re: Meeting tomorrow",
+            body="<strong>Thanks for the update!</strong>",
+            body_format="html,
             to="user@example.com",
             thread_id="thread_123",
             in_reply_to="<message123@gmail.com>",
@@ -732,6 +757,7 @@ async def draft_gmail_message(
     raw_message, thread_id_final = _prepare_gmail_message(
         subject=subject,
         body=body,
+        body_format=body_format,
         to=to,
         cc=cc,
         bcc=bcc,
