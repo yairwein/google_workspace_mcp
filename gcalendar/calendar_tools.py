@@ -168,11 +168,6 @@ def _format_attachment_details(attachments: List[Dict[str, Any]], indent: str = 
     """
     Format attachment details including file information.
 
-    Example output format:
-    "  Document.pdf
-    File URL: https://drive.google.com/open?id=abc123
-    File ID: abc123
-    MIME Type: application/pdf"
 
     Args:
         attachments: List of attachment dictionaries from Google Calendar API
