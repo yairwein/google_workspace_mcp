@@ -276,8 +276,8 @@ async def create_drive_file(
     if fileUrl:
         logger.info(f"[create_drive_file] Fetching file from URL: {fileUrl}")
 
-        download_chunk_size: int = 256 * 1024,  # 256KB for download
-        upload_chunk_size: int = 5 * 1024 * 1024,  # 5MB for upload (Google recommended minimum)
+        download_chunk_size: int = 256 * 1024  # 256KB for download
+        upload_chunk_size: int = 5 * 1024 * 1024  # 5MB for upload (Google recommended minimum)
 
         # Use NamedTemporaryFile to stream download and upload
         with NamedTemporaryFile(delete=True) as temp_file:
