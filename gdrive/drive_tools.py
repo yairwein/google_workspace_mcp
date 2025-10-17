@@ -6,6 +6,7 @@ This module provides MCP tools for interacting with Google Drive API.
 import logging
 import asyncio
 from typing import Optional
+from tempfile import NamedTemporaryFile
 
 from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 import io
@@ -264,37 +265,75 @@ async def create_drive_file(
         raise Exception("You must provide either 'content' or 'fileUrl'.")
 
     file_data = None
-    # Prefer fileUrl if both are provided
-    if fileUrl:
-        logger.info(f"[create_drive_file] Fetching file from URL: {fileUrl}")
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(fileUrl)
-            if resp.status_code != 200:
-                raise Exception(f"Failed to fetch file from URL: {fileUrl} (status {resp.status_code})")
-            file_data = await resp.aread()
-            # Try to get MIME type from Content-Type header
-            content_type = resp.headers.get("Content-Type")
-            if content_type and content_type != "application/octet-stream":
-                mime_type = content_type
-                logger.info(f"[create_drive_file] Using MIME type from Content-Type header: {mime_type}")
-    elif content:
-        file_data = content.encode('utf-8')
 
     file_metadata = {
         'name': file_name,
         'parents': [folder_id],
         'mimeType': mime_type
     }
-    media = io.BytesIO(file_data)
 
-    created_file = await asyncio.to_thread(
-        service.files().create(
-            body=file_metadata,
-            media_body=MediaIoBaseUpload(media, mimetype=mime_type, resumable=True),
-            fields='id, name, webViewLink',
-            supportsAllDrives=True
-        ).execute
-    )
+    # Prefer fileUrl if both are provided
+    if fileUrl:
+        logger.info(f"[create_drive_file] Fetching file from URL: {fileUrl}")
+
+        download_chunk_size: int = 256 * 1024,  # 256KB for download
+        upload_chunk_size: int = 5 * 1024 * 1024,  # 5MB for upload (Google recommended minimum)
+
+        # Use NamedTemporaryFile to stream download and upload
+        with NamedTemporaryFile(delete=True) as temp_file:
+            total_bytes = 0
+            # follow redirects
+            async with httpx.AsyncClient(follow_redirects=True) as client:
+                async with client.stream('GET', fileUrl) as resp:
+                    if resp.status_code != 200:
+                        raise Exception(f"Failed to fetch file from URL: {fileUrl}... (status {resp.status_code})")
+
+                    # Stream download in chunks
+                    async for chunk in resp.aiter_bytes(chunk_size=download_chunk_size):
+                        await asyncio.to_thread(temp_file.write, chunk)
+                        total_bytes += len(chunk)
+                        if total_bytes % (1024 * 1024) == 0 or total_bytes < 1024 * 1024:  # Log every MB
+                            logger.info(f"[create_drive_file] Downloaded {total_bytes / (1024 * 1024):.2f} MB")
+
+                    # Try to get MIME type from Content-Type header
+                    content_type = resp.headers.get("Content-Type")
+                    if content_type and content_type != "application/octet-stream":
+                        mime_type = content_type
+                        file_metadata['mimeType'] = mime_type
+                        logger.info(f"[create_drive_file] Using MIME type from Content-Type header: {mime_type}")
+
+            # Reset file pointer to beginning for upload
+            temp_file.seek(0)
+
+            # Upload with chunking
+            media = MediaIoBaseUpload(
+                temp_file,
+                mimetype=mime_type,
+                resumable=True,
+                chunksize=upload_chunk_size
+            )
+
+            logger.info("[create_drive_file] Starting upload to Google Drive...")
+            created_file = await asyncio.to_thread(
+                service.files().create(
+                    body=file_metadata,
+                    media_body=media,
+                    fields='id, name, webViewLink',
+                    supportsAllDrives=True
+                ).execute
+            )
+    elif content:
+        file_data = content.encode('utf-8')
+        media = io.BytesIO(file_data)
+
+        created_file = await asyncio.to_thread(
+            service.files().create(
+                body=file_metadata,
+                media_body=MediaIoBaseUpload(media, mimetype=mime_type, resumable=True),
+                fields='id, name, webViewLink',
+                supportsAllDrives=True
+            ).execute
+        )
 
     link = created_file.get('webViewLink', 'No link available')
     confirmation_message = f"Successfully created file '{created_file.get('name', file_name)}' (ID: {created_file.get('id', 'N/A')}) in folder '{folder_id}' for {user_google_email}. Link: {link}"
