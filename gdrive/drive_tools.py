@@ -286,7 +286,7 @@ async def create_drive_file(
             async with httpx.AsyncClient(follow_redirects=True) as client:
                 async with client.stream('GET', fileUrl) as resp:
                     if resp.status_code != 200:
-                        raise Exception(f"Failed to fetch file from URL: {fileUrl}... (status {resp.status_code})")
+                        raise Exception(f"Failed to fetch file from URL: {fileUrl} (status {resp.status_code})")
 
                     # Stream download in chunks
                     async for chunk in resp.aiter_bytes(chunk_size=download_chunk_size):
