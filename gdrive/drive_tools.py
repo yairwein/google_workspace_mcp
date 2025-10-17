@@ -292,8 +292,6 @@ async def create_drive_file(
                     async for chunk in resp.aiter_bytes(chunk_size=download_chunk_size):
                         await asyncio.to_thread(temp_file.write, chunk)
                         total_bytes += len(chunk)
-                        if total_bytes % (1024 * 1024) == 0 or total_bytes < 1024 * 1024:  # Log every MB
-                            logger.info(f"[create_drive_file] Downloaded {total_bytes / (1024 * 1024):.2f} MB")
 
                     # Try to get MIME type from Content-Type header
                     content_type = resp.headers.get("Content-Type")
