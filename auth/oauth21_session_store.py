@@ -682,6 +682,7 @@ def ensure_session_from_access_token(
         email = access_token.claims.get("email")
 
     credentials = _build_credentials_from_provider(access_token)
+    store_expiry: Optional[datetime] = None
 
     if credentials is None:
         client_id, client_secret = _resolve_client_credentials()
@@ -693,6 +694,7 @@ def ensure_session_from_access_token(
             except Exception:  # pragma: no cover - defensive
                 expiry = None
 
+        normalized_expiry = _normalize_expiry_to_naive_utc(expiry)
         credentials = Credentials(
             token=access_token.token,
             refresh_token=None,
@@ -700,8 +702,11 @@ def ensure_session_from_access_token(
             client_id=client_id,
             client_secret=client_secret,
             scopes=getattr(access_token, "scopes", None),
-            expiry=_normalize_expiry_to_naive_utc(expiry),
+            expiry=normalized_expiry,
         )
+        store_expiry = expiry
+    else:
+        store_expiry = credentials.expiry
 
     if email:
         try:
@@ -714,7 +719,7 @@ def ensure_session_from_access_token(
                 client_id=credentials.client_id,
                 client_secret=credentials.client_secret,
                 scopes=credentials.scopes,
-                expiry=credentials.expiry,
+                expiry=store_expiry,
                 session_id=f"google_{email}",
                 mcp_session_id=mcp_session_id,
                 issuer="https://accounts.google.com",
