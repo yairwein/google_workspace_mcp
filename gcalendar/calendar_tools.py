@@ -334,9 +334,11 @@ async def get_events(
         # Handle multiple events retrieval with time filtering
         # Ensure time_min and time_max are correctly formatted for the API
         formatted_time_min = _correct_time_format_for_api(time_min, "time_min")
-        effective_time_min = formatted_time_min or (
-            datetime.datetime.utcnow().isoformat() + "Z"
-        )
+        if formatted_time_min:
+            effective_time_min = formatted_time_min
+        else:
+            utc_now = datetime.datetime.now(datetime.timezone.utc)
+            effective_time_min = utc_now.isoformat().replace("+00:00", "Z")
         if time_min is None:
             logger.info(
                 f"time_min not provided, defaulting to current UTC time: {effective_time_min}"
