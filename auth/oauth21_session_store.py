@@ -23,7 +23,8 @@ def _normalize_expiry_to_naive_utc(expiry: Optional[Any]) -> Optional[datetime]:
     """
     Convert expiry values to timezone-naive UTC datetimes for google-auth compatibility.
 
-    google-auth Credentials expect naive UTC datetimes for expiry comparison.
+    Naive datetime inputs are assumed to already represent UTC and are returned unchanged so that
+    google-auth Credentials receive naive UTC datetimes for expiry comparison.
     """
     if expiry is None:
         return None
@@ -35,7 +36,7 @@ def _normalize_expiry_to_naive_utc(expiry: Optional[Any]) -> Optional[datetime]:
             except Exception:  # pragma: no cover - defensive
                 logger.debug("Failed to normalize aware expiry; returning without tzinfo")
                 return expiry.replace(tzinfo=None)
-        return expiry
+        return expiry  # Already naive; assumed to represent UTC
 
     if isinstance(expiry, str):
         try:
@@ -371,7 +372,7 @@ class OAuth21SessionStore:
                     client_id=session_info.get("client_id"),
                     client_secret=session_info.get("client_secret"),
                     scopes=session_info.get("scopes", []),
-                    expiry=_normalize_expiry_to_naive_utc(session_info.get("expiry")),
+                    expiry=session_info.get("expiry"),
                 )
 
                 logger.debug(f"Retrieved OAuth 2.1 credentials for {user_email}")
@@ -809,9 +810,7 @@ def store_token_session(token_response: dict, user_email: str, mcp_session_id: O
         client_id, client_secret = _resolve_client_credentials()
         scopes = token_response.get("scope", "")
         scopes_list = scopes.split() if scopes else None
-        expiry = _normalize_expiry_to_naive_utc(
-            datetime.now(timezone.utc) + timedelta(seconds=token_response.get("expires_in", 3600))
-        )
+        expiry = datetime.now(timezone.utc) + timedelta(seconds=token_response.get("expires_in", 3600))
 
         store.store_session(
             user_email=user_email,
