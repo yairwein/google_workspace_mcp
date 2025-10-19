@@ -20,6 +20,9 @@ from gdrive.drive_helpers import DRIVE_QUERY_PATTERNS, build_drive_list_params
 
 logger = logging.getLogger(__name__)
 
+DOWNLOAD_CHUNK_SIZE_BYTES = 256 * 1024  # 256 KB
+UPLOAD_CHUNK_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB (Google recommended minimum)
+
 @server.tool()
 @handle_http_errors("search_drive_files", is_read_only=True, service_type="drive")
 @require_google_service("drive", "drive_read")
@@ -287,7 +290,7 @@ async def create_drive_file(
                 content_type = resp.headers.get("Content-Type")
                 if content_type and content_type != "application/octet-stream":
                     file_metadata['mimeType'] = content_type
-                    logger.info(f"[create_drive_file] Using MIME type from Content-Type header: {mime_type}")
+                    logger.info(f"[create_drive_file] Using MIME type from Content-Type header: {content_type}")
 
             created_file = await asyncio.to_thread(
                 service.files().create(
@@ -298,11 +301,8 @@ async def create_drive_file(
                 ).execute
             )
         else:
-            download_chunk_size: int = 256 * 1024  # 256KB for download
-            upload_chunk_size: int = 5 * 1024 * 1024  # 5MB for upload (Google recommended minimum)
-
             # Use NamedTemporaryFile to stream download and upload
-            with NamedTemporaryFile(delete=True) as temp_file:
+            with NamedTemporaryFile() as temp_file:
                 total_bytes = 0
                 # follow redirects
                 async with httpx.AsyncClient(follow_redirects=True) as client:
@@ -311,7 +311,7 @@ async def create_drive_file(
                             raise Exception(f"Failed to fetch file from URL: {fileUrl} (status {resp.status_code})")
 
                         # Stream download in chunks
-                        async for chunk in resp.aiter_bytes(chunk_size=download_chunk_size):
+                        async for chunk in resp.aiter_bytes(chunk_size=DOWNLOAD_CHUNK_SIZE_BYTES):
                             await asyncio.to_thread(temp_file.write, chunk)
                             total_bytes += len(chunk)
 
@@ -330,7 +330,7 @@ async def create_drive_file(
                     temp_file,
                     mimetype=mime_type,
                     resumable=True,
-                    chunksize=upload_chunk_size
+                    chunksize=UPLOAD_CHUNK_SIZE_BYTES
                 )
 
                 logger.info("[create_drive_file] Starting upload to Google Drive...")
