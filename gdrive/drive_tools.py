@@ -323,6 +323,8 @@ async def create_drive_file(
                             await asyncio.to_thread(temp_file.write, chunk)
                             total_bytes += len(chunk)
 
+                        logger.info(f"[create_drive_file] Downloaded {total_bytes} bytes from URL before upload.")
+
                         # Try to get MIME type from Content-Type header
                         content_type = resp.headers.get("Content-Type")
                         if content_type and content_type != "application/octet-stream":
