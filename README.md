@@ -89,7 +89,6 @@ A production-ready MCP server that integrates all major Google Workspace service
 
 **<span style="color:#72898f">✓</span> Tasks** • **<span style="color:#72898f">◆</span> Custom Search** • **<span style="color:#72898f">↻</span> Transport Support**
 - Full support for all MCP Transports
-- OpenAPI compatibility via `mcpo`
 - Task & task list management with hierarchy
 - Programmable Search Engine (PSE) integration
 
@@ -1214,59 +1213,10 @@ The credential store automatically handles credential serialization, expiry pars
 - **OAuth Callback**: Uses `http://localhost:8000/oauth2callback` for development (requires `OAUTHLIB_INSECURE_TRANSPORT=1`)
 - **Transport-Aware Callbacks**: Stdio mode starts a minimal HTTP server only for OAuth, ensuring callbacks work in all modes
 - **Production**: Use HTTPS & OAuth 2.1 and configure accordingly
-- **Network Exposure**: Consider authentication when using `mcpo` over networks
 - **Scope Minimization**: Tools request only necessary permissions
 
 ---
 
-## <span style="color:#adbcbc">◆ Integration with Open WebUI</span>
-
-<details open>
-<summary>◆ <b>Open WebUI Integration</b> <sub><sup>← Connect to Open WebUI as tool provider</sup></sub></summary>
-
-<table>
-<tr><td width="50%" valign="top">
-
-### ▶ Instant Start (No Config)
-```bash
-# Set credentials & launch in one command
-GOOGLE_OAUTH_CLIENT_ID="your_id" \
-GOOGLE_OAUTH_CLIENT_SECRET="your_secret" \
-uvx mcpo --port 8000 --api-key "secret" \
--- uvx workspace-mcp
-```
-
-</td><td width="50%" valign="top">
-
-### ◆ Manual Configuration
-1. Create `config.json`:
-```json
-{
-  "mcpServers": {
-    "google_workspace": {
-      "type": "streamablehttp",
-      "url": "http://localhost:8000/mcp"
-    }
-  }
-}
-```
-
-2. Start MCPO:
-```bash
-mcpo --port 8001 --config config.json
-```
-
-</td></tr>
-</table>
-
-### ≡ Configure Open WebUI
-1. Navigate to **Settings** → **Connections** → **Tools**
-2. Click **Add Tool** and enter:
-   - **Server URL**: `http://localhost:8001/google_workspace`
-   - **API Key**: Your mcpo `--api-key` (if set)
-3. Save - Google Workspace tools are now available!
-
-</details>
 
 ---
 
