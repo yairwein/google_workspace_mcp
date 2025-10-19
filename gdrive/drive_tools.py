@@ -289,13 +289,21 @@ async def create_drive_file(
                 # Try to get MIME type from Content-Type header
                 content_type = resp.headers.get("Content-Type")
                 if content_type and content_type != "application/octet-stream":
+                    mime_type = content_type
                     file_metadata['mimeType'] = content_type
                     logger.info(f"[create_drive_file] Using MIME type from Content-Type header: {content_type}")
+
+            media = MediaIoBaseUpload(
+                io.BytesIO(file_data),
+                mimetype=mime_type,
+                resumable=True,
+                chunksize=UPLOAD_CHUNK_SIZE_BYTES
+            )
 
             created_file = await asyncio.to_thread(
                 service.files().create(
                     body=file_metadata,
-                    media_body=io.BytesIO(file_data),
+                    media_body=media,
                     fields='id, name, webViewLink',
                     supportsAllDrives=True
                 ).execute
