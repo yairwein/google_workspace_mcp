@@ -278,7 +278,7 @@ async def create_drive_file(
         logger.info(f"[create_drive_file] Fetching file from URL: {fileUrl}")
         # when running in stateless mode, deployment may not have access to local file system
         if is_stateless_mode():
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(follow_redirects=True) as client:
                 resp = await client.get(fileUrl)
                 if resp.status_code != 200:
                     raise Exception(f"Failed to fetch file from URL: {fileUrl} (status {resp.status_code})")
