@@ -95,16 +95,38 @@ def configure_server_for_http():
 
         try:
             required_scopes: List[str] = sorted(get_current_scopes())
-            provider = GoogleProvider(
-                client_id=config.client_id,
-                client_secret=config.client_secret,
-                base_url=config.get_oauth_base_url(),
-                redirect_path=config.redirect_path,
-                required_scopes=required_scopes,
-            )
-            server.auth = provider
+
+            # Check if external OAuth provider is configured
+            if config.is_external_oauth21_provider():
+                # External OAuth mode: use custom provider that handles ya29.* access tokens
+                from auth.external_oauth_provider import ExternalOAuthProvider
+
+                provider = ExternalOAuthProvider(
+                    client_id=config.client_id,
+                    client_secret=config.client_secret,
+                    base_url=config.get_oauth_base_url(),
+                    redirect_path=config.redirect_path,
+                    required_scopes=required_scopes,
+                )
+                # Disable protocol-level auth, expect bearer tokens in tool calls
+                server.auth = None
+                logger.info("OAuth 2.1 enabled with EXTERNAL provider mode - protocol-level auth disabled")
+                logger.info("Expecting Authorization bearer tokens in tool call headers")
+            else:
+                # Standard OAuth 2.1 mode: use FastMCP's GoogleProvider
+                provider = GoogleProvider(
+                    client_id=config.client_id,
+                    client_secret=config.client_secret,
+                    base_url=config.get_oauth_base_url(),
+                    redirect_path=config.redirect_path,
+                    required_scopes=required_scopes,
+                )
+                # Enable protocol-level auth
+                server.auth = provider
+                logger.info("OAuth 2.1 enabled using FastMCP GoogleProvider with protocol-level auth")
+
+            # Always set auth provider for token validation in middleware
             set_auth_provider(provider)
-            logger.info("OAuth 2.1 enabled using FastMCP GoogleProvider")
             _auth_provider = provider
         except Exception as exc:
             logger.error("Failed to initialize FastMCP GoogleProvider: %s", exc, exc_info=True)

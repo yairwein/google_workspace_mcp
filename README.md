@@ -169,6 +169,7 @@ uv run main.py --tools gmail drive
 | `GOOGLE_PSE_API_KEY` | API key for Custom Search |
 | `GOOGLE_PSE_ENGINE_ID` | Search Engine ID for Custom Search |
 | `MCP_ENABLE_OAUTH21` | Set to `true` for OAuth 2.1 support |
+| `EXTERNAL_OAUTH21_PROVIDER` | Set to `true` for external OAuth flow with bearer tokens (requires OAuth 2.1) |
 | `WORKSPACE_MCP_STATELESS_MODE` | Set to `true` for stateless operation (requires OAuth 2.1) |
 
 </td></tr>
@@ -992,6 +993,56 @@ This mode is ideal for:
 **MCP Inspector**: No additional configuration needed with desktop OAuth client.
 
 **Claude Code Inspector**: No additional configuration needed with desktop OAuth client.
+
+### External OAuth 2.1 Provider Mode
+
+The server supports an external OAuth 2.1 provider mode for scenarios where authentication is handled by an external system. In this mode, the MCP server does not manage the OAuth flow itself but expects valid bearer tokens in the Authorization header of tool calls.
+
+**Enabling External OAuth 2.1 Provider Mode:**
+```bash
+# External OAuth provider mode requires OAuth 2.1 to be enabled
+export MCP_ENABLE_OAUTH21=true
+export EXTERNAL_OAUTH21_PROVIDER=true
+uv run main.py --transport streamable-http
+```
+
+**How It Works:**
+- **Protocol-level auth disabled**: MCP handshake (`initialize`) and `tools/list` do not require authentication
+- **Tool-level auth required**: All tool calls must include `Authorization: Bearer <token>` header
+- **External OAuth flow**: Your external system handles the OAuth flow and obtains Google access tokens
+- **Token validation**: Server validates bearer tokens via Google's tokeninfo API
+- **Multi-user support**: Each request is authenticated independently based on its bearer token
+
+**Key Features:**
+- **No local OAuth flow**: Server does not provide OAuth callback endpoints or manage OAuth state
+- **Bearer token only**: All authentication via Authorization headers
+- **Stateless by design**: Works seamlessly with `WORKSPACE_MCP_STATELESS_MODE=true`
+- **External identity providers**: Integrate with your existing authentication infrastructure
+- **Tool discovery**: Clients can list available tools without authentication
+
+**Requirements:**
+- Must be used with `MCP_ENABLE_OAUTH21=true`
+- OAuth credentials still required for token validation (`GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`)
+- External system must obtain valid Google OAuth access tokens (ya29.*)
+- Each tool call request must include valid bearer token
+
+**Use Cases:**
+- Integrating with existing authentication systems
+- Custom OAuth flows managed by your application
+- API gateways that handle authentication upstream
+- Multi-tenant SaaS applications with centralized auth
+- Mobile or web apps with their own OAuth implementation
+
+**Example Request:**
+```bash
+# List tools (no auth required)
+curl http://localhost:8000/mcp/v1/tools/list
+
+# Call tool (bearer token required)
+curl -H "Authorization: Bearer ya29.a0AfH6..." \
+     http://localhost:8000/mcp/v1/tools/call \
+     -d '{"name": "search_messages", "arguments": {"query": "test"}}'
+```
 
 ### VS Code MCP Client Support
 
