@@ -1558,3 +1558,98 @@ async def transfer_drive_ownership(
     output_parts.extend(["", "Note: Previous owner now has editor access."])
 
     return "\n".join(output_parts)
+
+
+@server.tool()
+@handle_http_errors("copy_drive_file", service_type="drive")
+@require_google_service("drive", "drive_file")
+async def copy_drive_file(
+    service: Any,
+    user_google_email: str,
+    file_id: str,
+    new_name: Optional[str] = None,
+    destination_folder_id: Optional[str] = None,
+) -> str:
+    """
+    Creates a copy of a file in Google Drive.
+
+    Works with any file type including Google Docs, Sheets, Slides, PDFs, and other files.
+    The copy inherits permissions from the destination folder (if specified) or is created
+    in the user's root Drive folder.
+
+    Args:
+        user_google_email (str): The user's Google email address. Required.
+        file_id (str): The ID of the file to copy. Required.
+        new_name (str): Name for the copy (optional - defaults to "Copy of [original name]").
+        destination_folder_id (str): Folder ID to place the copy in (optional - defaults to root).
+
+    Returns:
+        str: Confirmation with copy details and links to both original and copy.
+    """
+    logger.info(
+        f"[copy_drive_file] Invoked. Email: '{user_google_email}', File ID: '{file_id}', "
+        f"New name: '{new_name}', Destination folder: '{destination_folder_id}'"
+    )
+
+    # Resolve the file ID and get metadata
+    resolved_file_id, file_metadata = await resolve_drive_item(
+        service, file_id, extra_fields="name, webViewLink"
+    )
+    file_id = resolved_file_id
+
+    original_name = file_metadata.get("name", "Unknown File")
+    original_link = file_metadata.get("webViewLink", "#")
+
+    # Determine copy name
+    copy_name = new_name if new_name else f"Copy of {original_name}"
+
+    # Build copy request body
+    copy_body = {"name": copy_name}
+    if destination_folder_id:
+        # Resolve destination folder if provided
+        resolved_folder_id, _ = await resolve_drive_item(
+            service, destination_folder_id, extra_fields="name"
+        )
+        copy_body["parents"] = [resolved_folder_id]
+
+    logger.info(f"[copy_drive_file] Creating copy '{copy_name}' of '{original_name}'")
+
+    # Execute copy
+    copied_file = await asyncio.to_thread(
+        service.files()
+        .copy(
+            fileId=file_id,
+            body=copy_body,
+            supportsAllDrives=True,
+            fields="id, name, webViewLink, parents",
+        )
+        .execute
+    )
+
+    copy_id = copied_file.get("id")
+    copy_link = copied_file.get("webViewLink", "#")
+    copy_parents = copied_file.get("parents", [])
+
+    logger.info(f"[copy_drive_file] Successfully created copy: {copy_id}")
+
+    # Build response
+    output_parts = [
+        f"Successfully copied '{original_name}' to '{copy_name}'",
+        "",
+        f"Copy ID: {copy_id}",
+        f"Copy link: {copy_link}",
+    ]
+
+    if destination_folder_id:
+        output_parts.append(f"Location: folder {destination_folder_id}")
+    elif copy_parents:
+        output_parts.append(f"Location: folder {copy_parents[0]}")
+
+    output_parts.extend(
+        [
+            "",
+            f"Original: {original_link}",
+        ]
+    )
+
+    return "\n".join(output_parts)
